@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.ProxiesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:vm="using:ClashSuki.ViewModels"
+    xmlns:ui="using:ClashSuki.Controls"
+    Loaded="Page_Loaded"
+    NavigationCacheMode="Enabled">
+    <Page.Resources>
+        <vm:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <vm:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <vm:InverseBoolConverter x:Key="InverseBool" />
+    </Page.Resources>
+    <Grid x:Name="PageRoot" Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource PageSpacing}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="240" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="代理组" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        VerticalAlignment="Center">
+                <TextBox Width="200"
+                         PlaceholderText="筛选组或节点"
+                         Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" />
+                <ComboBox SelectedIndex="{Binding SortIndex, Mode=TwoWay}" Width="120">
+                    <ComboBoxItem Content="默认排序" />
+                    <ComboBoxItem Content="按延迟" />
+                    <ComboBoxItem Content="按名称" />
+                </ComboBox>
+                <ui:IconActionButton Command="{Binding ToggleSortDirectionCommand}"
+                        Glyph="{Binding SortDirectionGlyph}"
+                        ToolTipService.ToolTip="切换排序方向" />
+                <ui:IconActionButton Command="{Binding ToggleDisplayModeCommand}"
+                        Glyph="&#xE712;"
+                        ToolTipService.ToolTip="{Binding DisplayModeLabel}" />
+                <ui:IconActionButton Command="{Binding RefreshCommand}"
+                        Glyph="&#xE72C;"
+                        ToolTipService.ToolTip="刷新代理组" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid Style="{StaticResource EmptyStateHostStyle}"
+                  Visibility="{Binding IsDirectMode, Converter={StaticResource BoolToVis}}">
+                <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
+                    <FontIcon Glyph="&#xE893;" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="直连模式" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="当前为 direct 模式，代理组不可用。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Style="{StaticResource EmptyStateHostStyle}"
+                  Visibility="{Binding ShowEmptyProxyGroups, Converter={StaticResource BoolToVis}}">
+                <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
+                    <FontIcon Glyph="&#xE774;" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="暂无代理组" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="代理组会在订阅配置加载后显示。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Style="{StaticResource EmptyStateHostStyle}"
+                  Visibility="{Binding ShowNoFilterResults, Converter={StaticResource BoolToVis}}">
+                <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
+                    <FontIcon Glyph="&#xE721;" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="无匹配结果" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="没有匹配当前筛选条件的代理组或节点。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <ListView ItemsSource="{Binding Groups}"
+                      Style="{StaticResource LiveListViewStyle}"
+                      Visibility="{Binding ShowProxyGroups, Converter={StaticResource BoolToVis}}"
+                      SelectionMode="None"
+                      IsItemClickEnabled="False"
+                      ScrollViewer.HorizontalScrollMode="Disabled"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem" BasedOn="{StaticResource LiveListViewItemStyle}">
+                        <Setter Property="Margin" Value="0,0,0,4" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ProxyGroupItemViewModel">
+                        <controls:SettingsExpander Description="{Binding SubtitleText, Mode=OneWay}"
+                                                   IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
+                                                   ItemsSource="{x:Bind FilteredNodes}">
+                            <controls:SettingsExpander.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Grid Width="20" Height="20">
+                                        <FontIcon Glyph="&#xE968;"
+                                                  FontSize="14"
+                                                  Opacity="0.35"
+                                                  Visibility="{Binding IconUri, Converter={StaticResource NullToVis}}" />
+                                        <Image Width="20"
+                                               Height="20"
+                                               Source="{Binding IconUri}"
+                                               Stretch="Uniform"
+                                               Visibility="{Binding IconUri, Converter={StaticResource NotNullToVis}}" />
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind Name}"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </controls:SettingsExpander.Header>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="8"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="{Binding NodeCountDisplay, Mode=OneWay}"
+                                           Style="{StaticResource MutedCaptionTextStyle}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding DataContext.IsFullDisplay, ElementName=PageRoot, Converter={StaticResource BoolToVis}}" />
+                                <ui:IconActionButton Command="{Binding DataContext.TestGroupDelayCommand, ElementName=PageRoot}"
+                                        AutoSyncLoadingFromCommand="False"
+                                        CommandParameter="{x:Bind}"
+                                        Glyph="&#xE9D9;"
+                                        IsLoading="{x:Bind IsGroupDelayRunning}"
+                                        ToolTipService.ToolTip="测速本组" />
+                            </StackPanel>
+                            <controls:SettingsExpander.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NodeItemViewModel">
+                                    <controls:SettingsCard Background="{Binding CardBackgroundBrush}"
+                                                           BorderBrush="{Binding CardBorderBrush}"
+                                                           BorderThickness="{Binding CardBorderThickness}"
+                                                           CornerRadius="4"
+                                                           Padding="10,8"
+                                                           Margin="0,0,0,4"
+                                                           ContentAlignment="Vertical"
+                                                           HorizontalContentAlignment="Stretch">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0"
+                                                    Background="Transparent"
+                                                    Tapped="NodeCard_Tapped">
+                                                <StackPanel Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               FontWeight="{Binding NameFontWeight}" />
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="4"
+                                                                Visibility="{Binding DataContext.IsFullDisplay, ElementName=PageRoot, Converter={StaticResource BoolToVis}}">
+                                                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                CornerRadius="4"
+                                                                Padding="4,2"
+                                                                Visibility="{Binding ShowProxyType, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="{Binding ProxyType}" Style="{StaticResource MutedCaptionTextStyle}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="4"
+                                                        VerticalAlignment="Center">
+                                                <ui:IconActionButton Click="UnfixNode_Click"
+                                                        Tag="{Binding GroupName}"
+                                                        Glyph="&#xE718;"
+                                                        Visibility="{Binding IsFixed, Converter={StaticResource BoolToVis}}"
+                                                        ToolTipService.ToolTip="取消固定" />
+                                                <Button Style="{StaticResource SubtleButtonStyle}"
+                                                        Padding="8,4"
+                                                        MinWidth="56"
+                                                        Click="DelayButton_Click"
+                                                        IsEnabled="{Binding IsDelayLoading, Converter={StaticResource InverseBool}}">
+                                                    <Grid Width="48" Height="20">
+                                                        <ProgressRing Width="16"
+                                                                      Height="16"
+                                                                      IsActive="{Binding IsDelayLoading}"
+                                                                      Visibility="{Binding IsDelayLoading, Converter={StaticResource BoolToVis}}" />
+                                                        <TextBlock Text="{Binding DelayButtonText}"
+                                                                   Foreground="{Binding DelayForeground}"
+                                                                   FontWeight="SemiBold"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsDelayLoading, Converter={StaticResource InverseBoolToVis}}" />
+                                                    </Grid>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </controls:SettingsCard>
+                                </DataTemplate>
+                            </controls:SettingsExpander.ItemTemplate>
+                        </controls:SettingsExpander>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+    </Grid>
+</Page>

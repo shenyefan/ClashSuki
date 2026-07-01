@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Source>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</Source>
+    <SmallTileSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</SmallTileSource>
+    <MediumTileSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</MediumTileSource>
+    <WideTileSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</WideTileSource>
+    <LargeTileSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</LargeTileSource>
+    <AppIconSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</AppIconSource>
+    <SplashScreenSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</SplashScreenSource>
+    <BadgeLogoSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</BadgeLogoSource>
+    <PackageLogoSource>C:\Users\shenyefan\RiderProjects\MihomoBar\ClashSuki\ClashSuki\Assets\Img\logo.png</PackageLogoSource>
+    <AppxShowAllApps>False</AppxShowAllApps>
+    <AppxBuildConfigurationSelection>x64</AppxBuildConfigurationSelection>
+    <PackageOptionalProjectsInIdeBuilds>False</PackageOptionalProjectsInIdeBuilds>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="ClashSuki/ClashSuki.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+    <Deploy />
+  </Project>
+  <Project Path="ClashSuki.Service/ClashSuki.Service.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="ClashSuki.Package/ClashSuki.Package.wapproj" Type="C7167F0D-BC9F-4E6E-AFE1-012C56B48DB5">
+    <Platform Solution="*|x64" Project="x64" />
+    <Deploy Solution="*|x64" />
+  </Project>
+</Solution>

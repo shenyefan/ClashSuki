@@ -1,0 +1,102 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>ClashSuki</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKBootstrapAutoInitializeOptions_OnPackageIdentity_NoOp>true</WindowsAppSDKBootstrapAutoInitializeOptions_OnPackageIdentity_NoOp>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <StartupObject>ClashSuki.Program</StartupObject>
+    <ApplicationIcon>Assets\Img\logo.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Img\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Img\*.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="CommunityToolkit.WinUI.Behaviors" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+    <PackageReference Include="Jint" Version="4.10.1" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="Polly" Version="8.5.2" />
+    <PackageReference Include="CliWrap" Version="3.8.2" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WinUI" Version="2.0.5" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="Assets\Age\age-inspect.exe;Assets\Age\age-plugin-batchpass.exe" />
+    <Content Include="Assets\Core\mihomo.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Core\mihomo.exe')" />
+    <Content Include="Assets\Age\age.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age.exe')" />
+    <Content Include="Assets\Age\age-keygen.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age-keygen.exe')" />
+    <Content Include="Assets\UWP\*.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\UWP\enableLoopback.exe')" />
+  </ItemGroup>
+
+  <Target Name="BuildClashSukiService" BeforeTargets="Build" Condition="'$(Configuration)' == 'Debug' and '$(SkipClashSukiServiceBuild)'!='true'">
+    <MSBuild Projects="..\ClashSuki.Service\ClashSuki.Service.csproj" Targets="Restore;Publish" Properties="Configuration=Debug;Platform=x64;RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;PublishTrimmed=false;PublishReadyToRun=false;PublishDir=$(MSBuildThisFileDirectory)..\ClashSuki.Service\bin\x64\Debug\net10.0-windows\publish-framework-dependent\" />
+  </Target>
+
+  <!--
+    服务采用框架依赖发布；仍需复制 publish 目录下的全部服务依赖，
+    而不仅是 ClashSuki.Service.*。
+  -->
+  <Target Name="CopyClashSukiServiceOutput" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug' and '$(SkipCopyClashSukiServiceOutput)'!='true'">
+    <PropertyGroup>
+      <_ClashSukiServicePublishDir>$(MSBuildThisFileDirectory)..\ClashSuki.Service\bin\x64\$(Configuration)\net10.0-windows\publish-framework-dependent\</_ClashSukiServicePublishDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <ClashSukiServiceOutput Include="$(_ClashSukiServicePublishDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ClashSukiServiceOutput)" DestinationFiles="@(ClashSukiServiceOutput->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="Exists('$(_ClashSukiServicePublishDir)ClashSuki.Service.exe')" />
+    <Copy SourceFiles="@(ClashSukiServiceOutput)" DestinationFiles="@(ClashSukiServiceOutput->'$(OutDir)AppX\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX') and Exists('$(_ClashSukiServicePublishDir)ClashSuki.Service.exe')" />
+  </Target>
+
+  <!-- The 2.2 meta-package is required to override WinAppSDK 1.7 references from UI libraries. -->
+  <Target Name="RemoveUnusedWindowsAppSdkPayload" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.Widgets.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.MachineLearning.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.ML.OnnxRuntime.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.MachineLearning.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'onnxruntime.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'DirectML.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.Imaging.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.Video.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.Foundation.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.Text.Projection.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'Microsoft.Windows.AI.ContentSafety.Projection.dll'" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Publish Properties -->
+  <PropertyGroup>
+    <!-- WinUI + JsonSerializer + YamlDotNet + Jint 依赖反射，Release 发布不可裁剪。 -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+</Project>

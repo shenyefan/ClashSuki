@@ -1,0 +1,422 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Windows.Input;
+using ClashSuki.Stores;
+using ClashSuki.ViewModels;
+using CommunityToolkit.Mvvm.Input;
+using H.NotifyIcon;
+using H.NotifyIcon.Core;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using DrawingIcon = System.Drawing.Icon;
+
+namespace ClashSuki.Services;
+
+public sealed class TrayService : IDisposable
+{
+    private const int SwHide = 0;
+    private const int SwShow = 5;
+
+    private readonly Window _window;
+    private readonly DashboardViewModel _dashboard;
+    private readonly FrameworkElement? _themeRoot;
+
+    private TaskbarIcon? _trayIcon;
+    private ToggleMenuFlyoutItem? _systemProxyItem;
+    private ToggleMenuFlyoutItem? _tunItem;
+    private ToggleMenuFlyoutItem? _ruleModeItem;
+    private ToggleMenuFlyoutItem? _globalModeItem;
+    private ToggleMenuFlyoutItem? _directModeItem;
+    private string? _currentIconName;
+    private bool _disposed;
+
+    public TrayService(Window window, DashboardViewModel dashboard)
+    {
+        _window = window;
+        _dashboard = dashboard;
+        _themeRoot = window.Content as FrameworkElement;
+    }
+
+    public void Initialize()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_trayIcon is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var iconName = ResolveIconName();
+            var menu = BuildContextMenu();
+            _trayIcon = new TaskbarIcon
+            {
+                ContextFlyout = menu,
+                ContextMenuMode = ContextMenuMode.PopupMenu,
+                Icon = GetIcon(iconName),
+                LeftClickCommand = new RelayCommand(ToggleWindow),
+                MenuActivation = PopupActivationMode.RightClick,
+                NoLeftClickDelay = true,
+                RequestedTheme = _themeRoot?.ActualTheme ?? ElementTheme.Default,
+                ToolTipText = BuildToolTip()
+            };
+
+            _currentIconName = iconName;
+            _dashboard.Runtime.PropertyChanged += Runtime_PropertyChanged;
+            if (_themeRoot is not null)
+            {
+                _themeRoot.ActualThemeChanged += ThemeRoot_ActualThemeChanged;
+            }
+            SynchronizeMenuState();
+
+            // ClashSuki must keep its core and controller responsive while hidden.
+            _trayIcon.ForceCreate(enablesEfficiencyMode: false);
+        }
+        catch (Exception ex)
+        {
+            Dispose();
+            _dashboard.Runtime.Notifications.Error(
+                $"托盘初始化失败：{ex.Message}",
+                source: LogSources.Tray,
+                exception: ex);
+        }
+    }
+
+    private MenuFlyout BuildContextMenu()
+    {
+        var menu = new MenuFlyout();
+        var showWindowItem = CreateMenuItem("显示窗口", "\uE8A7", new RelayCommand(ShowWindow));
+        menu.Items.Add(showWindowItem);
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        _systemProxyItem = CreateToggleItem(
+            "系统代理",
+            "\uE774",
+            new AsyncRelayCommand(ToggleSystemProxyAsync));
+        _tunItem = CreateToggleItem(
+            "虚拟网卡",
+            "\uE968",
+            new AsyncRelayCommand(ToggleTunAsync));
+        menu.Items.Add(_systemProxyItem);
+        menu.Items.Add(_tunItem);
+        menu.Items.Add(CreateMenuItem(
+            "复制代理环境变量",
+            "\uE8C8",
+            new AsyncRelayCommand(_dashboard.CopyProxyEnvironmentAsync)));
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        var modeMenu = new MenuFlyoutSubItem
+        {
+            Text = "代理模式",
+            Icon = CreateIcon("\uE8D7")
+        };
+        _ruleModeItem = CreateToggleItem(
+            "规则",
+            "\uE8FD",
+            new AsyncRelayCommand(() => SwitchModeAsync("rule")));
+        _globalModeItem = CreateToggleItem(
+            "全局",
+            "\uE909",
+            new AsyncRelayCommand(() => SwitchModeAsync("global")));
+        _directModeItem = CreateToggleItem(
+            "直连",
+            "\uE8AB",
+            new AsyncRelayCommand(() => SwitchModeAsync("direct")));
+        modeMenu.Items.Add(_ruleModeItem);
+        modeMenu.Items.Add(_globalModeItem);
+        modeMenu.Items.Add(_directModeItem);
+        menu.Items.Add(modeMenu);
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(CreateMenuItem("退出", "\uE8BB", new AsyncRelayCommand(ExitAsync)));
+        return menu;
+    }
+
+    private static MenuFlyoutItem CreateMenuItem(string text, string glyph, ICommand command)
+        => new()
+        {
+            Text = text,
+            Icon = CreateIcon(glyph),
+            Command = command
+        };
+
+    private static ToggleMenuFlyoutItem CreateToggleItem(string text, string glyph, ICommand command)
+        => new()
+        {
+            Text = text,
+            Icon = CreateIcon(glyph),
+            Command = command
+        };
+
+    private static FontIcon CreateIcon(string glyph)
+        => new()
+        {
+            FontFamily = new FontFamily("Segoe Fluent Icons"),
+            Glyph = glyph
+        };
+
+    private Task ToggleSystemProxyAsync()
+        => RunTrayOperationAsync(
+            () => _dashboard.SetSystemProxyAsync(!_dashboard.Runtime.IsSystemProxyEnabled));
+
+    private Task ToggleTunAsync()
+        => RunTrayOperationAsync(
+            () => _dashboard.SetTunAsync(!_dashboard.Runtime.IsTunEnabled));
+
+    private Task SwitchModeAsync(string mode)
+        => RunTrayOperationAsync(() => _dashboard.SwitchModeCommand.ExecuteAsync(mode));
+
+    private async Task RunTrayOperationAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (Exception ex)
+        {
+            _dashboard.Runtime.Notifications.Error(
+                $"托盘操作失败：{ex.Message}",
+                source: LogSources.Tray,
+                exception: ex);
+        }
+        finally
+        {
+            SynchronizeMenuState();
+            UpdateIcon();
+        }
+    }
+
+    private async Task ExitAsync()
+    {
+        try
+        {
+            Dispose();
+            if (Application.Current is App app)
+            {
+                await app.ShutdownAsync();
+            }
+        }
+        finally
+        {
+            Application.Current.Exit();
+        }
+    }
+
+    private void Runtime_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (
+            nameof(RuntimeStore.UploadText) or
+            nameof(RuntimeStore.DownloadText) or
+            nameof(RuntimeStore.IsSystemProxyEnabled) or
+            nameof(RuntimeStore.IsTunEnabled) or
+            nameof(RuntimeStore.CurrentMode)))
+        {
+            return;
+        }
+
+        RunOnUiThread(() =>
+        {
+            if (e.PropertyName is nameof(RuntimeStore.UploadText) or nameof(RuntimeStore.DownloadText))
+            {
+                UpdateToolTip();
+                return;
+            }
+
+            SynchronizeMenuState();
+            if (e.PropertyName is nameof(RuntimeStore.IsSystemProxyEnabled) or nameof(RuntimeStore.IsTunEnabled))
+            {
+                UpdateIcon();
+                UpdateToolTip();
+            }
+        });
+    }
+
+    private void ThemeRoot_ActualThemeChanged(FrameworkElement sender, object args)
+    {
+        if (_trayIcon is not null)
+        {
+            _trayIcon.RequestedTheme = sender.ActualTheme;
+        }
+    }
+
+    private void SynchronizeMenuState()
+    {
+        if (_systemProxyItem is null || _tunItem is null)
+        {
+            return;
+        }
+
+        _systemProxyItem.IsChecked = _dashboard.Runtime.IsSystemProxyEnabled;
+        _tunItem.IsChecked = _dashboard.Runtime.IsTunEnabled;
+
+        var mode = _dashboard.Runtime.CurrentMode;
+        if (_ruleModeItem is not null)
+        {
+            _ruleModeItem.IsChecked = string.Equals(mode, "rule", StringComparison.OrdinalIgnoreCase);
+        }
+        if (_globalModeItem is not null)
+        {
+            _globalModeItem.IsChecked = string.Equals(mode, "global", StringComparison.OrdinalIgnoreCase);
+        }
+        if (_directModeItem is not null)
+        {
+            _directModeItem.IsChecked = string.Equals(mode, "direct", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private void UpdateIcon()
+    {
+        if (_trayIcon is null)
+        {
+            return;
+        }
+
+        var iconName = ResolveIconName();
+        if (string.Equals(_currentIconName, iconName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _trayIcon.Icon = GetIcon(iconName);
+        _currentIconName = iconName;
+    }
+
+    private string ResolveIconName()
+        => (_dashboard.Runtime.IsSystemProxyEnabled, _dashboard.Runtime.IsTunEnabled) switch
+        {
+            (true, true) => "red.ico",
+            (false, true) => "green.ico",
+            (true, false) => "orange.ico",
+            _ => "logo.ico"
+        };
+
+    private DrawingIcon GetIcon(string iconName)
+    {
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Img", iconName);
+        if (!File.Exists(iconPath))
+        {
+            throw new FileNotFoundException($"找不到托盘图标：{iconPath}", iconPath);
+        }
+
+        var iconSize = Math.Max(16, GetSystemMetrics(SmCxSmallIcon));
+        return new DrawingIcon(iconPath, iconSize, iconSize);
+    }
+
+    private void UpdateToolTip()
+    {
+        if (_trayIcon is not null)
+        {
+            _trayIcon.ToolTipText = BuildToolTip();
+        }
+    }
+
+    private string BuildToolTip()
+    {
+        var state = (_dashboard.Runtime.IsSystemProxyEnabled, _dashboard.Runtime.IsTunEnabled) switch
+        {
+            (true, true) => "系统代理 + 虚拟网卡",
+            (false, true) => "虚拟网卡",
+            (true, false) => "系统代理",
+            _ => "未启用代理"
+        };
+        return $"ClashSuki · {state}\n↑{_dashboard.Runtime.UploadText}  ↓{_dashboard.Runtime.DownloadText}";
+    }
+
+    private void ToggleWindow()
+    {
+        if (IsVisible())
+        {
+            HideWindow();
+        }
+        else
+        {
+            ShowWindow();
+        }
+    }
+
+    public void ShowWindow()
+    {
+        RunOnUiThread(async () =>
+        {
+            if (_window is MainWindow mainWindow)
+            {
+                await mainWindow.PresentAsync();
+            }
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            NativeShowWindow(hwnd, SwShow);
+            SetForegroundWindow(hwnd);
+        });
+    }
+
+    public void HideWindow()
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        NativeShowWindow(hwnd, SwHide);
+    }
+
+    public bool IsVisible()
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        return IsWindowVisible(hwnd);
+    }
+
+    private void RunOnUiThread(Action action)
+    {
+        if (_window.DispatcherQueue.HasThreadAccess)
+        {
+            action();
+        }
+        else
+        {
+            _window.DispatcherQueue.TryEnqueue(() => action());
+        }
+    }
+
+    private void RunOnUiThread(Func<Task> action)
+    {
+        if (_window.DispatcherQueue.HasThreadAccess)
+        {
+            _ = action();
+        }
+        else
+        {
+            _window.DispatcherQueue.TryEnqueue(async () => await action());
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _dashboard.Runtime.PropertyChanged -= Runtime_PropertyChanged;
+        if (_themeRoot is not null)
+        {
+            _themeRoot.ActualThemeChanged -= ThemeRoot_ActualThemeChanged;
+        }
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "ShowWindow")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool NativeShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    private const int SmCxSmallIcon = 49;
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+}

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.DnsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="DNS" Style="{StaticResource PageTitleStyle}" />
+                <ui:IconActionButton Grid.Column="1" Click="Reset_Click" Glyph="&#xE72C;" IsLoading="{Binding ResetAndSaveCommand.IsRunning}" VerticalAlignment="Center" ToolTipService.ToolTip="恢复默认值" />
+                <ui:IconActionButton Grid.Column="2" Command="{Binding SaveCommand}" Glyph="&#xE74E;" VerticalAlignment="Center" ToolTipService.ToolTip="保存并热重载" />
+            </Grid>
+
+            <TextBlock Text="基础设置" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="启用 DNS" Description="开启 mihomo 内置 DNS 解析">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding DnsEnable, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="增强模式" Description="fake-ip 性能更好，redir-host 更兼容">
+                    <ComboBox SelectedIndex="{Binding EnhancedModeIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
+                        <ComboBoxItem Content="fake-ip" />
+                        <ComboBoxItem Content="redir-host" />
+                        <ComboBoxItem Content="normal" />
+                    </ComboBox>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="系统 Hosts" Description="use-system-hosts">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding UseSystemHosts, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="自定义 Hosts" Description="use-hosts">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding UseHosts, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="IPv6" Description="启用 IPv6 DNS 解析">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding DnsIpv6, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="尊重规则" Description="DNS 请求遵循代理规则">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding RespectRules, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="Fake-IP" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="Fake-IP" Description="地址池与过滤列表">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="Fake-IP 范围" Description="fake-ip-range">
+                        <TextBox Text="{Binding FakeIpRange, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MinWidth="260" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Fake-IP 过滤" Description="fake-ip-filter" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding FakeIpFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Fake-IP 过滤模式" Description="fake-ip-filter-mode">
+                        <ComboBox SelectedIndex="{Binding FakeIpFilterModeIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
+                            <ComboBoxItem Content="blacklist" />
+                            <ComboBoxItem Content="whitelist" />
+                            <ComboBoxItem Content="rule" />
+                        </ComboBox>
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="DNS 服务器" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="DNS 服务器" Description="nameserver / fallback / direct-nameserver">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="Nameserver" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding Nameserver, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Fallback" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding Fallback, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Default Nameserver" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="72"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding DefaultNameserver, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Direct Nameserver" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="72"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding DirectNameserver, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Proxy Server Nameserver" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="72"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding ProxyServerNameserver, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="Fallback Filter" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="Fallback Filter" Description="geoip / ipcidr / domain">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="GeoIP" Description="fallback-filter.geoip">
+                        <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding FallbackGeoIp, Mode=TwoWay}" HorizontalAlignment="Right" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="GeoIP Code" Description="fallback-filter.geoip-code">
+                        <TextBox Text="{Binding FallbackGeoIpCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MinWidth="160" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="IP CIDR" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="72"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding FallbackIpCidr, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="Domain" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="72"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding FallbackDomain, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="Hosts" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsCard Header="自定义 Hosts" Description="每行：domain=ip 或 domain:ip" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                <TextBox AcceptsReturn="True" MinHeight="88"
+                         HorizontalAlignment="Stretch"
+                         Text="{Binding Hosts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </controls:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

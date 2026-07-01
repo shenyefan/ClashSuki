@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.SnifferPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="嗅探" Style="{StaticResource PageTitleStyle}" />
+                <ui:IconActionButton Grid.Column="1" Click="Reset_Click" Glyph="&#xE72C;" IsLoading="{Binding ResetAndSaveCommand.IsRunning}" VerticalAlignment="Center" ToolTipService.ToolTip="恢复默认值" />
+                <ui:IconActionButton Grid.Column="2" Command="{Binding SaveCommand}" Glyph="&#xE74E;" VerticalAlignment="Center" ToolTipService.ToolTip="保存并热重载" />
+            </Grid>
+
+            <TextBlock Text="基础设置" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="启用嗅探" Description="识别连接域名用于提升规则匹配准确性">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding SnifferEnable, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="覆盖目标地址" Description="使用嗅探结果覆盖连接目标">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding OverrideDestination, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="强制 DNS 映射" Description="强制使用 DNS 映射结果">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding ForceDnsMapping, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="解析纯 IP" Description="对纯 IP 连接也进行解析">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding ParsePureIp, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="协议端口" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="协议端口" Description="按协议指定需要嗅探的端口">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="网页流量端口">
+                        <TextBox Text="{Binding HttpPorts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="80" MinWidth="180" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="加密流量端口">
+                        <TextBox Text="{Binding TlsPorts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="443" MinWidth="180" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="快速连接端口">
+                        <TextBox Text="{Binding QuicPorts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="443" MinWidth="180" />
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="域名过滤" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="域名过滤" Description="跳过或强制嗅探的域名">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="跳过域名" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="104"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding SkipDomain, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="强制嗅探域名" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="104"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding ForceDomain, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="跳过目标地址" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding SkipDstAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="跳过来源地址" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding SkipSrcAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

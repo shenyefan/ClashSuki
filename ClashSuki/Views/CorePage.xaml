@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.CorePage"
+    x:Name="PageRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:ui="using:ClashSuki.Controls"
+    xmlns:vm="using:ClashSuki.ViewModels"
+    NavigationCacheMode="Enabled">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="内核" Style="{StaticResource PageTitleStyle}" />
+                <ui:IconActionButton Grid.Column="1" Command="{Binding ValidateConfigCommand}" Glyph="&#xE9D9;" VerticalAlignment="Center" ToolTipService.ToolTip="校验配置" />
+                <ui:IconActionButton Grid.Column="2" Command="{Binding RestartCoreCommand}" Glyph="&#xE777;" VerticalAlignment="Center" ToolTipService.ToolTip="重启内核" />
+                <ui:IconActionButton Grid.Column="3" Click="ResetConfig_Click" Glyph="&#xE72C;" IsLoading="{Binding ResetConfigCommand.IsRunning}" VerticalAlignment="Center" ToolTipService.ToolTip="重置核心配置" />
+                <ui:IconActionButton Grid.Column="4" Command="{Binding SaveConfigCommand}" Glyph="&#xE74E;" VerticalAlignment="Center" ToolTipService.ToolTip="保存并重启内核" />
+            </Grid>
+
+            <TextBlock Text="状态" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="运行状态">
+                    <TextBlock Text="{Binding Runtime.CoreStatusText}" FontWeight="SemiBold" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="内核版本">
+                    <TextBlock Text="{Binding Runtime.MihomoVersion}" FontWeight="SemiBold" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="目录" Description="内核文件与运行配置">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <ui:IconActionButton Command="{Binding OpenCoreDirectoryCommand}" Glyph="&#xE8B7;" ToolTipService.ToolTip="打开内核目录" />
+                        <ui:IconActionButton Command="{Binding OpenConfigDirectoryCommand}" Glyph="&#xE8A5;" ToolTipService.ToolTip="打开配置目录" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="内核版本" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="发行通道" Description="选择通道后点击「应用」，将下载并启动对应内核">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <ComboBox SelectedIndex="{Binding CoreReleaseIndex, Mode=TwoWay}" MinWidth="136">
+                            <ComboBoxItem Content="最新版" />
+                            <ComboBoxItem Content="预览版" />
+                            <ComboBoxItem Content="Smart" />
+                            <ComboBoxItem Content="指定版本" />
+                        </ComboBox>
+                        <ui:IconActionButton Click="ApplyCoreRelease_Click" AutoSyncLoadingFromCommand="False" Glyph="&#xE73E;" IsLoading="{Binding ApplyCoreReleaseCommand.IsRunning}" ToolTipService.ToolTip="应用所选通道" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="指定版本" Description="MetaCubeX/mihomo Release Tag，例如 v1.19.13" Visibility="{Binding IsSpecificCoreSelected, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <ComboBox MinWidth="180"
+                                  PlaceholderText="选择版本"
+                                  ItemsSource="{Binding CoreVersions}"
+                                  SelectedItem="{Binding CoreSpecificVersion, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsCoreVersionsLoading, Converter={StaticResource InverseBool}}" />
+                        <ui:IconActionButton Command="{Binding RefreshCoreVersionsCommand}" AutoSyncLoadingFromCommand="False" Glyph="&#xE72C;" IsLoading="{Binding IsCoreVersionsLoading}" ToolTipService.ToolTip="刷新版本列表" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="内核维护" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="GeoData" Description="调用 mihomo 更新 GeoIP / GeoSite / MMDB">
+                    <ui:IconActionButton Command="{Binding UpdateGeoCommand}" Glyph="&#xE895;" ToolTipService.ToolTip="更新 GeoData" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="Fake-IP 缓存" Description="清空内核 DNS fake-ip 缓存">
+                    <ui:IconActionButton Command="{Binding FlushFakeIpCommand}" Glyph="&#xE74D;" ToolTipService.ToolTip="清空 Fake-IP 缓存" />
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="监听端口" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="Mixed Port" Description="mixed-port">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <NumberBox Width="120" Value="{Binding MixedPort, Mode=TwoWay}" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                        <ui:IconActionButton Command="{Binding RandomizeMixedPortCommand}" Glyph="&#xE8B1;" ToolTipService.ToolTip="随机端口" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="Socks Port" Description="socks-port，0 表示关闭">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <NumberBox Width="120" Value="{Binding SocksPort, Mode=TwoWay}" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                        <ui:IconActionButton Command="{Binding RandomizeSocksPortCommand}" Glyph="&#xE8B1;" ToolTipService.ToolTip="随机端口" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="HTTP Port" Description="port，0 表示关闭">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <NumberBox Width="120" Value="{Binding HttpPort, Mode=TwoWay}" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                        <ui:IconActionButton Command="{Binding RandomizeHttpPortCommand}" Glyph="&#xE8B1;" ToolTipService.ToolTip="随机端口" />
+                    </StackPanel>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="Redir Port" Description="redir-port，Windows 通常保持关闭">
+                    <NumberBox Width="120" HorizontalAlignment="Right" Value="{Binding RedirPort, Mode=TwoWay}" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="TProxy Port" Description="tproxy-port，Windows 通常保持关闭">
+                    <NumberBox Width="120" HorizontalAlignment="Right" Value="{Binding TproxyPort, Mode=TwoWay}" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="外部控制" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="启用外部控制" Description="本应用始终通过命名管道控制内核；开启后额外对外暴露 HTTP REST API。修改后请点击「保存并重启内核」">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding EnableExternalController, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="External Controller" Description="监听地址">
+                    <TextBox Width="260"
+                             HorizontalAlignment="Right"
+                             IsEnabled="{Binding EnableExternalController}"
+                             Text="{Binding ExternalController, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="Secret" Description="外部控制 API 密钥">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <TextBox Width="260"
+                                 IsEnabled="{Binding EnableExternalController}"
+                                 Text="{Binding Secret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:IconActionButton Command="{Binding GenerateSecretCommand}"
+                                IsEnabled="{Binding EnableExternalController}"
+                                Glyph="&#xE72C;"
+                                ToolTipService.ToolTip="生成密钥" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="WebUI" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="新增面板" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox PlaceholderText="名称" Text="{Binding NewWebUiName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Grid.Column="1" PlaceholderText="https://...%host...%port...%secret" Text="{Binding NewWebUiUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:IconActionButton Grid.Column="2" Command="{Binding AddWebUiPanelCommand}" Glyph="&#xE710;" ToolTipService.ToolTip="添加 WebUI" />
+                    </Grid>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="恢复默认面板" Description="MetaCubeXD / YACD / Zashboard">
+                    <ui:IconActionButton Command="{Binding RestoreWebUiPanelsCommand}" Glyph="&#xE72C;" ToolTipService.ToolTip="恢复默认 WebUI" />
+                </controls:SettingsCard>
+            </StackPanel>
+            <controls:SettingsExpander Header="WebUI 面板"
+                                       Description="支持 %host、%port、%secret 变量"
+                                       ItemsSource="{Binding WebUiPanels}">
+                <controls:SettingsExpander.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WebUiPanelViewModel">
+                        <controls:SettingsCard Header="{x:Bind Name}"
+                                               Description="{x:Bind Url}"
+                                               Margin="0,0,0,4">
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <ui:IconActionButton Command="{Binding DataContext.OpenWebUiCommand, ElementName=PageRoot}"
+                                                     CommandParameter="{x:Bind}"
+                                                     Glyph="&#xE8A7;"
+                                                     ToolTipService.ToolTip="打开 WebUI" />
+                                <ui:IconActionButton Click="DeleteWebUiPanel_Click"
+                                                     Tag="{x:Bind}"
+                                                     Glyph="&#xE74D;"
+                                                     ToolTipService.ToolTip="删除 WebUI" />
+                            </StackPanel>
+                        </controls:SettingsCard>
+                    </DataTemplate>
+                </controls:SettingsExpander.ItemTemplate>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="访问控制" Style="{StaticResource SectionTitleStyle}" />
+            <controls:SettingsExpander Header="局域网与认证" Description="allow-lan / authentication / skip-auth-prefixes">
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard Header="允许局域网" Description="allow-lan">
+                        <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding AllowLan, Mode=TwoWay}" HorizontalAlignment="Right" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="允许 IP 段" Description="lan-allowed-ips，每行一个" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88" HorizontalAlignment="Stretch" Text="{Binding LanAllowedIps, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="禁止 IP 段" Description="lan-disallowed-ips，每行一个" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88" HorizontalAlignment="Stretch" Text="{Binding LanDisallowedIps, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="用户认证" Description="authentication，每行 user:password" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88" HorizontalAlignment="Stretch" Text="{Binding Authentication, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                    <controls:SettingsCard Header="跳过认证前缀" Description="skip-auth-prefixes，每行一个 CIDR" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                        <TextBox AcceptsReturn="True" MinHeight="88" HorizontalAlignment="Stretch" Text="{Binding SkipAuthPrefixes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <TextBlock Text="基础参数" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="IPv6" Description="启用 IPv6 支持">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Ipv6, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="统一延迟" Description="unified-delay">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding UnifiedDelay, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="TCP 并发" Description="tcp-concurrent">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding TcpConcurrent, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="记住节点选择" Description="profile.store-selected">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding StoreSelected, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="保存 Fake-IP" Description="profile.store-fake-ip">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding StoreFakeIp, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="日志级别" Description="log-level">
+                    <ComboBox SelectedIndex="{Binding LogLevelIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
+                        <ComboBoxItem Content="silent" />
+                        <ComboBoxItem Content="error" />
+                        <ComboBoxItem Content="warning" />
+                        <ComboBoxItem Content="info" />
+                        <ComboBoxItem Content="debug" />
+                    </ComboBox>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="进程查找模式" Description="find-process-mode">
+                    <ComboBox SelectedIndex="{Binding FindProcessIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
+                        <ComboBoxItem Content="off" />
+                        <ComboBoxItem Content="strict" />
+                        <ComboBoxItem Content="always" />
+                    </ComboBox>
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="日志维护" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="保留天数" Description="程序日志与内核日志">
+                    <NumberBox Width="120" HorizontalAlignment="Right" Value="{Binding MaxLogDays, Mode=TwoWay}" Minimum="1" Maximum="365" SpinButtonPlacementMode="Compact" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="单文件大小（MB）" Description="超过限制后由日志服务轮转">
+                    <NumberBox Width="120" HorizontalAlignment="Right" Value="{Binding MaxLogFileSizeMb, Mode=TwoWay}" Minimum="1" Maximum="1024" SpinButtonPlacementMode="Compact" />
+                </controls:SettingsCard>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:lvc="using:LiveChartsCore.SkiaSharpView.WinUI"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+            <TextBlock Text="仪表盘" Style="{StaticResource PageTitleStyle}" />
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <controls:SettingsCard Header="系统代理"
+                                       Description="{Binding Runtime.MixedPortText}"
+                                       MinHeight="64"
+                                       VerticalAlignment="Stretch">
+                    <ToggleSwitch MinWidth="0"
+                                  Width="48"
+                                  OnContent=""
+                                  OffContent=""
+                                  IsOn="{Binding Runtime.IsSystemProxyEnabled, Mode=OneWay}"
+                                  Toggled="SystemProxy_Toggled"
+                                  HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Grid.Column="1"
+                                       Header="虚拟网卡"
+                                       Description="{Binding Runtime.TunServiceStatusText}"
+                                       MinHeight="64"
+                                       VerticalAlignment="Stretch">
+                    <Grid HorizontalAlignment="Right">
+                        <ToggleSwitch MinWidth="0"
+                                      Width="48"
+                                      OnContent=""
+                                      OffContent=""
+                                      IsOn="{Binding Runtime.IsTunEnabled, Mode=OneWay}"
+                                      Toggled="Tun_Toggled"
+                                      HorizontalAlignment="Right"
+                                      Visibility="{Binding Runtime.IsTunToggleAvailable, Converter={StaticResource BoolToVis}}" />
+                        <ui:IconActionButton Command="{Binding InstallServiceCommand}"
+                                             Glyph="&#xE7B8;"
+                                             Visibility="{Binding Runtime.ShowTunServiceInstall, Converter={StaticResource BoolToVis}}"
+                                             ToolTipService.ToolTip="安装服务" />
+                    </Grid>
+                </controls:SettingsCard>
+                <controls:SettingsCard Grid.Column="2"
+                                       Header="代理模式"
+                                       Description="选择内核的流量处理方式"
+                                       MinHeight="64"
+                                       VerticalAlignment="Stretch">
+                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                        <ui:IconActionButton Command="{Binding SwitchModeCommand}"
+                                             CommandParameter="rule"
+                                             AutoSyncLoadingFromCommand="False"
+                                             IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
+                                             IsSelected="{Binding Runtime.IsRuleMode}"
+                                             Glyph="&#xE8FD;"
+                                             ToolTipService.ToolTip="规则模式" />
+                        <ui:IconActionButton Command="{Binding SwitchModeCommand}"
+                                             CommandParameter="global"
+                                             AutoSyncLoadingFromCommand="False"
+                                             IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
+                                             IsSelected="{Binding Runtime.IsGlobalMode}"
+                                             Glyph="&#xE774;"
+                                             ToolTipService.ToolTip="全局模式" />
+                        <ui:IconActionButton Command="{Binding SwitchModeCommand}"
+                                             CommandParameter="direct"
+                                             AutoSyncLoadingFromCommand="False"
+                                             IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
+                                             IsSelected="{Binding Runtime.IsDirectMode}"
+                                             Glyph="&#xE72A;"
+                                             ToolTipService.ToolTip="直连模式" />
+                    </StackPanel>
+                </controls:SettingsCard>
+            </Grid>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="上传" Style="{StaticResource MetricLabelTextStyle}" />
+                        <TextBlock Text="{Binding Runtime.UploadText}" Style="{StaticResource MetricValueTextStyle}" />
+                        <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                            <Run Text="总计 " />
+                            <Run Text="{Binding Runtime.UploadTotalText}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="下载" Style="{StaticResource MetricLabelTextStyle}" />
+                        <TextBlock Text="{Binding Runtime.DownloadText}" Style="{StaticResource MetricValueTextStyle}" />
+                        <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                            <Run Text="总计 " />
+                            <Run Text="{Binding Runtime.DownloadTotalText}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="运行内存" Style="{StaticResource MetricLabelTextStyle}" />
+                        <TextBlock Text="{Binding Runtime.MemoryText}" Style="{StaticResource MetricValueTextStyle}" />
+                        <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                            <Run Text="mihomo " />
+                            <Run Text="{Binding Runtime.MihomoVersion}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="260" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="实时流量" Style="{StaticResource SectionTitleStyle}" Margin="0" />
+                        <TextBlock Grid.Column="1"
+                                   Text="最近 60 秒"
+                                   Style="{StaticResource MutedCaptionTextStyle}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <lvc:CartesianChart Grid.Row="1"
+                                        Background="Transparent"
+                                        Series="{Binding TrafficSeries}"
+                                        XAxes="{Binding TrafficXAxes}"
+                                        YAxes="{Binding TrafficYAxes}"
+                                        LegendPosition="Top"
+                                        AnimationsSpeed="0:0:0" />
+                </Grid>
+            </Border>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="320" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="代理排行" Style="{StaticResource SectionTitleStyle}" Margin="0" />
+                        <Grid Grid.Row="1">
+                            <ListView ItemsSource="{Binding ProxyRankings}"
+                                      SelectionMode="None"
+                                      Visibility="{Binding HasProxyRankings, Converter={StaticResource BoolToVis}}">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="8,7" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Rank}"
+                                                       Style="{StaticResource MutedCaptionTextStyle}"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Text="{Binding Label}"
+                                                           Style="{StaticResource ListItemTitleTextStyle}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                                                        <Run Text="上传 " />
+                                                        <Run Text="{Binding Upload}" />
+                                                    </TextBlock>
+                                                    <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                                                        <Run Text="下载 " />
+                                                        <Run Text="{Binding Download}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Total}"
+                                                       Style="{StaticResource BodyTextStyle}"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Style="{StaticResource EmptyStatePanelStyle}"
+                                        Visibility="{Binding HasProxyRankings, Converter={StaticResource InverseBoolToVis}}">
+                                <FontIcon Glyph="&#xE8CB;" Style="{StaticResource EmptyStateIconStyle}" />
+                                <TextBlock Text="暂无代理用量" Style="{StaticResource EmptyStateTitleStyle}" />
+                                <TextBlock Text="产生代理流量后将在此显示"
+                                           Style="{StaticResource EmptyStateDescriptionStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="320" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="域名排行" Style="{StaticResource SectionTitleStyle}" Margin="0" />
+                        <Grid Grid.Row="1">
+                            <ListView ItemsSource="{Binding DomainRankings}"
+                                      SelectionMode="None"
+                                      Visibility="{Binding HasDomainRankings, Converter={StaticResource BoolToVis}}">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="8,7" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Rank}"
+                                                       Style="{StaticResource MutedCaptionTextStyle}"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Text="{Binding Label}"
+                                                           Style="{StaticResource ListItemTitleTextStyle}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                                                        <Run Text="上传 " />
+                                                        <Run Text="{Binding Upload}" />
+                                                    </TextBlock>
+                                                    <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
+                                                        <Run Text="下载 " />
+                                                        <Run Text="{Binding Download}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Total}"
+                                                       Style="{StaticResource BodyTextStyle}"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Style="{StaticResource EmptyStatePanelStyle}"
+                                        Visibility="{Binding HasDomainRankings, Converter={StaticResource InverseBoolToVis}}">
+                                <FontIcon Glyph="&#xE774;" Style="{StaticResource EmptyStateIconStyle}" />
+                                <TextBlock Text="暂无域名用量" Style="{StaticResource EmptyStateTitleStyle}" />
+                                <TextBlock Text="产生网络流量后将在此显示"
+                                           Style="{StaticResource EmptyStateDescriptionStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,9 @@
+/.vs/
+/.idea/
+/ClashSuki/bin/
+/ClashSuki/obj/
+/ClashSuki.Service/bin/
+/ClashSuki.Service/obj/
+/ClashSuki.Package/bin/
+/ClashSuki.Package/obj/
+/artifacts/

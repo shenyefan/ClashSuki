@@ -1,0 +1,145 @@
+using System.IO.Pipes;
+using System.Text;
+using ClashSuki.Services;
+
+namespace ClashSuki.Utilities;
+
+public static class SingleInstanceManager
+{
+    private const string MutexName = @"Local\ClashSuki.SingleInstance";
+    private const string PipeName = "ClashSuki.SingleInstance";
+    private const string ActivateCommand = "show";
+
+    private static Mutex? _mutex;
+    private static CancellationTokenSource? _listenerCts;
+    private static Action? _activateHandler;
+
+    public static bool TryAcquirePrimary()
+    {
+        _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
+        return createdNew;
+    }
+
+    public static void RegisterActivateHandler(Action handler) => _activateHandler = handler;
+
+    public static void StartListening()
+    {
+        _listenerCts = new CancellationTokenSource();
+        _ = Task.Run(() => ListenLoopAsync(_listenerCts.Token));
+    }
+
+    public static void StopListening()
+    {
+        _listenerCts?.Cancel();
+        _listenerCts?.Dispose();
+        _listenerCts = null;
+    }
+
+    public static void ReleasePrimary()
+    {
+        StopListening();
+
+        if (_mutex is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _mutex.ReleaseMutex();
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.WriteAppExceptionThrottled(
+                "SINGLE-INSTANCE-MUTEX",
+                LogSources.Application,
+                ex,
+                "释放单实例互斥锁失败",
+                level: "WARN");
+        }
+        finally
+        {
+            _mutex.Dispose();
+            _mutex = null;
+        }
+    }
+
+    public static void RequestActivatePrimary()
+    {
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            try
+            {
+                using var client = new NamedPipeClientStream(
+                    ".",
+                    PipeName,
+                    PipeDirection.Out,
+                    PipeOptions.None);
+
+                client.Connect(300);
+                var payload = Encoding.UTF8.GetBytes(ActivateCommand + "\n");
+                client.Write(payload, 0, payload.Length);
+                client.Flush();
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (attempt == 24)
+                {
+                    DiagnosticLog.WriteAppException(
+                        LogSources.Application,
+                        ex,
+                        "通知主实例显示窗口失败",
+                        "WARN");
+                }
+                Thread.Sleep(200);
+            }
+        }
+    }
+
+    private static async Task ListenLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await using var server = new NamedPipeServerStream(
+                    PipeName,
+                    PipeDirection.In,
+                    maxNumberOfServerInstances: 1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+
+                await server.WaitForConnectionAsync(cancellationToken);
+
+                using var reader = new StreamReader(server, Encoding.UTF8, leaveOpen: true);
+                var command = await reader.ReadLineAsync(cancellationToken);
+                if (string.Equals(command, ActivateCommand, StringComparison.OrdinalIgnoreCase))
+                {
+                    _activateHandler?.Invoke();
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.WriteAppExceptionThrottled(
+                    "SINGLE-INSTANCE-LISTENER",
+                    LogSources.Application,
+                    ex,
+                    "单实例激活监听发生错误",
+                    level: "WARN");
+                try
+                {
+                    await Task.Delay(300, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+        }
+    }
+}

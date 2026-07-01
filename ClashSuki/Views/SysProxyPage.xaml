@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.SysProxyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="系统代理" Style="{StaticResource PageTitleStyle}" />
+                <ui:IconActionButton Grid.Column="1" Click="ResetSystemProxySettings_Click" Glyph="&#xE72C;" IsLoading="{Binding ResetSystemProxySettingsCommand.IsRunning}" VerticalAlignment="Center" ToolTipService.ToolTip="重置系统代理设置" />
+                <ui:IconActionButton Grid.Column="2" Command="{Binding SaveSystemProxySettingsCommand}" Glyph="&#xE74E;" VerticalAlignment="Center" ToolTipService.ToolTip="保存系统代理设置" />
+            </Grid>
+
+            <TextBlock Text="代理" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                <controls:SettingsCard Header="启用系统代理" Description="{Binding Runtime.MixedPortText}">
+                    <ToggleSwitch MinWidth="0"
+                                  Width="48"
+                                  OnContent=""
+                                  OffContent=""
+                                  IsOn="{Binding Runtime.IsSystemProxyEnabled, Mode=OneWay}"
+                                  Toggled="SysProxy_Toggled"
+                                  HorizontalAlignment="Right" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="代理主机" Description="host">
+                    <TextBox Width="220"
+                             HorizontalAlignment="Right"
+                             Text="{Binding SystemProxyHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="127.0.0.1" />
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="代理模式" Description="manual / PAC">
+                    <ComboBox SelectedIndex="{Binding SystemProxyModeIndex, Mode=TwoWay}"
+                              MinWidth="136"
+                              HorizontalAlignment="Right">
+                        <ComboBoxItem Content="手动" />
+                        <ComboBoxItem Content="PAC" />
+                    </ComboBox>
+                </controls:SettingsCard>
+                <controls:SettingsCard Header="UWP 应用代理" Description="配置商店应用回环代理">
+                    <ui:IconActionButton Command="{Binding OpenUwpToolCommand}" Glyph="&#xE8A7;" ToolTipService.ToolTip="打开 UWP 代理工具" />
+                </controls:SettingsCard>
+            </StackPanel>
+
+            <TextBlock Text="PAC" Style="{StaticResource SectionTitleStyle}" Visibility="{Binding IsPacMode, Converter={StaticResource BoolToVis}}" />
+            <controls:SettingsCard Header="PAC 脚本" Description="保存后应用到系统代理" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch" Visibility="{Binding IsPacMode, Converter={StaticResource BoolToVis}}">
+                <TextBox AcceptsReturn="True"
+                         MinHeight="180"
+                         HorizontalAlignment="Stretch"
+                         Text="{Binding PacScript, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </controls:SettingsCard>
+
+            <TextBlock Text="绕过列表" Style="{StaticResource SectionTitleStyle}" Visibility="{Binding IsPacMode, Converter={StaticResource InverseBoolToVis}}" />
+            <controls:SettingsCard Header="地址列表" Description="以下地址不使用系统代理" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch" Visibility="{Binding IsPacMode, Converter={StaticResource InverseBoolToVis}}">
+                <StackPanel Spacing="12">
+                    <TextBox AcceptsReturn="True"
+                             MinHeight="180"
+                             HorizontalAlignment="Stretch"
+                             Text="{Binding BypassList, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="localhost&#x0a;127.0.0.1&#x0a;192.168.0.0/16&#x0a;10.0.0.0/8" />
+                </StackPanel>
+            </controls:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

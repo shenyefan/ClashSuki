@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.ConnectionsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:vm="using:ClashSuki.ViewModels"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <Grid x:Name="PageRoot" Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource PageSpacing}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="240" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="连接" Style="{StaticResource PageTitleStyle}" />
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <SelectorBar x:Name="ConnectionViewSelector" SelectionChanged="ConnectionViewSelector_SelectionChanged">
+                <SelectorBarItem x:Name="ActiveConnectionsItem" Text="{Binding ActiveTabText}" IsSelected="True">
+                    <SelectorBarItem.Icon>
+                        <FontIcon Glyph="&#xE768;" />
+                    </SelectorBarItem.Icon>
+                </SelectorBarItem>
+                <SelectorBarItem x:Name="ClosedConnectionsItem" Text="{Binding ClosedTabText}">
+                    <SelectorBarItem.Icon>
+                        <FontIcon Glyph="&#xE8FB;" />
+                    </SelectorBarItem.Icon>
+                </SelectorBarItem>
+            </SelectorBar>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                <TextBox Width="200"
+                         PlaceholderText="搜索连接"
+                         Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" />
+                <ComboBox SelectedIndex="{Binding SortIndex, Mode=TwoWay}" Width="120">
+                    <ComboBoxItem Content="最近更新" />
+                    <ComboBoxItem Content="目标主机" />
+                    <ComboBoxItem Content="进程" />
+                    <ComboBoxItem Content="规则" />
+                    <ComboBoxItem Content="上传" />
+                    <ComboBoxItem Content="下载" />
+                    <ComboBoxItem Content="开始时间" />
+                </ComboBox>
+                <ui:IconActionButton Command="{Binding ToggleSortDirectionCommand}" Glyph="{Binding SortDirectionGlyph}" VerticalAlignment="Center" ToolTipService.ToolTip="切换排序方向" />
+                <ui:IconActionButton Click="CloseAllConnections_Click" Glyph="&#xE74D;" IsLoading="{Binding CloseAllConnectionsCommand.IsRunning}" VerticalAlignment="Center" ToolTipService.ToolTip="关闭全部连接" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="2" ColumnSpacing="12" RowSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <controls:SettingsCard Header="上传速度" Description="{Binding Runtime.UploadText}" />
+            <controls:SettingsCard Grid.Column="1" Header="下载速度" Description="{Binding Runtime.DownloadText}" />
+            <controls:SettingsCard Grid.Column="2" Header="上传总量" Description="{Binding Runtime.UploadTotalText}" />
+            <controls:SettingsCard Grid.Column="3" Header="下载总量" Description="{Binding Runtime.DownloadTotalText}" />
+        </Grid>
+
+        <Grid Grid.Row="3">
+            <Grid Style="{StaticResource EmptyStateHostStyle}"
+                  Visibility="{Binding Connections.VisibleCount, Converter={StaticResource NumberZeroToVis}}">
+                <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
+                    <FontIcon Glyph="&#xE7C3;" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="{Binding EmptyTitle}" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="{Binding EmptyDescription}" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <ListView x:Name="ConnectionsListView"
+                      Style="{StaticResource LiveListViewStyle}"
+                      ItemsSource="{Binding Connections.Visible}"
+                      Visibility="{Binding Connections.VisibleCount, Converter={StaticResource NumberNotZeroToVis}}"
+                      SelectionMode="None"
+                      IsItemClickEnabled="False"
+                      ScrollViewer.HorizontalScrollMode="Disabled"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      ContainerContentChanging="ConnectionsListView_ContainerContentChanging">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem" BasedOn="{StaticResource LiveListViewItemStyle}">
+                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                        <Setter Property="Margin" Value="0,0,0,4" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ConnectionItemViewModel">
+                        <controls:SettingsCard Margin="0,0,0,4"
+                                               Header="{x:Bind HostDisplay}"
+                                               Description="{x:Bind SubtitleText}"
+                                               HeaderIcon="{x:Bind ProcessIconUri, Converter={StaticResource ProcessIconElement}}">
+                            <controls:SettingsCard.ActionIcon>
+                                <FontIcon Glyph="&#xE70F;" Visibility="Collapsed" />
+                            </controls:SettingsCard.ActionIcon>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="16"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <StackPanel Spacing="2" Width="220">
+                                    <TextBlock Text="规则" Style="{StaticResource MutedCaptionTextStyle}" />
+                                    <TextBlock Text="{x:Bind RuleDisplay}" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Text="{x:Bind Chain}" Style="{StaticResource BodyTextStyle}" />
+                                </StackPanel>
+                                <StackPanel Spacing="2" Width="92">
+                                    <TextBlock Text="速度" Style="{StaticResource MutedCaptionTextStyle}" />
+                                    <TextBlock Text="{x:Bind UpSpeedText}" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Text="{x:Bind DownSpeedText}" Style="{StaticResource BodyTextStyle}" />
+                                </StackPanel>
+                                <StackPanel Spacing="2" Width="92">
+                                    <TextBlock Text="流量" Style="{StaticResource MutedCaptionTextStyle}" />
+                                    <TextBlock Text="{x:Bind UploadText}" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Text="{x:Bind DownloadText}" Style="{StaticResource BodyTextStyle}" />
+                                </StackPanel>
+                                <StackPanel Spacing="2" Width="72">
+                                    <TextBlock Text="网络" Style="{StaticResource MutedCaptionTextStyle}" />
+                                    <TextBlock Text="{x:Bind Network}" Style="{StaticResource BodyTextStyle}" />
+                                    <TextBlock Text="{x:Bind Port}" Style="{StaticResource BodyTextStyle}" />
+                                </StackPanel>
+                                <ui:IconActionButton Command="{Binding DataContext.CloseConnectionCommand, ElementName=PageRoot}"
+                                                     AutoSyncLoadingFromCommand="False"
+                                                     CommandParameter="{x:Bind}"
+                                                     Glyph="&#xE711;"
+                                                     IsLoading="{x:Bind IsClosing}"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="{x:Bind IsClosed, Converter={StaticResource InverseBoolToVis}}"
+                                                     ToolTipService.ToolTip="关闭连接" />
+                                </StackPanel>
+                        </controls:SettingsCard>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+    </Grid>
+</Page>

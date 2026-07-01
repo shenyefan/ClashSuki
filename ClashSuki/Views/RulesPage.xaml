@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ClashSuki.Views.RulesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:vm="using:ClashSuki.ViewModels"
+    xmlns:ui="using:ClashSuki.Controls"
+    NavigationCacheMode="Enabled">
+    <Page.Resources>
+        <vm:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <vm:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <vm:InverseBoolConverter x:Key="InverseBool" />
+    </Page.Resources>
+    <Grid x:Name="PageRoot">
+        <ScrollViewer>
+            <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+                <TextBlock Text="分流规则" Style="{StaticResource PageTitleStyle}" />
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="规则列表" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBox Grid.Column="1"
+                             PlaceholderText="筛选过滤"
+                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center" />
+                    <ui:IconActionButton Grid.Column="2" Command="{Binding RefreshCommand}" AutoSyncLoadingFromCommand="False" Glyph="&#xE72C;" IsLoading="{Binding IsRefreshing}" VerticalAlignment="Center" ToolTipService.ToolTip="刷新规则" />
+                </Grid>
+
+                <controls:SettingsCard ContentAlignment="Vertical"
+                                       HorizontalContentAlignment="Stretch"
+                                       Visibility="{Binding FilteredRuleCount, Converter={StaticResource NumberZeroToVis}}">
+                    <Grid Style="{StaticResource EmptyStateHostStyle}">
+                        <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
+                            <FontIcon Glyph="&#xE8A5;" Style="{StaticResource EmptyStateIconStyle}" />
+                            <TextBlock Text="{Binding EmptyText}" Style="{StaticResource EmptyStateTitleStyle}" />
+                            <TextBlock Text="规则数据会在核心返回后自动刷新。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </controls:SettingsCard>
+
+                <ItemsControl ItemsSource="{Binding FilteredRules}"
+                              Visibility="{Binding FilteredRuleCount, Converter={StaticResource NumberNotZeroToVis}}">
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                            <Setter Property="Margin" Value="0,0,0,4" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <controls:SettingsCard Header="{Binding DisplayPayload}" Description="{Binding DetailText}" Opacity="{Binding DisabledOpacity}">
+                                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                                    <TextBlock Text="{Binding HitTimeText}"
+                                               Style="{StaticResource MutedCaptionTextStyle}"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Right"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="180"
+                                               Visibility="{Binding HasRuntimeStats, Converter={StaticResource BoolToVis}}" />
+                                    <TextBlock Text="{Binding HitSummary}"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasRuntimeStats, Converter={StaticResource BoolToVis}}" />
+                                    <Grid Width="56" HorizontalAlignment="Right">
+                                        <ProgressRing Width="20"
+                                                      Height="20"
+                                                      IsActive="{Binding IsUpdating}"
+                                                      Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVis}}" />
+                                        <ToggleSwitch Loaded="RuleSwitch_Loaded"
+                                                      Toggled="RuleSwitch_Toggled"
+                                                      MinWidth="0"
+                                                      Width="48"
+                                                      OnContent=""
+                                                      OffContent=""
+                                                      IsOn="{Binding IsEnabled, Mode=OneWay}"
+                                                      Visibility="{Binding IsUpdating, Converter={StaticResource InverseBoolToVis}}" />
+                                    </Grid>
+                                </StackPanel>
+                            </controls:SettingsCard>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
