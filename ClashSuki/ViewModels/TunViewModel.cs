@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.ViewModels;
 
@@ -73,10 +74,10 @@ public sealed partial class TunViewModel : ObservableObject
         AutoRoute = settings.AutoRoute;
         AutoDetectInterface = settings.AutoDetectInterface;
         StrictRoute = settings.StrictRoute;
-        Mtu = settings.Mtu;
+        Mtu = settings.Mtu.ToString(System.Globalization.CultureInfo.InvariantCulture);
         DeviceName = settings.DeviceName;
-        DnsHijack = settings.DnsHijack;
-        RouteExcludeAddress = settings.RouteExcludeAddress;
+        DnsHijack = ConfigTextCodec.FormatLines(settings.DnsHijack);
+        RouteExcludeAddress = ConfigTextCodec.FormatLines(settings.RouteExcludeAddress);
     }
 
     [RelayCommand]
@@ -90,28 +91,20 @@ public sealed partial class TunViewModel : ObservableObject
                 2 => "system",
                 _ => "mixed"
             };
-            var tun = new Dictionary<string, object?>
-            {
-                ["stack"] = stack,
-                ["auto-route"] = AutoRoute,
-                ["auto-detect-interface"] = AutoDetectInterface,
-                ["strict-route"] = StrictRoute,
-                ["dns-hijack"] = SplitLines(DnsHijack)
-            };
-            if (int.TryParse(Mtu, out var mtuVal) && mtuVal > 0)
-            {
-                tun["mtu"] = mtuVal;
-            }
-            else
+            if (!int.TryParse(Mtu, out var mtuValue) || mtuValue <= 0)
             {
                 throw new InvalidOperationException("MTU 必须是大于 0 的数字。");
             }
 
-            tun["device-name"] = DeviceName.Trim();
-            tun["route-exclude-address"] = SplitLines(RouteExcludeAddress);
-
-            await _coordinator.SaveTunSettingsAsync(
-                new Dictionary<string, object?> { ["tun"] = tun });
+            await _coordinator.SaveTunSettingsAsync(new YamlConfigService.TunSectionSettings(
+                stack,
+                AutoRoute,
+                AutoDetectInterface,
+                StrictRoute,
+                mtuValue,
+                DeviceName.Trim(),
+                ConfigTextCodec.ParseLines(DnsHijack),
+                ConfigTextCodec.ParseLines(RouteExcludeAddress)));
 
             Runtime.Notifications.Success(
                 "虚拟网卡配置已保存。",
@@ -172,6 +165,4 @@ public sealed partial class TunViewModel : ObservableObject
         }
     }
 
-    private static string[] SplitLines(string text) =>
-        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

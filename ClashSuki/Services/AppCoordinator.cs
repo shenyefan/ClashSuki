@@ -4,6 +4,7 @@ using System.Text;
 using System.Collections.Concurrent;
 using ClashSuki.Models;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.Services;
 
@@ -361,8 +362,40 @@ public sealed class AppCoordinator : IAsyncDisposable
         await ApplyConfigPatchTransactionAsync(patch, reloadAfterPatch: false, replaceRootMappings);
     }
 
-    public async Task SaveDnsSettingsAsync(Dictionary<string, object?> patch)
+    public async Task SaveDnsSettingsAsync(YamlConfigService.DnsSectionSettings settings)
     {
+        var hosts = settings.Hosts.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.Count == 1 ? (object?)pair.Value[0] : pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+        var patch = new Dictionary<string, object?>
+        {
+            ["dns"] = new Dictionary<string, object?>
+            {
+                ["enable"] = settings.Enable,
+                ["enhanced-mode"] = settings.EnhancedMode,
+                ["ipv6"] = settings.Ipv6,
+                ["respect-rules"] = settings.RespectRules,
+                ["use-hosts"] = settings.UseHosts,
+                ["use-system-hosts"] = settings.UseSystemHosts,
+                ["fake-ip-range"] = settings.FakeIpRange,
+                ["fake-ip-filter"] = settings.FakeIpFilter,
+                ["fake-ip-filter-mode"] = settings.FakeIpFilterMode,
+                ["nameserver"] = settings.Nameserver,
+                ["fallback"] = settings.Fallback,
+                ["default-nameserver"] = settings.DefaultNameserver,
+                ["direct-nameserver"] = settings.DirectNameserver,
+                ["proxy-server-nameserver"] = settings.ProxyServerNameserver,
+                ["fallback-filter"] = new Dictionary<string, object?>
+                {
+                    ["geoip"] = settings.FallbackGeoIp,
+                    ["geoip-code"] = settings.FallbackGeoIpCode,
+                    ["ipcidr"] = settings.FallbackIpCidr,
+                    ["domain"] = settings.FallbackDomain
+                }
+            },
+            ["hosts"] = hosts
+        };
         await ApplyConfigPatchTransactionAsync(
             patch,
             reloadAfterPatch: true,
@@ -2029,11 +2062,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    private static string[] SplitLines(string value) =>
-        value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .ToArray();
-
     private static (string Host, string Port) SplitController(string controller)
     {
         var normalized = controller.Trim();
@@ -2180,10 +2208,10 @@ public sealed class AppCoordinator : IAsyncDisposable
             ["external-controller"] = effectiveController,
             ["secret"] = settings.Secret,
             ["allow-lan"] = settings.AllowLan,
-            ["lan-allowed-ips"] = SplitLines(settings.LanAllowedIps),
-            ["lan-disallowed-ips"] = SplitLines(settings.LanDisallowedIps),
-            ["authentication"] = SplitLines(settings.Authentication),
-            ["skip-auth-prefixes"] = SplitLines(settings.SkipAuthPrefixes),
+            ["lan-allowed-ips"] = settings.LanAllowedIps,
+            ["lan-disallowed-ips"] = settings.LanDisallowedIps,
+            ["authentication"] = settings.Authentication,
+            ["skip-auth-prefixes"] = settings.SkipAuthPrefixes,
             ["profile"] = new Dictionary<string, object?>
             {
                 ["store-selected"] = settings.StoreSelected,
@@ -2319,13 +2347,47 @@ public sealed class AppCoordinator : IAsyncDisposable
     public Task<YamlConfigService.TunSectionSettings> LoadTunSettingsAsync() =>
         YamlConfigService.LoadTunSettingsAsync(AppPaths.ConfigPath, _cts.Token);
 
-    public async Task SaveSnifferSettingsAsync(Dictionary<string, object?> patch)
+    public async Task SaveSnifferSettingsAsync(YamlConfigService.SnifferSectionSettings settings)
     {
+        var patch = new Dictionary<string, object?>
+        {
+            ["sniffer"] = new Dictionary<string, object?>
+            {
+                ["enable"] = settings.Enable,
+                ["override-destination"] = settings.OverrideDestination,
+                ["force-dns-mapping"] = settings.ForceDnsMapping,
+                ["parse-pure-ip"] = settings.ParsePureIp,
+                ["sniff"] = new Dictionary<string, object?>
+                {
+                    ["HTTP"] = new Dictionary<string, object?> { ["ports"] = settings.HttpPorts },
+                    ["TLS"] = new Dictionary<string, object?> { ["ports"] = settings.TlsPorts },
+                    ["QUIC"] = new Dictionary<string, object?> { ["ports"] = settings.QuicPorts }
+                },
+                ["skip-domain"] = settings.SkipDomain,
+                ["force-domain"] = settings.ForceDomain,
+                ["skip-dst-address"] = settings.SkipDstAddress,
+                ["skip-src-address"] = settings.SkipSrcAddress
+            }
+        };
         await ApplyConfigPatchTransactionAsync(patch, reloadAfterPatch: true);
     }
 
-    public async Task SaveTunSettingsAsync(Dictionary<string, object?> patch)
+    public async Task SaveTunSettingsAsync(YamlConfigService.TunSectionSettings settings)
     {
+        var patch = new Dictionary<string, object?>
+        {
+            ["tun"] = new Dictionary<string, object?>
+            {
+                ["stack"] = settings.Stack,
+                ["auto-route"] = settings.AutoRoute,
+                ["auto-detect-interface"] = settings.AutoDetectInterface,
+                ["strict-route"] = settings.StrictRoute,
+                ["mtu"] = settings.Mtu,
+                ["device-name"] = settings.DeviceName,
+                ["dns-hijack"] = settings.DnsHijack,
+                ["route-exclude-address"] = settings.RouteExcludeAddress
+            }
+        };
         await ApplyConfigPatchTransactionAsync(patch, reloadAfterPatch: true);
     }
 
@@ -2594,9 +2656,9 @@ public sealed class AppCoordinator : IAsyncDisposable
 
         _lastSsidCheck = DateTime.UtcNow;
         var settings = await AppSettingsService.LoadAsync(cancellationToken);
-        var ssids = SplitLines(settings.PauseSsid);
+        var ssids = settings.PauseSsids;
         var currentSsid = await WindowsNetworkEnvironmentService.GetCurrentWifiSsidAsync(cancellationToken);
-        var shouldDirect = ssids.Length > 0 &&
+        var shouldDirect = ssids.Count > 0 &&
                            !string.IsNullOrWhiteSpace(currentSsid) &&
                            ssids.Contains(currentSsid, StringComparer.OrdinalIgnoreCase);
         if (shouldDirect)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.Services;
 
@@ -108,7 +109,8 @@ public sealed class AppSettings
     public bool DiffWorkDir { get; set; }
 
     [JsonPropertyName("pause_ssid")]
-    public string PauseSsid { get; set; } = "";
+    [JsonConverter(typeof(StringListJsonConverter))]
+    public List<string> PauseSsids { get; set; } = [];
 
     [JsonPropertyName("disable_dns_on_pause_ssid")]
     public bool DisableDnsOnPauseSsid { get; set; }
@@ -133,6 +135,60 @@ public sealed class AppSettings
 
     [JsonPropertyName("external_controller_address")]
     public string ExternalControllerAddress { get; set; } = MihomoControllerEndpoint.DefaultHttpAddress;
+}
+
+public sealed class StringListJsonConverter : JsonConverter<List<string>>
+{
+    public override List<string> Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return [];
+        }
+
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            return ConfigTextCodec.ParseLines(reader.GetString()).ToList();
+        }
+
+        if (reader.TokenType != JsonTokenType.StartArray)
+        {
+            throw new JsonException("列表设置必须是字符串或字符串数组。");
+        }
+
+        var values = new List<string>();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException("列表设置只能包含字符串。");
+            }
+
+            var value = reader.GetString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values;
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        List<string> value,
+        JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var item in value.Where(item => !string.IsNullOrWhiteSpace(item)))
+        {
+            writer.WriteStringValue(item.Trim());
+        }
+        writer.WriteEndArray();
+    }
 }
 
 public sealed class WebUiPanelSetting

@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using System.Text;
@@ -94,10 +95,10 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
             : appSettings.ExternalControllerAddress;
         Secret = settings.Secret;
         AllowLan = settings.AllowLan;
-        LanAllowedIps = settings.LanAllowedIps;
-        LanDisallowedIps = settings.LanDisallowedIps;
-        Authentication = settings.Authentication;
-        SkipAuthPrefixes = settings.SkipAuthPrefixes;
+        LanAllowedIps = ConfigTextCodec.FormatLines(settings.LanAllowedIps);
+        LanDisallowedIps = ConfigTextCodec.FormatLines(settings.LanDisallowedIps);
+        Authentication = ConfigTextCodec.FormatLines(settings.Authentication);
+        SkipAuthPrefixes = ConfigTextCodec.FormatLines(settings.SkipAuthPrefixes);
         StoreSelected = settings.StoreSelected;
         StoreFakeIp = settings.StoreFakeIp;
         MaxLogDays = appSettings.MaxLogDays;
@@ -285,10 +286,10 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
                 NormalizeController(ExternalController),
                 Secret.Trim(),
                 AllowLan,
-                LanAllowedIps,
-                LanDisallowedIps,
-                Authentication,
-                SkipAuthPrefixes,
+                ConfigTextCodec.ParseLines(LanAllowedIps),
+                ConfigTextCodec.ParseLines(LanDisallowedIps),
+                ConfigTextCodec.ParseLines(Authentication),
+                ConfigTextCodec.ParseLines(SkipAuthPrefixes),
                 StoreSelected,
                 StoreFakeIp), EnableExternalController);
             Runtime.Notifications.Success(

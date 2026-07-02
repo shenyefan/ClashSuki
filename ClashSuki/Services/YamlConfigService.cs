@@ -13,10 +13,10 @@ public static class YamlConfigService
         bool AutoRoute,
         bool AutoDetectInterface,
         bool StrictRoute,
-        string Mtu,
+        int Mtu,
         string DeviceName,
-        string DnsHijack,
-        string RouteExcludeAddress);
+        IReadOnlyList<string> DnsHijack,
+        IReadOnlyList<string> RouteExcludeAddress);
 
     public sealed record DnsSectionSettings(
         bool Enable,
@@ -26,31 +26,31 @@ public static class YamlConfigService
         bool UseHosts,
         bool UseSystemHosts,
         string FakeIpRange,
-        string FakeIpFilter,
+        IReadOnlyList<string> FakeIpFilter,
         string FakeIpFilterMode,
-        string Nameserver,
-        string Fallback,
-        string DefaultNameserver,
-        string DirectNameserver,
-        string ProxyServerNameserver,
-        string FallbackGeoIp,
+        IReadOnlyList<string> Nameserver,
+        IReadOnlyList<string> Fallback,
+        IReadOnlyList<string> DefaultNameserver,
+        IReadOnlyList<string> DirectNameserver,
+        IReadOnlyList<string> ProxyServerNameserver,
+        bool FallbackGeoIp,
         string FallbackGeoIpCode,
-        string FallbackIpCidr,
-        string FallbackDomain,
-        string Hosts);
+        IReadOnlyList<string> FallbackIpCidr,
+        IReadOnlyList<string> FallbackDomain,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> Hosts);
 
     public sealed record SnifferSectionSettings(
         bool Enable,
         bool OverrideDestination,
         bool ForceDnsMapping,
         bool ParsePureIp,
-        string HttpPorts,
-        string TlsPorts,
-        string QuicPorts,
-        string SkipDomain,
-        string ForceDomain,
-        string SkipDstAddress,
-        string SkipSrcAddress);
+        IReadOnlyList<string> HttpPorts,
+        IReadOnlyList<string> TlsPorts,
+        IReadOnlyList<string> QuicPorts,
+        IReadOnlyList<string> SkipDomain,
+        IReadOnlyList<string> ForceDomain,
+        IReadOnlyList<string> SkipDstAddress,
+        IReadOnlyList<string> SkipSrcAddress);
 
     public sealed record CoreSectionSettings(
         bool Ipv6,
@@ -66,10 +66,10 @@ public static class YamlConfigService
         string ExternalController,
         string Secret,
         bool AllowLan,
-        string LanAllowedIps,
-        string LanDisallowedIps,
-        string Authentication,
-        string SkipAuthPrefixes,
+        IReadOnlyList<string> LanAllowedIps,
+        IReadOnlyList<string> LanDisallowedIps,
+        IReadOnlyList<string> Authentication,
+        IReadOnlyList<string> SkipAuthPrefixes,
         bool StoreSelected,
         bool StoreFakeIp);
 
@@ -235,7 +235,7 @@ public static class YamlConfigService
             var doc = LoadDocument(yaml);
             var root = EnsureRoot(doc);
             MergePatch(root, patch, replaceRootMappings);
-            await File.WriteAllTextAsync(path, SaveDocument(doc), cancellationToken);
+            await File.WriteAllTextAsync(path, SaveAndVerifyDocument(doc), cancellationToken);
         }
     }
 
@@ -253,7 +253,7 @@ public static class YamlConfigService
         var yaml = await File.ReadAllTextAsync(path, cancellationToken);
         var doc = LoadDocument(yaml);
         MergePatch(EnsureRoot(doc), patch, replaceRootMappings);
-        return SaveDocument(doc);
+        return SaveAndVerifyDocument(doc);
     }
 
     public static string RemoveRootKeys(string yaml, IEnumerable<string> keys)
@@ -314,10 +314,10 @@ public static class YamlConfigService
             TryGetBool(tun, "auto-route") ?? true,
             TryGetBool(tun, "auto-detect-interface") ?? true,
             TryGetBool(tun, "strict-route") ?? false,
-            TryGetString(tun, "mtu") ?? "9000",
+            TryGetInt(tun, "mtu") ?? 9000,
             TryGetString(tun, "device-name") ?? TryGetString(tun, "device") ?? "",
-            ReadLines(tun, "dns-hijack", "any:53"),
-            ReadLines(tun, "route-exclude-address", ""));
+            ReadList(tun, "dns-hijack", ["any:53"]),
+            ReadList(tun, "route-exclude-address", []));
     }
 
     public static async Task<DnsSectionSettings> LoadDnsSettingsAsync(string path, CancellationToken cancellationToken)
@@ -332,18 +332,18 @@ public static class YamlConfigService
             TryGetBool(dns, "use-hosts") ?? false,
             TryGetBool(dns, "use-system-hosts") ?? true,
             TryGetString(dns, "fake-ip-range") ?? "198.18.0.0/15",
-            ReadLines(dns, "fake-ip-filter", "*.lan\nlocalhost.ptlogin2.qq.com"),
+            ReadList(dns, "fake-ip-filter", ["*.lan", "localhost.ptlogin2.qq.com"]),
             TryGetString(dns, "fake-ip-filter-mode") ?? "blacklist",
-            ReadLines(dns, "nameserver", "114.114.114.114\n8.8.8.8"),
-            ReadLines(dns, "fallback", "tls://1.1.1.1\ntls://8.8.4.4"),
-            ReadLines(dns, "default-nameserver", "114.114.114.114\n8.8.8.8"),
-            ReadLines(dns, "direct-nameserver", ""),
-            ReadLines(dns, "proxy-server-nameserver", ""),
-            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip")?.ToString().ToLowerInvariant() ?? "true",
+            ReadList(dns, "nameserver", ["114.114.114.114", "8.8.8.8"]),
+            ReadList(dns, "fallback", ["tls://1.1.1.1", "tls://8.8.4.4"]),
+            ReadList(dns, "default-nameserver", ["114.114.114.114", "8.8.8.8"]),
+            ReadList(dns, "direct-nameserver", []),
+            ReadList(dns, "proxy-server-nameserver", []),
+            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip") ?? true,
             TryGetString(TryGetMap(dns, "fallback-filter"), "geoip-code") ?? "CN",
-            ReadLines(TryGetMap(dns, "fallback-filter"), "ipcidr", ""),
-            ReadLines(TryGetMap(dns, "fallback-filter"), "domain", ""),
-            FormatSimpleMapping(TryGetMap(root, "hosts")));
+            ReadList(TryGetMap(dns, "fallback-filter"), "ipcidr", []),
+            ReadList(TryGetMap(dns, "fallback-filter"), "domain", []),
+            ReadSimpleMapping(TryGetMap(root, "hosts")));
     }
 
     public static async Task<SnifferSectionSettings> LoadSnifferSettingsAsync(string path, CancellationToken cancellationToken)
@@ -356,13 +356,13 @@ public static class YamlConfigService
             TryGetBool(sniffer, "override-destination") ?? false,
             TryGetBool(sniffer, "force-dns-mapping") ?? true,
             TryGetBool(sniffer, "parse-pure-ip") ?? false,
-            ReadPorts(sniff, "HTTP", "80"),
-            ReadPorts(sniff, "TLS", "443"),
-            ReadPorts(sniff, "QUIC", "443"),
-            ReadLines(sniffer, "skip-domain", ""),
-            ReadLines(sniffer, "force-domain", ""),
-            ReadLines(sniffer, "skip-dst-address", ""),
-            ReadLines(sniffer, "skip-src-address", ""));
+            ReadPorts(sniff, "HTTP", ["80"]),
+            ReadPorts(sniff, "TLS", ["443"]),
+            ReadPorts(sniff, "QUIC", ["443"]),
+            ReadList(sniffer, "skip-domain", []),
+            ReadList(sniffer, "force-domain", []),
+            ReadList(sniffer, "skip-dst-address", []),
+            ReadList(sniffer, "skip-src-address", []));
     }
 
     public static async Task<CoreSectionSettings> LoadCoreSettingsAsync(string path, CancellationToken cancellationToken)
@@ -383,10 +383,10 @@ public static class YamlConfigService
             TryGetString(root, "external-controller") ?? "",
             TryGetString(root, "secret") ?? "",
             TryGetBool(root, "allow-lan") ?? false,
-            ReadLines(root, "lan-allowed-ips", ""),
-            ReadLines(root, "lan-disallowed-ips", ""),
-            ReadLines(root, "authentication", ""),
-            ReadLines(root, "skip-auth-prefixes", "127.0.0.1/8\n::1/128"),
+            ReadList(root, "lan-allowed-ips", []),
+            ReadList(root, "lan-disallowed-ips", []),
+            ReadList(root, "authentication", []),
+            ReadList(root, "skip-auth-prefixes", ["127.0.0.1/8", "::1/128"]),
             TryGetBool(profile, "store-selected") ?? true,
             TryGetBool(profile, "store-fake-ip") ?? true);
     }
@@ -565,10 +565,10 @@ public static class YamlConfigService
         map.Children[keyNode] = new YamlScalarNode(value);
     }
 
-    private static int? TryGetInt(YamlMappingNode map, string key)
+    private static int? TryGetInt(YamlMappingNode? map, string key)
     {
         var keyNode = new YamlScalarNode(key);
-        if (map.Children.TryGetValue(keyNode, out var node) &&
+        if (map?.Children.TryGetValue(keyNode, out var node) == true &&
             node is YamlScalarNode scalar &&
             int.TryParse(scalar.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
         {
@@ -668,30 +668,44 @@ public static class YamlConfigService
         return writer.ToString();
     }
 
+    private static string SaveAndVerifyDocument(YamlDocument document)
+    {
+        var yaml = SaveDocument(document);
+        _ = EnsureRoot(LoadDocument(yaml));
+        return yaml;
+    }
+
     private static string SaveNode(YamlNode node)
     {
         var document = new YamlDocument(CloneNode(node));
         return SaveDocument(document);
     }
 
-    private static string ReadLines(YamlMappingNode? map, string key, string fallback) =>
+    private static IReadOnlyList<string> ReadList(
+        YamlMappingNode? map,
+        string key,
+        IReadOnlyList<string> fallback) =>
         TryGetNode(map, key) is null
             ? fallback
-            : string.Join(Environment.NewLine, TryGetStringList(map, key));
+            : TryGetStringList(map, key);
 
-    private static string ReadPorts(YamlMappingNode? sniff, string key, string fallback) =>
+    private static IReadOnlyList<string> ReadPorts(
+        YamlMappingNode? sniff,
+        string key,
+        IReadOnlyList<string> fallback) =>
         TryGetNode(TryGetMap(sniff, key), "ports") is null
             ? fallback
-            : string.Join(',', TryGetPorts(sniff, key));
+            : TryGetPorts(sniff, key);
 
-    private static string FormatSimpleMapping(YamlMappingNode? map)
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadSimpleMapping(
+        YamlMappingNode? map)
     {
         if (map is null || map.Children.Count == 0)
         {
-            return "";
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var lines = new List<string>();
+        var values = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var (keyNode, valueNode) in map.Children)
         {
             if (keyNode is not YamlScalarNode { Value: { Length: > 0 } key })
@@ -701,18 +715,22 @@ public static class YamlConfigService
 
             var value = valueNode switch
             {
-                YamlSequenceNode sequence => string.Join(',', sequence.Children
+                YamlSequenceNode sequence => sequence.Children
                     .OfType<YamlScalarNode>()
                     .Select(item => item.Value ?? "")
-                    .Where(item => !string.IsNullOrWhiteSpace(item))),
-                YamlScalarNode scalar => scalar.Value ?? "",
-                _ => SaveNode(valueNode).Trim()
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToArray(),
+                YamlScalarNode scalar when !string.IsNullOrWhiteSpace(scalar.Value) => [scalar.Value],
+                _ => []
             };
 
-            lines.Add($"{key}={value}");
+            if (value.Length > 0)
+            {
+                values[key] = value;
+            }
         }
 
-        return string.Join(Environment.NewLine, lines);
+        return values;
     }
 
     private static void MergeTun(YamlMappingNode root, YamlNode patchNode)

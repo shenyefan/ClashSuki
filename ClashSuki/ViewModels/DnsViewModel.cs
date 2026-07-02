@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.ViewModels;
 
@@ -52,23 +53,23 @@ public sealed partial class DnsViewModel : ObservableObject
         UseHosts = settings.UseHosts;
         UseSystemHosts = settings.UseSystemHosts;
         FakeIpRange = settings.FakeIpRange;
-        FakeIpFilter = settings.FakeIpFilter;
+        FakeIpFilter = ConfigTextCodec.FormatLines(settings.FakeIpFilter);
         FakeIpFilterModeIndex = settings.FakeIpFilterMode.ToLowerInvariant() switch
         {
             "whitelist" => 1,
             "rule" => 2,
             _ => 0
         };
-        Nameserver = settings.Nameserver;
-        Fallback = settings.Fallback;
-        DefaultNameserver = settings.DefaultNameserver;
-        DirectNameserver = settings.DirectNameserver;
-        ProxyServerNameserver = settings.ProxyServerNameserver;
-        FallbackGeoIp = bool.TryParse(settings.FallbackGeoIp, out var geoIp) ? geoIp : true;
+        Nameserver = ConfigTextCodec.FormatLines(settings.Nameserver);
+        Fallback = ConfigTextCodec.FormatLines(settings.Fallback);
+        DefaultNameserver = ConfigTextCodec.FormatLines(settings.DefaultNameserver);
+        DirectNameserver = ConfigTextCodec.FormatLines(settings.DirectNameserver);
+        ProxyServerNameserver = ConfigTextCodec.FormatLines(settings.ProxyServerNameserver);
+        FallbackGeoIp = settings.FallbackGeoIp;
         FallbackGeoIpCode = settings.FallbackGeoIpCode;
-        FallbackIpCidr = settings.FallbackIpCidr;
-        FallbackDomain = settings.FallbackDomain;
-        Hosts = settings.Hosts;
+        FallbackIpCidr = ConfigTextCodec.FormatLines(settings.FallbackIpCidr);
+        FallbackDomain = ConfigTextCodec.FormatLines(settings.FallbackDomain);
+        Hosts = ConfigTextCodec.FormatMapping(settings.Hosts);
     }
 
     [RelayCommand]
@@ -76,35 +77,26 @@ public sealed partial class DnsViewModel : ObservableObject
     {
         try
         {
-            var patch = new Dictionary<string, object?>
-            {
-                ["dns"] = new Dictionary<string, object?>
-                {
-                    ["enable"] = DnsEnable,
-                    ["enhanced-mode"] = EnhancedModeIndex switch { 1 => "redir-host", 2 => "normal", _ => "fake-ip" },
-                    ["ipv6"] = DnsIpv6,
-                    ["respect-rules"] = RespectRules,
-                    ["use-hosts"] = UseHosts,
-                    ["use-system-hosts"] = UseSystemHosts,
-                    ["fake-ip-range"] = FakeIpRange,
-                    ["fake-ip-filter"] = SplitLines(FakeIpFilter),
-                    ["fake-ip-filter-mode"] = FakeIpFilterModeIndex switch { 1 => "whitelist", 2 => "rule", _ => "blacklist" },
-                    ["nameserver"] = SplitLines(Nameserver),
-                    ["fallback"] = SplitLines(Fallback),
-                    ["default-nameserver"] = SplitLines(DefaultNameserver),
-                    ["direct-nameserver"] = SplitLines(DirectNameserver),
-                    ["proxy-server-nameserver"] = SplitLines(ProxyServerNameserver),
-                    ["fallback-filter"] = new Dictionary<string, object?>
-                    {
-                        ["geoip"] = FallbackGeoIp,
-                        ["geoip-code"] = FallbackGeoIpCode,
-                        ["ipcidr"] = SplitLines(FallbackIpCidr),
-                        ["domain"] = SplitLines(FallbackDomain)
-                    }
-                },
-                ["hosts"] = ParseHosts(Hosts)
-            };
-            await _coordinator.SaveDnsSettingsAsync(patch);
+            await _coordinator.SaveDnsSettingsAsync(new YamlConfigService.DnsSectionSettings(
+                DnsEnable,
+                EnhancedModeIndex switch { 1 => "redir-host", 2 => "normal", _ => "fake-ip" },
+                DnsIpv6,
+                RespectRules,
+                UseHosts,
+                UseSystemHosts,
+                FakeIpRange.Trim(),
+                ConfigTextCodec.ParseLines(FakeIpFilter),
+                FakeIpFilterModeIndex switch { 1 => "whitelist", 2 => "rule", _ => "blacklist" },
+                ConfigTextCodec.ParseLines(Nameserver),
+                ConfigTextCodec.ParseLines(Fallback),
+                ConfigTextCodec.ParseLines(DefaultNameserver),
+                ConfigTextCodec.ParseLines(DirectNameserver),
+                ConfigTextCodec.ParseLines(ProxyServerNameserver),
+                FallbackGeoIp,
+                FallbackGeoIpCode.Trim(),
+                ConfigTextCodec.ParseLines(FallbackIpCidr),
+                ConfigTextCodec.ParseLines(FallbackDomain),
+                ConfigTextCodec.ParseMapping(Hosts)));
             Runtime.Notifications.Success("DNS 配置已保存。", source: LogSources.Dns);
         }
         catch (Exception ex)
@@ -148,26 +140,4 @@ public sealed partial class DnsViewModel : ObservableObject
         await SaveAsync();
     }
 
-    private static string[] SplitLines(string text) =>
-        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-    private static Dictionary<string, object?> ParseHosts(string text)
-    {
-        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var line in SplitLines(text))
-        {
-            var index = line.IndexOfAny(['=', ':']);
-            if (index <= 0 || index >= line.Length - 1)
-            {
-                continue;
-            }
-
-            var key = line[..index].Trim();
-            var value = line[(index + 1)..]
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            result[key] = value.Length > 1 ? value : value.FirstOrDefault() ?? "";
-        }
-
-        return result;
-    }
 }

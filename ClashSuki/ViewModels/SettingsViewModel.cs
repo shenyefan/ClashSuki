@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
+using ClashSuki.Utilities;
 using Microsoft.UI.Xaml;
 using System.Diagnostics;
 
@@ -20,6 +21,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private double subscriptionTimeout;
     [ObservableProperty] private double delayTestConcurrency;
     [ObservableProperty] private double delayTestTimeout;
+    [ObservableProperty] private string pauseSsidText = "";
 
     public SettingsViewModel(AppCoordinator coordinator)
     {
@@ -40,6 +42,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         SubscriptionTimeout = Settings.SubscriptionTimeout;
         DelayTestConcurrency = Settings.DelayTestConcurrency;
         DelayTestTimeout = Settings.DelayTestTimeout;
+        PauseSsidText = ConfigTextCodec.FormatLines(Settings.PauseSsids);
         IsLoading = false;
     }
 
@@ -59,6 +62,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         Settings.SubscriptionTimeout = NormalizeInt(SubscriptionTimeout, 1, 600, 30);
         Settings.DelayTestConcurrency = NormalizeInt(DelayTestConcurrency, 1, 100, 10);
         Settings.DelayTestTimeout = NormalizeInt(DelayTestTimeout, 1000, 60000, 5000);
+        Settings.PauseSsids = ConfigTextCodec.ParseLines(PauseSsidText).ToList();
         if (string.IsNullOrWhiteSpace(Settings.DelayTestUrl))
         {
             Settings.DelayTestUrl = "https://www.gstatic.com/generate_204";
@@ -409,5 +413,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         SubscriptionTimeout = value.SubscriptionTimeout;
         DelayTestConcurrency = value.DelayTestConcurrency;
         DelayTestTimeout = value.DelayTestTimeout;
+        PauseSsidText = ConfigTextCodec.FormatLines(value.PauseSsids);
     }
 }

@@ -34,7 +34,7 @@
     <AppxPackageTestDir>$(AppxPackageDir)</AppxPackageTestDir>
     <AppxPackageSigningEnabled Condition="'$(PackageCertificateKeyFile)' == ''">false</AppxPackageSigningEnabled>
     <AppxPackageSigningEnabled Condition="'$(PackageCertificateKeyFile)' != ''">true</AppxPackageSigningEnabled>
-    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <GenerateAppInstallerFile Condition="'$(AppInstallerUri)' == ''">false</GenerateAppInstallerFile>
     <GenerateAppInstallerFile Condition="'$(AppInstallerUri)' != ''">true</GenerateAppInstallerFile>
     <AppInstallerCheckForUpdateFrequency>Daily</AppInstallerCheckForUpdateFrequency>

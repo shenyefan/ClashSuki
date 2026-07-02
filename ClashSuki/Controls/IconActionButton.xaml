@@ -9,7 +9,8 @@
             <VisualState x:Name="Unselected" />
             <VisualState x:Name="Selected">
                 <VisualState.Setters>
-                    <Setter Target="ActionButton.Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                    <Setter Target="ActionButton.Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                    <Setter Target="ActionButton.Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                 </VisualState.Setters>
             </VisualState>
         </VisualStateGroup>
