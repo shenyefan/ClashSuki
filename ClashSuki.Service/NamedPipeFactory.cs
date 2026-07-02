@@ -13,8 +13,12 @@ internal static class NamedPipeFactory
     {
         var pipeSecurity = new PipeSecurity();
         pipeSecurity.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.NetworkSid, null),
+            PipeAccessRights.FullControl,
+            AccessControlType.Deny));
+        pipeSecurity.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
-            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+            PipeAccessRights.ReadData | PipeAccessRights.WriteData | PipeAccessRights.Synchronize,
             AccessControlType.Allow));
         pipeSecurity.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
@@ -24,7 +28,7 @@ internal static class NamedPipeFactory
         return NamedPipeServerStreamAcl.Create(
             pipeName,
             PipeDirection.InOut,
-            NamedPipeServerStream.MaxAllowedServerInstances,
+            maxNumberOfServerInstances: 1,
             PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous,
             inBufferSize: 0,

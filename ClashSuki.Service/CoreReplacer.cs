@@ -6,30 +6,60 @@ internal static class CoreReplacer
 {
     public static void Replace(string sourcePath, string destinationPath)
     {
-        if (!File.Exists(sourcePath))
+        var normalizedSourcePath = Path.GetFullPath(sourcePath);
+        var normalizedDestinationPath = Path.GetFullPath(destinationPath);
+        ValidatePaths(normalizedSourcePath, normalizedDestinationPath);
+
+        if (!File.Exists(normalizedSourcePath))
         {
-            throw new FileNotFoundException("找不到源内核程序。", sourcePath);
+            throw new FileNotFoundException("找不到源内核程序。", normalizedSourcePath);
         }
 
-        var directory = Path.GetDirectoryName(destinationPath);
+        var directory = Path.GetDirectoryName(normalizedDestinationPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        KillProcessesUsingFile(destinationPath);
+        KillProcessesUsingFile(normalizedDestinationPath);
 
-        var backupPath = destinationPath + ".bak";
-        if (File.Exists(destinationPath))
+        var backupPath = normalizedDestinationPath + ".bak";
+        var restoringBackup = string.Equals(
+            normalizedSourcePath,
+            backupPath,
+            StringComparison.OrdinalIgnoreCase);
+        if (!restoringBackup && File.Exists(normalizedDestinationPath))
         {
-            File.Copy(destinationPath, backupPath, overwrite: true);
+            File.Copy(normalizedDestinationPath, backupPath, overwrite: true);
         }
-        else
+        else if (!restoringBackup)
         {
             TryDeleteFile(backupPath);
         }
 
-        File.Copy(sourcePath, destinationPath, overwrite: true);
+        File.Copy(normalizedSourcePath, normalizedDestinationPath, overwrite: true);
+    }
+
+    private static void ValidatePaths(string sourcePath, string destinationPath)
+    {
+        if (!string.Equals(Path.GetFileName(destinationPath), "mihomo.exe", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                Path.GetFileName(Path.GetDirectoryName(destinationPath)),
+                "core",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("提权进程仅允许替换 ClashSuki 的 mihomo.exe。");
+        }
+
+        var allowedSources = new[]
+        {
+            destinationPath + ".new",
+            destinationPath + ".bak"
+        };
+        if (!allowedSources.Contains(sourcePath, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("内核替换源文件不属于 ClashSuki 的受管临时文件。");
+        }
     }
 
     private static void KillProcessesUsingFile(string filePath)

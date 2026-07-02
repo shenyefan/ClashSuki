@@ -1,9 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
-using System.Text;
-using System.Text.Json;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Services;
 
@@ -24,8 +22,7 @@ public enum MihomoServiceStatus
 
 public sealed class MihomoServiceManager
 {
-    internal const string ServicePipeName = "ClashSukiService";
-    private const int ServiceProtocolVersion = 3;
+    private readonly ServiceIpcClient _ipcClient = new();
 
     public async Task<MihomoServiceStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
@@ -67,7 +64,7 @@ public sealed class MihomoServiceManager
             {
                 DiagnosticLog.WriteApp(
                     "SERVICE",
-                    $"服务协议版本不匹配；期望版本={ServiceProtocolVersion}；实际版本={probe.ProtocolVersion?.ToString() ?? "未知"}；正在重启服务。");
+                    $"服务协议版本不匹配；期望版本={ServiceProtocol.Version}；实际版本={probe.ProtocolVersion?.ToString() ?? "未知"}；正在重启服务。");
                 MihomoServiceInstaller.Restart();
             }
             else
@@ -143,7 +140,9 @@ public sealed class MihomoServiceManager
 
         try
         {
-            await SendIpcAsync(new { command = "stop_service" }, cancellationToken);
+            await _ipcClient.SendAsync(
+                new ServiceRequest { Command = ServiceCommands.StopService },
+                cancellationToken);
             await WaitForHostStateAsync(expectedRunning: false, TimeSpan.FromSeconds(10), cancellationToken);
         }
         catch (Exception ex)
@@ -206,57 +205,33 @@ public sealed class MihomoServiceManager
             : Path.GetFullPath(configDirectory);
         Directory.CreateDirectory(effectiveConfigDirectory);
 
-        var payload = new
+        var payload = new ServiceRequest
         {
-            command = "start_core",
-            core_path = AppPaths.ManagedCorePath,
-            config_path = AppPaths.RuntimeConfigPath,
-            config_dir = effectiveConfigDirectory,
-            core_ipc_path = MihomoControllerEndpoint.PipePath
+            Command = ServiceCommands.StartCore,
+            CorePath = AppPaths.ManagedCorePath,
+            ConfigPath = AppPaths.RuntimeConfigPath,
+            ConfigDir = effectiveConfigDirectory,
+            CoreIpcPath = MihomoControllerEndpoint.PipePath
         };
 
-        await SendIpcAsync(payload, cancellationToken);
+        await _ipcClient.SendAsync(payload, cancellationToken);
         await WaitForCoreStateAsync(expectedRunning: true, TimeSpan.FromSeconds(10), cancellationToken);
     }
 
     public async Task StopCoreAsync(CancellationToken cancellationToken = default)
     {
-        await SendIpcAsync(new { command = "stop_core" }, cancellationToken);
+        await _ipcClient.SendAsync(
+            new ServiceRequest { Command = ServiceCommands.StopCore },
+            cancellationToken);
         await WaitForCoreStateAsync(expectedRunning: false, TimeSpan.FromSeconds(10), cancellationToken);
     }
 
     public async Task<(bool Running, int? Pid)> GetCoreStatusAsync(CancellationToken cancellationToken = default)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-
-        await using var pipe = new NamedPipeClientStream(".", ServicePipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-        await pipe.ConnectAsync(1500, timeout.Token);
-
-        var request = Encoding.UTF8.GetBytes("""{"command":"get_status"}""" + "\n");
-        await pipe.WriteAsync(request, timeout.Token);
-        await pipe.FlushAsync(timeout.Token);
-
-        using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
-        var responseLine = await reader.ReadLineAsync(timeout.Token);
-        if (string.IsNullOrWhiteSpace(responseLine))
-        {
-            throw new InvalidOperationException("服务 IPC 未返回状态。");
-        }
-
-        using var doc = JsonDocument.Parse(responseLine);
-        var root = doc.RootElement;
-        var ok = root.TryGetProperty("ok", out var okElement) && okElement.GetBoolean();
-        if (!ok)
-        {
-            throw new InvalidOperationException("服务 IPC 状态查询失败。");
-        }
-
-        var running = root.TryGetProperty("core_running", out var runningElement) && runningElement.GetBoolean();
-        int? pid = root.TryGetProperty("core_pid", out var pidElement) && pidElement.ValueKind == JsonValueKind.Number
-            ? pidElement.GetInt32()
-            : null;
-        return (running, pid);
+        var response = await _ipcClient.SendAsync(
+            new ServiceRequest { Command = ServiceCommands.GetStatus },
+            cancellationToken);
+        return (response.CoreRunning == true, response.CorePid);
     }
 
     private async Task WaitForCoreStateAsync(
@@ -316,70 +291,29 @@ public sealed class MihomoServiceManager
             : "等待服务停止超时。");
     }
 
-    private static async Task<bool> CanConnectIpcAsync(CancellationToken cancellationToken)
+    private async Task<bool> CanConnectIpcAsync(CancellationToken cancellationToken)
     {
         return (await ProbeIpcAsync(cancellationToken)).IsCompatible;
     }
 
-    private static async Task<ServiceProbe> ProbeIpcAsync(CancellationToken cancellationToken)
+    private async Task<ServiceProbe> ProbeIpcAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var response = await SendIpcAsync(
-                new { command = "ping" },
+            var response = await _ipcClient.SendAsync(
+                new ServiceRequest { Command = ServiceCommands.Ping },
                 cancellationToken,
-                connectTimeoutMs: 500);
-            var protocolVersion = response.TryGetProperty("protocol_version", out var versionElement) &&
-                                  versionElement.ValueKind == JsonValueKind.Number
-                ? versionElement.GetInt32()
-                : (int?)null;
+                connectTimeoutMilliseconds: 500);
+            var protocolVersion = response.ProtocolVersion;
             return new ServiceProbe(
                 IsReachable: true,
-                IsCompatible: protocolVersion == ServiceProtocolVersion,
+                IsCompatible: protocolVersion == ServiceProtocol.Version,
                 ProtocolVersion: protocolVersion);
         }
         catch
         {
             return new ServiceProbe(false, false, null);
         }
-    }
-
-    private static async Task<JsonElement> SendIpcAsync(
-        object payload,
-        CancellationToken cancellationToken,
-        int connectTimeoutMs = 1500)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-
-        await using var pipe = new NamedPipeClientStream(".", ServicePipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-        await pipe.ConnectAsync(connectTimeoutMs, timeout.Token);
-
-        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload) + "\n");
-        await pipe.WriteAsync(bytes, timeout.Token);
-        await pipe.FlushAsync(timeout.Token);
-
-        using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
-        var responseLine = await reader.ReadLineAsync(timeout.Token);
-        if (string.IsNullOrWhiteSpace(responseLine))
-        {
-            throw new InvalidOperationException("服务 IPC 未返回执行结果。");
-        }
-
-        using var doc = JsonDocument.Parse(responseLine);
-        var root = doc.RootElement;
-        var ok = root.TryGetProperty("ok", out var okElement) && okElement.GetBoolean();
-        if (!ok)
-        {
-            var error = root.TryGetProperty("error", out var errorElement)
-                ? errorElement.GetString()
-                : null;
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
-                ? "服务 IPC 命令执行失败。"
-                : error);
-        }
-
-        return root.Clone();
     }
 
     private readonly record struct ServiceProbe(

@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.ServiceProcess;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Services;
 
 public static class MihomoServiceInstaller
 {
-    public const string ServiceName = "ClashSukiService";
+    public const string ServiceName = ServiceProtocol.ServiceName;
 
     public static bool IsInstalled()
     {
@@ -52,7 +53,10 @@ public static class MihomoServiceInstaller
     public static void Start()
     {
         using var controller = FindController();
-        if (controller is null) return;
+        if (controller is null)
+        {
+            throw new InvalidOperationException("ClashSuki 服务尚未安装。");
+        }
 
         if (controller.Status != ServiceControllerStatus.Running &&
             controller.Status != ServiceControllerStatus.StartPending)
@@ -89,6 +93,8 @@ public static class MihomoServiceInstaller
         {
             throw new InvalidOperationException(delete.Output);
         }
+
+        WaitUntilUninstalled();
     }
 
     public static void Stop()
@@ -123,6 +129,22 @@ public static class MihomoServiceInstaller
             sc.Dispose();
         }
         return null;
+    }
+
+    private static void WaitUntilUninstalled()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsInstalled())
+            {
+                return;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        throw new System.TimeoutException("等待 ClashSuki 服务删除超时。");
     }
 
     private static string ResolveServiceExecutablePath()

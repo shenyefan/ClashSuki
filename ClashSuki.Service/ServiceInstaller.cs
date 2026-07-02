@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.ServiceProcess;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Service;
 
 internal static class ServiceInstaller
 {
-    public const string ServiceName = "ClashSukiService";
+    public const string ServiceName = ServiceProtocol.ServiceName;
     private const string DisplayName = "ClashSuki Service";
     private const string Description = "使用 Windows 服务权限运行 ClashSuki 内核。";
 
@@ -51,12 +52,17 @@ internal static class ServiceInstaller
     public static void Start()
     {
         using var c = FindController();
-        if (c?.Status is not (ServiceControllerStatus.Running or ServiceControllerStatus.StartPending))
+        if (c is null)
         {
-            c?.Start();
+            throw new InvalidOperationException("ClashSuki 服务尚未安装。");
+        }
+
+        if (c.Status is not (ServiceControllerStatus.Running or ServiceControllerStatus.StartPending))
+        {
+            c.Start();
             try
             {
-                c?.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
+                c.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
             }
             catch (System.ServiceProcess.TimeoutException ex)
             {
@@ -89,6 +95,19 @@ internal static class ServiceInstaller
         {
             throw new InvalidOperationException(delete.Output);
         }
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsInstalled())
+            {
+                return;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        throw new System.TimeoutException("等待 ClashSuki 服务删除超时。");
     }
 
     private static ServiceController? FindController()
@@ -125,8 +144,8 @@ internal static class ServiceInstaller
         using var process = Process.Start(startInfo)
                             ?? throw new InvalidOperationException("无法启动 sc.exe。");
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(15_000))
         {
             try
@@ -142,6 +161,12 @@ internal static class ServiceInstaller
             return (-1, "sc.exe 执行超时。");
         }
 
+        var output = Task.WhenAll(stdoutTask, stderrTask)
+            .WaitAsync(TimeSpan.FromSeconds(2))
+            .GetAwaiter()
+            .GetResult();
+        var stdout = output[0];
+        var stderr = output[1];
         return (process.ExitCode, stdout + stderr);
     }
 }
