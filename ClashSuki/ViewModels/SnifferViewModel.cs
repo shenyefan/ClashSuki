@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.ViewModels;
 
@@ -36,13 +37,13 @@ public sealed partial class SnifferViewModel : ObservableObject
         OverrideDestination = settings.OverrideDestination;
         ForceDnsMapping = settings.ForceDnsMapping;
         ParsePureIp = settings.ParsePureIp;
-        HttpPorts = settings.HttpPorts;
-        TlsPorts = settings.TlsPorts;
-        QuicPorts = settings.QuicPorts;
-        SkipDomain = settings.SkipDomain;
-        ForceDomain = settings.ForceDomain;
-        SkipDstAddress = settings.SkipDstAddress;
-        SkipSrcAddress = settings.SkipSrcAddress;
+        HttpPorts = ConfigTextCodec.FormatValues(settings.HttpPorts);
+        TlsPorts = ConfigTextCodec.FormatValues(settings.TlsPorts);
+        QuicPorts = ConfigTextCodec.FormatValues(settings.QuicPorts);
+        SkipDomain = ConfigTextCodec.FormatLines(settings.SkipDomain);
+        ForceDomain = ConfigTextCodec.FormatLines(settings.ForceDomain);
+        SkipDstAddress = ConfigTextCodec.FormatLines(settings.SkipDstAddress);
+        SkipSrcAddress = ConfigTextCodec.FormatLines(settings.SkipSrcAddress);
     }
 
     [RelayCommand]
@@ -50,24 +51,18 @@ public sealed partial class SnifferViewModel : ObservableObject
     {
         try
         {
-            var sniffer = new Dictionary<string, object?>
-            {
-                ["enable"] = SnifferEnable,
-                ["override-destination"] = OverrideDestination,
-                ["force-dns-mapping"] = ForceDnsMapping,
-                ["parse-pure-ip"] = ParsePureIp,
-                ["sniff"] = new Dictionary<string, object?>
-                {
-                    ["HTTP"] = new Dictionary<string, object?> { ["ports"] = SplitPorts(HttpPorts) },
-                    ["TLS"] = new Dictionary<string, object?> { ["ports"] = SplitPorts(TlsPorts) },
-                    ["QUIC"] = new Dictionary<string, object?> { ["ports"] = SplitPorts(QuicPorts) }
-                },
-                ["skip-domain"] = SplitLines(SkipDomain),
-                ["force-domain"] = SplitLines(ForceDomain),
-                ["skip-dst-address"] = SplitLines(SkipDstAddress),
-                ["skip-src-address"] = SplitLines(SkipSrcAddress)
-            };
-            await _coordinator.SaveSnifferSettingsAsync(new Dictionary<string, object?> { ["sniffer"] = sniffer });
+            await _coordinator.SaveSnifferSettingsAsync(new YamlConfigService.SnifferSectionSettings(
+                SnifferEnable,
+                OverrideDestination,
+                ForceDnsMapping,
+                ParsePureIp,
+                ConfigTextCodec.ParseValues(HttpPorts, ','),
+                ConfigTextCodec.ParseValues(TlsPorts, ','),
+                ConfigTextCodec.ParseValues(QuicPorts, ','),
+                ConfigTextCodec.ParseLines(SkipDomain),
+                ConfigTextCodec.ParseLines(ForceDomain),
+                ConfigTextCodec.ParseLines(SkipDstAddress),
+                ConfigTextCodec.ParseLines(SkipSrcAddress)));
             Runtime.Notifications.Success(
                 "嗅探配置已保存并重载。",
                 source: LogSources.Sniffer);
@@ -105,9 +100,4 @@ public sealed partial class SnifferViewModel : ObservableObject
         await SaveAsync();
     }
 
-    private static string[] SplitLines(string text) =>
-        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-    private static string[] SplitPorts(string text) =>
-        text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

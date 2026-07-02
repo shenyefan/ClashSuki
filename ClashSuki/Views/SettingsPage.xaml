@@ -159,7 +159,7 @@
             <controls:SettingsExpander Header="网络环境" Description="指定 WiFi SSID 下自动直连">
                 <controls:SettingsExpander.Items>
                     <controls:SettingsCard Header="指定 WiFi SSID 直连" Description="每行一个 SSID" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
-                        <TextBox AcceptsReturn="True" MinHeight="96" HorizontalAlignment="Stretch" Text="{Binding Settings.PauseSsid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox AcceptsReturn="True" MinHeight="96" HorizontalAlignment="Stretch" Text="{Binding PauseSsidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
                     <controls:SettingsCard Header="直连时使用系统默认 DNS" Description="SSID 直连时不强制应用内 DNS">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.DisableDnsOnPauseSsid, Mode=TwoWay}" HorizontalAlignment="Right" />
