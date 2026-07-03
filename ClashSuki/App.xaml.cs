@@ -218,6 +218,10 @@ public partial class App : Application
         {
             await viewModel.StartCommand.ExecuteAsync(null);
         }
+        catch (OperationCanceledException)
+        {
+            // Application shutdown cancels startup work and is not an error.
+        }
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(

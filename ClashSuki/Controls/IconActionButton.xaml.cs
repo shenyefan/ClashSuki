@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media;
 using System.Windows.Input;
 
 namespace ClashSuki.Controls;
@@ -52,6 +53,20 @@ public sealed partial class IconActionButton : UserControl
                 }
             }));
 
+    public static readonly DependencyProperty SelectedBackgroundProperty =
+        DependencyProperty.Register(
+            nameof(SelectedBackground),
+            typeof(Brush),
+            typeof(IconActionButton),
+            new PropertyMetadata(null, OnSelectionAppearanceChanged));
+
+    public static readonly DependencyProperty SelectedForegroundProperty =
+        DependencyProperty.Register(
+            nameof(SelectedForeground),
+            typeof(Brush),
+            typeof(IconActionButton),
+            new PropertyMetadata(null, OnSelectionAppearanceChanged));
+
     public static readonly DependencyProperty CommandProperty =
         DependencyProperty.Register(nameof(Command), typeof(ICommand), typeof(IconActionButton),
             new PropertyMetadata(null, OnCommandChanged));
@@ -84,6 +99,18 @@ public sealed partial class IconActionButton : UserControl
     {
         get => (bool)GetValue(IsSelectedProperty);
         set => SetValue(IsSelectedProperty, value);
+    }
+
+    public Brush? SelectedBackground
+    {
+        get => (Brush?)GetValue(SelectedBackgroundProperty);
+        set => SetValue(SelectedBackgroundProperty, value);
+    }
+
+    public Brush? SelectedForeground
+    {
+        get => (Brush?)GetValue(SelectedForegroundProperty);
+        set => SetValue(SelectedForegroundProperty, value);
     }
 
     public ICommand? Command
@@ -137,6 +164,16 @@ public sealed partial class IconActionButton : UserControl
         button.UpdateInteractionEnabled();
     }
 
+    private static void OnSelectionAppearanceChanged(
+        DependencyObject dependencyObject,
+        DependencyPropertyChangedEventArgs _)
+    {
+        if (dependencyObject is IconActionButton button)
+        {
+            button.UpdateSelectionState();
+        }
+    }
+
     private void TryBindLoadingFromCommand()
     {
         if (!AutoSyncLoadingFromCommand || Command is not IAsyncRelayCommand asyncCommand)
@@ -183,6 +220,23 @@ public sealed partial class IconActionButton : UserControl
 
     private void UpdateSelectionState()
     {
+        ActionButton.ClearValue(Control.BackgroundProperty);
+        ActionButton.ClearValue(Control.ForegroundProperty);
         VisualStateManager.GoToState(this, IsSelected ? "Selected" : "Unselected", false);
+
+        if (!IsSelected)
+        {
+            return;
+        }
+
+        if (SelectedBackground is not null)
+        {
+            ActionButton.Background = SelectedBackground;
+        }
+
+        if (SelectedForeground is not null)
+        {
+            ActionButton.Foreground = SelectedForeground;
+        }
     }
 }
