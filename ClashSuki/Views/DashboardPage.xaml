@@ -43,10 +43,11 @@
                                       Toggled="Tun_Toggled"
                                       HorizontalAlignment="Right"
                                       Visibility="{Binding Runtime.IsTunToggleAvailable, Converter={StaticResource BoolToVis}}" />
-                        <ui:IconActionButton Command="{Binding InstallServiceCommand}"
-                                             Glyph="&#xE7B8;"
-                                             Visibility="{Binding Runtime.ShowTunServiceInstall, Converter={StaticResource BoolToVis}}"
-                                             ToolTipService.ToolTip="安装服务" />
+                        <ui:IconActionButton Click="RepairService_Click"
+                                             Glyph="&#xE72C;"
+                                             IsLoading="{Binding RepairServiceCommand.IsRunning}"
+                                             Visibility="{Binding Runtime.ShowTunServiceRepair, Converter={StaticResource BoolToVis}}"
+                                             ToolTipService.ToolTip="修复服务" />
                     </Grid>
                 </controls:SettingsCard>
                 <controls:SettingsCard Grid.Column="2"
@@ -60,6 +61,8 @@
                                              AutoSyncLoadingFromCommand="False"
                                              IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
                                              IsSelected="{Binding Runtime.IsRuleMode}"
+                                             SelectedBackground="{ThemeResource SystemFillColorSuccessBrush}"
+                                             SelectedForeground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                              Glyph="&#xE8FD;"
                                              ToolTipService.ToolTip="规则模式" />
                         <ui:IconActionButton Command="{Binding SwitchModeCommand}"
@@ -67,6 +70,8 @@
                                              AutoSyncLoadingFromCommand="False"
                                              IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
                                              IsSelected="{Binding Runtime.IsGlobalMode}"
+                                             SelectedBackground="{ThemeResource SystemFillColorSuccessBrush}"
+                                             SelectedForeground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                              Glyph="&#xE774;"
                                              ToolTipService.ToolTip="全局模式" />
                         <ui:IconActionButton Command="{Binding SwitchModeCommand}"
@@ -74,6 +79,8 @@
                                              AutoSyncLoadingFromCommand="False"
                                              IsEnabled="{Binding SwitchModeCommand.IsRunning, Converter={StaticResource InverseBool}}"
                                              IsSelected="{Binding Runtime.IsDirectMode}"
+                                             SelectedBackground="{ThemeResource SystemFillColorSuccessBrush}"
+                                             SelectedForeground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                              Glyph="&#xE72A;"
                                              ToolTipService.ToolTip="直连模式" />
                     </StackPanel>
