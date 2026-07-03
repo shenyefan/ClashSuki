@@ -81,7 +81,11 @@
                                     Background="Transparent"
                                     Tapped="LogItem_Tapped"
                                     ToolTipService.ToolTip="点击复制这一行日志">
-                                <Grid ColumnSpacing="6">
+                                <Grid ColumnSpacing="6" RowSpacing="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="70" />
                                         <ColumnDefinition Width="54" />
@@ -116,7 +120,25 @@
                                                          Visibility="{x:Bind HasDetails, Converter={StaticResource BoolToVis}}"
                                                          Click="LogDetails_Click"
                                                          Tapped="LogDetailsButton_Tapped"
-                                                         ToolTipService.ToolTip="查看异常详情" />
+                                                         ToolTipService.ToolTip="展开或收起异常详情" />
+                                    <Border Grid.Row="1"
+                                            Grid.ColumnSpan="5"
+                                            Padding="10"
+                                            CornerRadius="4"
+                                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                            Visibility="{x:Bind IsDetailsExpanded, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                        <ScrollViewer MaxHeight="240"
+                                                      HorizontalScrollMode="Disabled"
+                                                      HorizontalScrollBarVisibility="Disabled"
+                                                      VerticalScrollMode="Auto"
+                                                      VerticalScrollBarVisibility="Auto">
+                                            <TextBlock Text="{x:Bind Details}"
+                                                       FontFamily="Consolas"
+                                                       FontSize="12"
+                                                       IsTextSelectionEnabled="True"
+                                                       TextWrapping="Wrap" />
+                                        </ScrollViewer>
+                                    </Border>
                                 </Grid>
                             </Border>
                         </DataTemplate>

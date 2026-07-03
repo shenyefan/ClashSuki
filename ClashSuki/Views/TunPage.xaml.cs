@@ -56,7 +56,7 @@ public sealed partial class TunPage : Page
         await viewModel.ResetAndSaveCommand.ExecuteAsync(null);
     }
 
-    private async void UninstallService_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void StopService_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (DataContext is not TunViewModel viewModel)
         {
@@ -65,16 +65,37 @@ public sealed partial class TunPage : Page
 
         if (!await viewModel.Runtime.Notifications.ConfirmAsync(
                 XamlRoot,
-                "卸载服务",
-                "确定卸载 ClashSuki 虚拟网卡服务吗？卸载后需重新安装才能使用 TUN 模式。",
-                "卸载",
+                "停止服务",
+                "停止服务会同时关闭虚拟网卡。以后再次启用虚拟网卡时，服务会按需启动。",
+                "停止",
                 "取消",
                 LogSources.Service))
         {
             return;
         }
 
-        await viewModel.UninstallServiceCommand.ExecuteAsync(null);
+        await viewModel.StopServiceCommand.ExecuteAsync(null);
+    }
+
+    private async void RepairService_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not TunViewModel viewModel)
+        {
+            return;
+        }
+
+        if (!await viewModel.Runtime.Notifications.ConfirmAsync(
+                XamlRoot,
+                "修复服务",
+                "程序将停止服务并退出，重新注册应用包和服务后自动启动。是否继续？",
+                "修复并重启",
+                "取消",
+                LogSources.Service))
+        {
+            return;
+        }
+
+        await viewModel.RepairServiceCommand.ExecuteAsync(null);
     }
 
     private async void Tun_Toggled(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
