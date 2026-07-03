@@ -215,8 +215,10 @@ public sealed partial class ConnectionItemViewModel : ObservableObject
     partial void OnDownSpeedTextChanged(string value) => OnPropertyChanged(nameof(SpeedDisplay));
 }
 
-public sealed class LogItemViewModel
+public sealed partial class LogItemViewModel : ObservableObject
 {
+    [ObservableProperty] private bool isDetailsExpanded;
+
     public string Source { get; init; } = "应用";
     public string Level { get; init; } = "INFO";
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.Now;

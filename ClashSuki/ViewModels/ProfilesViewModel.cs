@@ -46,7 +46,8 @@ public sealed partial class ProfilesViewModel : ObservableObject
         {
             Runtime.Notifications.Warning(
                 "订阅地址不能为空。",
-                source: LogSources.Subscription);
+                source: LogSources.Subscription,
+                writeLog: false);
             return;
         }
 

@@ -157,7 +157,8 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         {
             Runtime.Notifications.Warning(
                 "已取消管理员权限请求，内核未替换。",
-                source: LogSources.Core);
+                source: LogSources.Core,
+                writeLog: false);
         }
         catch (Exception ex)
         {
@@ -245,19 +246,14 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
     public async Task SetAllowLanAsync(bool enabled) => await _coordinator.SetAllowLanAsync(enabled);
 
     [RelayCommand]
-    private async Task InstallServiceAsync() => await _coordinator.InstallServiceAsync();
-
-    [RelayCommand]
-    private async Task UninstallServiceAsync() => await _coordinator.UninstallServiceAsync();
-
-    [RelayCommand]
     private async Task SaveConfigAsync()
     {
         if (EnableExternalController && string.IsNullOrWhiteSpace(Secret))
         {
             Runtime.Notifications.Warning(
                 "开启外部控制时请设置 Secret。",
-                source: LogSources.Core);
+                source: LogSources.Core,
+                writeLog: false);
             return;
         }
 
@@ -370,7 +366,8 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         {
             Runtime.Notifications.Warning(
                 "WebUI 名称和地址不能为空。",
-                source: LogSources.Core);
+                source: LogSources.Core,
+                writeLog: false);
             return;
         }
 

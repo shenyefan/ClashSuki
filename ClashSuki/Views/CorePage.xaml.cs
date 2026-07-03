@@ -68,11 +68,12 @@ public sealed partial class CorePage : Page
         {
             viewModel.Runtime.Notifications.Warning(
                 "请先选择指定版本。",
-                source: LogSources.Core);
+                source: LogSources.Core,
+                writeLog: false);
             return;
         }
 
-        var hasService = MihomoServiceInstaller.IsInstalled();
+        var hasService = PackagedServiceController.IsInstalled();
         var message = hasService
             ? "将下载并替换当前内核，然后重新启动。已安装 ClashSuki 服务，将先停止当前内核。替换内核文件时可能需要管理员权限，若弹出 UAC 请选择「是」。"
             : "将下载并替换当前内核，然后重新启动。若内核文件被占用或写入失败，可能会弹出 UAC 以请求管理员权限。";

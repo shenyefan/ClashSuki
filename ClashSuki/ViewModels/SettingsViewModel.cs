@@ -158,7 +158,10 @@ public sealed partial class SettingsViewModel : ObservableObject
                 FileName = BackupService.BackupDirectory,
                 UseShellExecute = true
             });
-            Runtime.Notifications.Info("备份目录已打开。", source: LogSources.Settings);
+            Runtime.Notifications.Info(
+                "备份目录已打开。",
+                source: LogSources.Settings,
+                writeLog: false);
         }, "打开备份目录", LogSources.Settings);
 
     [RelayCommand]

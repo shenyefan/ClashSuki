@@ -21,6 +21,20 @@ public sealed class ProfileStore : IDisposable
     public ObservableCollection<ProfileItemViewModel> Items { get; } = [];
     public string ActiveUid => _config.Current ?? "";
 
+    public async Task<string?> BuildActiveRuntimeYamlAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_config.Current))
+        {
+            return null;
+        }
+
+        var profile = _config.Items.FirstOrDefault(
+            item => string.Equals(item.Uid, _config.Current, StringComparison.Ordinal));
+        return profile is null
+            ? null
+            : await _service.BuildRuntimeYamlAsync(profile, cancellationToken);
+    }
+
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         _config = await _service.LoadAsync(cancellationToken);
@@ -66,8 +80,7 @@ public sealed class ProfileStore : IDisposable
         string? ageSecretKey,
         string? fileName,
         int? mixedPort,
-        CancellationToken cancellationToken,
-        Action<string, string>? log = null)
+        CancellationToken cancellationToken)
     {
         var profile = new ProfileItem
         {
@@ -80,7 +93,7 @@ public sealed class ProfileStore : IDisposable
             File = string.IsNullOrWhiteSpace(fileName) ? null : fileName.Trim()
         };
 
-        profile = await _service.DownloadAsync(profile, mixedPort, cancellationToken, log);
+        profile = await _service.DownloadAsync(profile, mixedPort, cancellationToken);
         _config.Items.Add(profile);
         _config.Current ??= profile.Uid;
         await _service.SaveAsync(_config, cancellationToken);
@@ -151,8 +164,7 @@ public sealed class ProfileStore : IDisposable
     public async Task<ProfileItem> UpdateAsync(
         string uid,
         int? mixedPort,
-        CancellationToken cancellationToken,
-        Action<string, string>? log = null)
+        CancellationToken cancellationToken)
     {
         var profile = Require(uid);
         if (!string.Equals(profile.Type, "remote", StringComparison.OrdinalIgnoreCase))
@@ -163,7 +175,7 @@ public sealed class ProfileStore : IDisposable
         SetBusy(uid, true);
         try
         {
-            var updated = await _service.DownloadAsync(profile, mixedPort, cancellationToken, log);
+            var updated = await _service.DownloadAsync(profile, mixedPort, cancellationToken);
             var index = _config.Items.FindIndex(item => item.Uid == uid);
             _config.Items[index] = updated;
             await _service.SaveAsync(_config, cancellationToken);
@@ -210,27 +222,14 @@ public sealed class ProfileStore : IDisposable
         await LoadAsync(cancellationToken);
     }
 
-    public async Task ActivateAsync(
+    public async Task SetActiveAsync(
         string uid,
-        MihomoApiClient api,
-        MihomoCoreManager core,
-        CancellationToken cancellationToken,
-        Action<string, string>? log = null,
-        bool useHotReload = true,
-        bool closeConnectionsBeforeHotReload = false)
+        CancellationToken cancellationToken)
     {
-        var profile = Require(uid);
+        _ = Require(uid);
         SetBusy(uid, true);
         try
         {
-            await _service.ActivateAsync(
-                profile,
-                api,
-                core,
-                cancellationToken,
-                log,
-                useHotReload,
-                closeConnectionsBeforeHotReload);
             _config.Current = uid;
             await _service.SaveAsync(_config, cancellationToken);
             await LoadAsync(cancellationToken);
@@ -239,6 +238,20 @@ public sealed class ProfileStore : IDisposable
         {
             SetBusy(uid, false);
         }
+    }
+
+    public async Task RestoreActiveAsync(
+        string? uid,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            _ = Require(uid);
+        }
+
+        _config.Current = string.IsNullOrWhiteSpace(uid) ? null : uid;
+        await _service.SaveAsync(_config, cancellationToken);
+        await LoadAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(string uid, CancellationToken cancellationToken)

@@ -16,11 +16,11 @@ public sealed partial class RuntimeStore : ObservableObject
     [ObservableProperty] private bool isSystemProxyEnabled;
     [ObservableProperty] private bool isTunEnabled;
     [ObservableProperty] private bool isTunToggleAvailable = true;
-    [ObservableProperty] private bool showTunServiceInstall;
+    [ObservableProperty] private bool showTunServiceRepair;
     [ObservableProperty] private bool isTunServiceInstalled;
     [ObservableProperty] private bool isTunServiceReady;
-    [ObservableProperty] private bool showTunServiceInstallAction = true;
-    [ObservableProperty] private bool showTunServiceUninstallAction = true;
+    [ObservableProperty] private bool showTunServiceRepairAction = true;
+    [ObservableProperty] private bool showTunServiceStopAction;
     [ObservableProperty] private bool isAllowLan;
     [ObservableProperty] private string mixedPortText = "mixed --";
     [ObservableProperty] private string apiPortText = "api 9090";
@@ -96,28 +96,24 @@ public sealed partial class RuntimeStore : ObservableObject
         }
     }
 
-    public void ApplyTunCapability(MihomoServiceStatus status, bool isElevated)
+    public void ApplyTunCapability(MihomoServiceStatus status)
     {
-        var packageOwnsService = PackageIdentityService.IsPackaged;
         IsTunServiceInstalled = status != MihomoServiceStatus.InstallRequired;
         IsTunServiceReady = status == MihomoServiceStatus.Ready;
-        ShowTunServiceInstallAction =
-            !packageOwnsService &&
-            status is MihomoServiceStatus.InstallRequired or MihomoServiceStatus.Unavailable;
-        ShowTunServiceUninstallAction = !packageOwnsService && IsTunServiceInstalled;
+        ShowTunServiceRepairAction = true;
+        ShowTunServiceStopAction = status == MihomoServiceStatus.Ready;
         TunServiceStatusText = status switch
         {
+            _ when !PackageIdentityService.IsPackaged => "未打包调试 · 请启动 Package 项目",
             MihomoServiceStatus.Ready => "服务已就绪",
             MihomoServiceStatus.Stopped => "服务已安装 · 按需启动",
-            MihomoServiceStatus.InstallRequired when packageOwnsService => "打包服务未注册 · 请重新安装应用",
-            MihomoServiceStatus.Unavailable => "服务不可用",
-            _ when isElevated => "服务未安装 · 已提权",
-            MihomoServiceStatus.InstallRequired => "服务未安装 · 未提权",
+            MihomoServiceStatus.InstallRequired => "打包服务未注册 · 请修复应用",
+            MihomoServiceStatus.Unavailable => "服务不可用 · 请修复应用",
             _ => "服务状态未知"
         };
 
-        IsTunToggleAvailable = status is MihomoServiceStatus.Ready or MihomoServiceStatus.Stopped || isElevated;
-        ShowTunServiceInstall = !packageOwnsService && !IsTunToggleAvailable;
+        IsTunToggleAvailable = status is MihomoServiceStatus.Ready or MihomoServiceStatus.Stopped;
+        ShowTunServiceRepair = !IsTunToggleAvailable;
     }
 
     public void ApplyConnected(VersionInfo? version, ConfigSnapshot? config, CoreRunMode runMode, int? processId, bool syncTun = true)

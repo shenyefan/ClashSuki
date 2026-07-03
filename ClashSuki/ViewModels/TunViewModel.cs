@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
 using ClashSuki.Utilities;
+using Microsoft.UI.Xaml;
 
 namespace ClashSuki.ViewModels;
 
@@ -30,33 +31,42 @@ public sealed partial class TunViewModel : ObservableObject
     public async Task SetTunAsync(bool enabled) => await _coordinator.SetTunAsync(enabled);
 
     [RelayCommand]
-    private async Task InstallServiceAsync()
+    private async Task RepairServiceAsync()
     {
         try
         {
-            await _coordinator.InstallServiceAsync();
+            await _coordinator.RepairServiceAsync();
+            if (Application.Current is App app)
+            {
+                await app.ShutdownAsync();
+            }
+
+            Application.Current.Exit();
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"服务安装失败：{ex.Message}",
+                $"服务修复失败：{ex.Message}",
                 source: LogSources.Service,
                 exception: ex);
         }
     }
 
     [RelayCommand]
-    private async Task UninstallServiceAsync()
+    private async Task StopServiceAsync()
     {
         try
         {
-            await _coordinator.UninstallServiceAsync();
-            Runtime.Notifications.Success("服务已卸载。", source: LogSources.Service);
+            await _coordinator.StopServiceAsync();
+            Runtime.Notifications.Success(
+                "服务已停止。",
+                source: LogSources.Service,
+                writeLog: false);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"服务卸载失败：{ex.Message}",
+                $"服务停止失败：{ex.Message}",
                 source: LogSources.Service,
                 exception: ex);
         }
@@ -154,7 +164,8 @@ public sealed partial class TunViewModel : ObservableObject
         {
             Runtime.Notifications.Info(
                 "已取消防火墙规则配置。",
-                source: LogSources.Tun);
+                source: LogSources.Tun,
+                writeLog: false);
         }
         catch (Exception ex)
         {

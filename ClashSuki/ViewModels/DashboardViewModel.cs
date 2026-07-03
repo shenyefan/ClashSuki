@@ -7,6 +7,7 @@ using ClashSuki.Utilities;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
+using Microsoft.UI.Xaml;
 using SkiaSharp;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -112,7 +113,26 @@ public sealed partial class DashboardViewModel : ObservableObject
     public async Task SetTunAsync(bool enabled) => await _coordinator.SetTunAsync(enabled);
 
     [RelayCommand]
-    private async Task InstallServiceAsync() => await _coordinator.InstallServiceAsync();
+    private async Task RepairServiceAsync()
+    {
+        try
+        {
+            await _coordinator.RepairServiceAsync();
+            if (Application.Current is App app)
+            {
+                await app.ShutdownAsync();
+            }
+
+            Application.Current.Exit();
+        }
+        catch (Exception ex)
+        {
+            Runtime.Notifications.Error(
+                $"服务修复失败：{ex.Message}",
+                source: LogSources.Service,
+                exception: ex);
+        }
+    }
 
     [RelayCommand]
     private async Task SwitchModeAsync(string? mode)
@@ -135,7 +155,8 @@ public sealed partial class DashboardViewModel : ObservableObject
         Clipboard.SetContent(package);
         Runtime.Notifications.Success(
             "代理环境变量已复制。",
-            source: LogSources.SystemProxy);
+            source: LogSources.SystemProxy,
+            writeLog: false);
     }
 
     public async Task LoadSystemProxySettingsAsync()
@@ -230,11 +251,17 @@ public sealed partial class DashboardViewModel : ObservableObject
         try
         {
             await UwpLoopbackToolService.OpenAsync();
-            Runtime.Notifications.Info("UWP 工具已打开。", source: LogSources.Tun);
+            Runtime.Notifications.Info(
+                "UWP 工具已打开。",
+                source: LogSources.Tun,
+                writeLog: false);
         }
         catch (OperationCanceledException)
         {
-            Runtime.Notifications.Info("已取消打开 UWP 工具。", source: LogSources.Tun);
+            Runtime.Notifications.Info(
+                "已取消打开 UWP 工具。",
+                source: LogSources.Tun,
+                writeLog: false);
         }
         catch (Exception ex)
         {

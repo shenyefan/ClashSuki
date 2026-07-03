@@ -139,7 +139,10 @@ public sealed partial class OverrideViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(ImportUrl))
         {
-            Runtime.Notifications.Warning("请输入覆写 URL。", source: LogSources.Override);
+            Runtime.Notifications.Warning(
+                "请输入覆写 URL。",
+                source: LogSources.Override,
+                writeLog: false);
             return;
         }
 
@@ -150,8 +153,7 @@ public sealed partial class OverrideViewModel : ObservableObject
                 _config,
                 ImportUrl.Trim(),
                 _coordinator.GetMixedPortForDownload(),
-                fetchRequest,
-                _coordinator.LogDownload);
+                fetchRequest);
             var item = new OverrideItemViewModel(entry);
             Items.Add(item);
             ImportUrl = "";
@@ -249,13 +251,19 @@ public sealed partial class OverrideViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(InfoName))
         {
-            Runtime.Notifications.Warning("显示名称不能为空。", source: LogSources.Override);
+            Runtime.Notifications.Warning(
+                "显示名称不能为空。",
+                source: LogSources.Override,
+                writeLog: false);
             return false;
         }
 
         if (_infoEditingItem.IsRemote && string.IsNullOrWhiteSpace(InfoUrl))
         {
-            Runtime.Notifications.Warning("远程覆写地址不能为空。", source: LogSources.Override);
+            Runtime.Notifications.Warning(
+                "远程覆写地址不能为空。",
+                source: LogSources.Override,
+                writeLog: false);
             return false;
         }
 

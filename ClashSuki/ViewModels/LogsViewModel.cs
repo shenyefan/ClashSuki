@@ -147,7 +147,9 @@ public sealed partial class LogsViewModel : ObservableObject
         var query = SearchText.Trim();
         var level = LevelFilter;
         return (string.IsNullOrWhiteSpace(level) || item.Level.Contains(level, StringComparison.OrdinalIgnoreCase))
-               && (string.IsNullOrWhiteSpace(query) || item.Message.Contains(query, StringComparison.OrdinalIgnoreCase));
+               && (string.IsNullOrWhiteSpace(query) ||
+                   item.Message.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                   item.Details.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 
     private void NotifyFilteredCount(bool isApp)
