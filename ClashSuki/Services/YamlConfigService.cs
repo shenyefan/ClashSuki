@@ -114,7 +114,6 @@ public static class YamlConfigService
             subscriptionRoot.Children[new YamlScalarNode(scalarKey.Value)] = CloneNode(valueNode);
         }
 
-        SetScalar(subscriptionRoot, "secret", "", overwrite: true);
         var baseController = TryGetString(baseRoot, "external-controller") ?? "";
         SetScalar(subscriptionRoot, "external-controller", baseController, overwrite: true);
         SetScalar(subscriptionRoot, "mixed-port", "7890", overwrite: false);
@@ -163,57 +162,7 @@ public static class YamlConfigService
         return SaveDocument(doc);
     }
 
-    public static async Task PersistTunSettingAsync(bool enabled, CancellationToken cancellationToken)
-    {
-        await PersistTunSettingAsync(enabled, enableDns: enabled, cancellationToken);
-    }
-
-    public static async Task PersistTunSettingAsync(bool enabled, bool enableDns, CancellationToken cancellationToken)
-    {
-        await PersistTunStateAsync(
-            enabled,
-            dnsEnabled: enableDns ? true : null,
-            cancellationToken);
-    }
-
-    public static async Task PersistTunStateAsync(
-        bool enabled,
-        bool? dnsEnabled,
-        CancellationToken cancellationToken)
-    {
-        await AppPaths.BootstrapAsync(cancellationToken);
-        foreach (var path in new[]
-                 {
-                     AppPaths.BaseConfigPath,
-                     AppPaths.ConfigPath,
-                     AppPaths.RuntimeConfigPath
-                 }.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            if (!File.Exists(path))
-            {
-                continue;
-            }
-
-            var yaml = await File.ReadAllTextAsync(path, cancellationToken);
-            var doc = LoadDocument(yaml);
-            var root = EnsureRoot(doc);
-            var tun = EnsureMap(root, "tun");
-            SetScalar(tun, "enable", enabled.ToString().ToLowerInvariant(), overwrite: true);
-            if (dnsEnabled.HasValue)
-            {
-                var dns = EnsureMap(root, "dns");
-                SetScalar(
-                    dns,
-                    "enable",
-                    dnsEnabled.Value.ToString().ToLowerInvariant(),
-                    overwrite: true);
-            }
-
-            await File.WriteAllTextAsync(path, SaveDocument(doc), cancellationToken);
-        }
-    }
-
-    public static async Task PersistPatchAsync(
+    public static async Task PersistBasePatchAsync(
         IReadOnlyDictionary<string, object?> patch,
         CancellationToken cancellationToken,
         IReadOnlySet<string>? replaceRootMappings = null)
@@ -224,19 +173,13 @@ public static class YamlConfigService
         }
 
         await AppPaths.BootstrapAsync(cancellationToken);
-        foreach (var path in new[] { AppPaths.BaseConfigPath, AppPaths.ConfigPath })
-        {
-            if (!File.Exists(path))
-            {
-                continue;
-            }
-
-            var yaml = await File.ReadAllTextAsync(path, cancellationToken);
-            var doc = LoadDocument(yaml);
-            var root = EnsureRoot(doc);
-            MergePatch(root, patch, replaceRootMappings);
-            await File.WriteAllTextAsync(path, SaveAndVerifyDocument(doc), cancellationToken);
-        }
+        var yaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
+        var doc = LoadDocument(yaml);
+        MergePatch(EnsureRoot(doc), patch, replaceRootMappings);
+        await File.WriteAllTextAsync(
+            AppPaths.BaseConfigPath,
+            SaveAndVerifyDocument(doc),
+            cancellationToken);
     }
 
     public static async Task<string> BuildPatchedConfigAsync(
@@ -265,14 +208,6 @@ public static class YamlConfigService
             root.Children.Remove(new YamlScalarNode(key));
         }
 
-        return SaveDocument(doc);
-    }
-
-    public static string SetTunEnabled(string yaml, bool enabled)
-    {
-        var doc = LoadDocument(yaml);
-        var tun = EnsureMap(EnsureRoot(doc), "tun");
-        SetScalar(tun, "enable", enabled.ToString().ToLowerInvariant(), overwrite: true);
         return SaveDocument(doc);
     }
 
@@ -448,32 +383,6 @@ public static class YamlConfigService
             TryGetBool(root, "geo-auto-update") ?? false,
             TryGetInt(root, "geo-update-interval") ?? 24);
     }
-
-    public static async Task PersistGeoDataSettingsAsync(GeoDataSettings settings, CancellationToken cancellationToken)
-    {
-        await AppPaths.BootstrapAsync(cancellationToken);
-        foreach (var path in new[] { AppPaths.BaseConfigPath, AppPaths.ConfigPath })
-        {
-            if (!File.Exists(path))
-            {
-                continue;
-            }
-
-            var yaml = await File.ReadAllTextAsync(path, cancellationToken);
-            var doc = LoadDocument(yaml);
-            var root = EnsureRoot(doc);
-            var geoxUrl = EnsureMap(root, "geox-url");
-            SetScalar(geoxUrl, "geoip", settings.GeoIpUrl, overwrite: true);
-            SetScalar(geoxUrl, "geosite", settings.GeoSiteUrl, overwrite: true);
-            SetScalar(geoxUrl, "mmdb", settings.MmdbUrl, overwrite: true);
-            SetScalar(geoxUrl, "asn", settings.AsnUrl, overwrite: true);
-            SetScalar(root, "geodata-mode", settings.GeoDataMode.ToString().ToLowerInvariant(), overwrite: true);
-            SetScalar(root, "geo-auto-update", settings.AutoUpdate.ToString().ToLowerInvariant(), overwrite: true);
-            SetScalar(root, "geo-update-interval", settings.UpdateInterval.ToString(CultureInfo.InvariantCulture), overwrite: true);
-            await File.WriteAllTextAsync(path, SaveDocument(doc), cancellationToken);
-        }
-    }
-
 
     public static async Task EnsureMixedPortAvailableAsync(
         string configPath,

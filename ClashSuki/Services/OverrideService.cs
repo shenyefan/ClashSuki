@@ -114,10 +114,9 @@ public sealed class OverrideService : IDisposable
         string url,
         int? mixedPort,
         RemoteFetchRequest? fetchRequest = null,
-        Action<string, string>? log = null,
         CancellationToken cancellationToken = default)
     {
-        var content = await DownloadRemoteAsync(url, fetchRequest, mixedPort, log, cancellationToken);
+        var content = await DownloadRemoteAsync(url, fetchRequest, mixedPort, cancellationToken);
         var fileName = TryGetFileName(url);
         var ext = fileName.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ? "js" : "yaml";
         var entry = new OverrideEntry
@@ -141,7 +140,6 @@ public sealed class OverrideService : IDisposable
         OverrideConfig config,
         OverrideEntry entry,
         int? mixedPort,
-        Action<string, string>? log = null,
         CancellationToken cancellationToken = default)
     {
         if (!entry.Type.Equals("remote", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(entry.Url))
@@ -153,7 +151,6 @@ public sealed class OverrideService : IDisposable
             entry.Url,
             BuildFetchRequest(entry),
             mixedPort,
-            log,
             cancellationToken);
         entry.UpdatedAt = DateTimeOffset.Now;
         await WriteContentAsync(entry, content, cancellationToken);
@@ -176,9 +173,12 @@ public sealed class OverrideService : IDisposable
         string url,
         RemoteFetchRequest? fetchRequest,
         int? mixedPort,
-        Action<string, string>? log,
         CancellationToken cancellationToken) =>
-        await _fetch.FetchAsync(url, fetchRequest ?? new RemoteFetchRequest(), mixedPort, log, cancellationToken);
+        await _fetch.FetchAsync(
+            url,
+            fetchRequest ?? new RemoteFetchRequest(),
+            mixedPort,
+            cancellationToken);
 
     private static RemoteFetchRequest BuildFetchRequest(OverrideEntry entry) =>
         new(entry.UserAgent, entry.AuthToken, entry.UpdateTimeout);

@@ -78,13 +78,11 @@ public sealed class ProfileService : IDisposable
     /// <summary>
     /// 从 URL 下载订阅配置，解析 subscription-userinfo 头获取流量信息，
     /// 保存到 profiles 目录，返回更新后的 ProfileItem。
-    /// <paramref name="log"/> 为可选日志回调，签名为 (level, message)。
     /// </summary>
     public async Task<ProfileItem> DownloadAsync(
         ProfileItem profile,
         int? mixedPort,
-        CancellationToken cancellationToken = default,
-        Action<string, string>? log = null)
+        CancellationToken cancellationToken = default)
     {
         var url = profile.Url
                   ?? throw new ArgumentException("订阅 URL 不能为空。");
@@ -95,34 +93,14 @@ public sealed class ProfileService : IDisposable
             throw new ArgumentException("订阅 URL 必须以 http:// 或 https:// 开头。");
         }
 
-        log?.Invoke("INFO", $"订阅下载开始；名称={profile.Name}");
-        log?.Invoke("INFO", $"订阅下载地址；主机={FormatUrlHostForLog(url)}");
-        var appSettings = await AppSettingsService.LoadAsync(cancellationToken);
-        var effectiveUserAgent = EffectiveUserAgent(profile, appSettings);
-        log?.Invoke("INFO", $"订阅下载参数；User-Agent={effectiveUserAgent}");
-
         // 三级代理回退：直连 → 本地 mixed 代理 → 失败
-        var (content, headers) = await TryDownloadWithFallbackAsync(profile, mixedPort, cancellationToken, log);
-        content = await DecryptAgeContentIfNeededAsync(content, profile.AgeSecretKey, cancellationToken, log);
-
-        log?.Invoke("INFO", $"订阅下载完成；内容大小={content.Length:N0} 字节");
+        var (content, headers) = await TryDownloadWithFallbackAsync(profile, mixedPort, cancellationToken);
+        content = await DecryptAgeContentIfNeededAsync(content, profile.AgeSecretKey, cancellationToken);
 
         // 解析 subscription-userinfo
         var extra = ParseSubscriptionInfo(headers);
-        if (extra is not null)
-        {
-            log?.Invoke("INFO", $"订阅流量信息；已用={FormatBytes(extra.Used)}；总计={FormatBytes(extra.Total)}" +
-                                 (extra.Expire.HasValue
-                                     ? $"；到期={DateTimeOffset.FromUnixTimeSeconds(extra.Expire.Value).LocalDateTime:yyyy-MM-dd}"
-                                     : "；到期=永不过期"));
-        }
-        else
-        {
-            log?.Invoke("INFO", "订阅未返回流量信息；服务器没有 subscription-userinfo 响应头。");
-        }
 
         // 基础 YAML 校验（必须有 proxies 或 proxy-providers）
-        log?.Invoke("INFO", "正在校验订阅配置格式。");
         if (!content.Contains("proxies:", StringComparison.OrdinalIgnoreCase) &&
             !content.Contains("proxy-providers:", StringComparison.OrdinalIgnoreCase))
         {
@@ -137,7 +115,6 @@ public sealed class ProfileService : IDisposable
         profile.File = NormalizeProfileFileName(filename, profile.Uid);
         var filePath = Path.Combine(ProfilesDir, profile.File);
         await File.WriteAllTextAsync(filePath, content, cancellationToken);
-        log?.Invoke("INFO", $"订阅配置已保存；路径={filePath}");
 
         // 更新元数据
         profile.Updated = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -147,144 +124,29 @@ public sealed class ProfileService : IDisposable
     }
 
     /// <summary>将指定 profile 的配置文件（注入全局配置后）写为 mihomo 的运行配置并触发重载。</summary>
-    public async Task ActivateAsync(
+    public async Task<string> BuildRuntimeYamlAsync(
         ProfileItem profile,
-        MihomoApiClient api,
-        MihomoCoreManager core,
-        CancellationToken cancellationToken = default,
-        Action<string, string>? log = null,
-        bool useHotReload = true,
-        bool closeConnectionsBeforeHotReload = false)
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(profile.File))
         {
             throw new InvalidOperationException($"配置项 [{profile.Name}] 没有关联的本地文件。");
         }
 
-        var srcPath = Path.Combine(ProfilesDir, profile.File);
-        if (!File.Exists(srcPath))
+        var profilePath = Path.Combine(ProfilesDir, profile.File);
+        if (!File.Exists(profilePath))
         {
-            throw new FileNotFoundException($"配置文件不存在：{srcPath}");
+            throw new FileNotFoundException("订阅配置文件不存在。", profilePath);
         }
 
-        // 读取订阅 YAML，与 base 模板合并（全局配置来自 base，代理内容来自订阅）
-        var rawYaml = await File.ReadAllTextAsync(srcPath, cancellationToken);
-        string mergedYaml;
-
-        if (File.Exists(AppPaths.BaseConfigPath))
+        var profileYaml = await File.ReadAllTextAsync(profilePath, cancellationToken);
+        if (!File.Exists(AppPaths.BaseConfigPath))
         {
-            var baseYaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
-            mergedYaml = MergeWithBase(rawYaml, baseYaml);
-            log?.Invoke("INFO", $"订阅已与基础模板合并；路径={AppPaths.BaseConfigPath}");
-        }
-        else
-        {
-            // 没有 base 时回退到简单注入
-            mergedYaml = InjectGlobalConfig(rawYaml);
-            log?.Invoke("INFO", "未找到基础模板，正在注入默认全局配置。");
+            return YamlConfigService.EnsureGlobalConfig(profileYaml);
         }
 
-        var tempPath = Path.Combine(Path.GetDirectoryName(AppPaths.ConfigPath)!, "mihomo.profile.tmp.yaml");
-        Directory.CreateDirectory(Path.GetDirectoryName(AppPaths.ConfigPath)!);
-        await File.WriteAllTextAsync(tempPath, mergedYaml, cancellationToken);
-        try
-        {
-            log?.Invoke("INFO", "正在校验合并后的订阅配置。");
-            await core.ValidateConfigAsync(tempPath, cancellationToken);
-            log?.Invoke("INFO", "订阅配置校验通过。");
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                log?.Invoke("WARN", $"删除订阅临时配置失败：{ex.Message}");
-            }
-        }
-
-        var snapshot = await ConfigFileSnapshot.CaptureAsync(
-            [AppPaths.ConfigPath, AppPaths.RuntimeConfigPath],
-            cancellationToken);
-        var previousConfig = snapshot.GetContent(AppPaths.ConfigPath);
-        var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
-        var coreWasRunning = core.RunMode != CoreRunMode.NotRunning || core.IsRunning;
-        var previousTunEnabled = previousConfig is not null &&
-                                 YamlConfigService.IsTunEnabled(previousConfig);
-
-        try
-        {
-            log?.Invoke("INFO", $"正在写入订阅主配置；路径={AppPaths.ConfigPath}");
-            Directory.CreateDirectory(Path.GetDirectoryName(AppPaths.ConfigPath)!);
-            await File.WriteAllTextAsync(AppPaths.ConfigPath, mergedYaml, cancellationToken);
-            log?.Invoke("INFO", "订阅配置文件写入完成。");
-
-            await MihomoControllerEndpoint.ApplyPolicyAsync(cancellationToken);
-            await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(cancellationToken);
-            log?.Invoke("INFO", "订阅外部控制策略已同步。");
-
-            var requireTun = await YamlConfigService.IsTunEnabledAsync(AppPaths.ConfigPath, cancellationToken);
-
-            // Core 正在运行（含 service mode）：热重载；未运行：直接启动
-            if (core.RunMode != CoreRunMode.NotRunning && useHotReload)
-            {
-                log?.Invoke("INFO", "订阅激活：内核运行中，正在尝试热重载。");
-                try
-                {
-                    if (closeConnectionsBeforeHotReload)
-                    {
-                        await api.CloseAllConnectionsAsync(cancellationToken);
-                        log?.Invoke("INFO", "订阅激活：已关闭现有连接。");
-                    }
-
-                    await api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, cancellationToken);
-                    log?.Invoke("INFO", "订阅激活：热重载成功。");
-                }
-                catch (Exception ex)
-                {
-                    log?.Invoke("WARN", $"订阅热重载失败，正在重启内核：{ex.Message}");
-                    await core.RestartAsync(requireTun, cancellationToken);
-                    log?.Invoke("INFO", "订阅激活：内核重启完成。");
-                }
-            }
-            else if (core.RunMode != CoreRunMode.NotRunning)
-            {
-                log?.Invoke("INFO", "订阅激活：热重载已关闭，正在重启内核。");
-                await core.RestartAsync(requireTun, cancellationToken);
-                log?.Invoke("INFO", "订阅激活：内核重启完成。");
-            }
-            else
-            {
-                log?.Invoke("INFO", "订阅激活：内核未运行，正在启动。");
-                await core.EnsureStartedAsync(requireTun, cancellationToken);
-                log?.Invoke("INFO", "订阅激活：内核启动完成。");
-            }
-        }
-        catch (Exception ex)
-        {
-            log?.Invoke("WARN", $"订阅激活失败，正在恢复之前的配置：{ex.Message}");
-            await snapshot.RestoreAsync();
-
-            if (coreWasRunning && previousRuntime is not null)
-            {
-                try
-                {
-                    await api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, CancellationToken.None);
-                }
-                catch (Exception restoreEx)
-                {
-                    log?.Invoke("WARN", $"恢复订阅配置的热重载失败，正在重启内核：{restoreEx.Message}");
-                    await core.RestartAsync(previousTunEnabled, CancellationToken.None);
-                }
-            }
-
-            throw;
-        }
+        var baseYaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
+        return YamlConfigService.MergeWithBase(profileYaml, baseYaml);
     }
 
     public async Task<ProfileItem> ImportLocalAsync(
@@ -326,8 +188,7 @@ public sealed class ProfileService : IDisposable
     private async Task<(string Content, Dictionary<string, string> Headers)> TryDownloadWithFallbackAsync(
         ProfileItem profile,
         int? mixedPort,
-        CancellationToken cancellationToken,
-        Action<string, string>? log = null)
+        CancellationToken cancellationToken)
     {
         var url = profile.Url ?? throw new ArgumentException("订阅 URL 不能为空。");
         var settings = await AppSettingsService.LoadAsync(cancellationToken);
@@ -338,21 +199,18 @@ public sealed class ProfileService : IDisposable
         // 1. 直连（复用 _directClient，禁用系统代理）
         if (!useProxy)
         {
-            log?.Invoke("INFO", "正在直连下载订阅。");
             try
             {
-                var result = await FetchWithClientAsync(_directClient, url, userAgent, profile.AuthToken, timeout, cancellationToken);
-                log?.Invoke("INFO", "订阅直连下载成功。");
-                return result;
+                return await FetchWithClientAsync(
+                    _directClient,
+                    url,
+                    userAgent,
+                    profile.AuthToken,
+                    timeout,
+                    cancellationToken);
             }
-            catch (Exception ex) when (mixedPort.HasValue)
+            catch (Exception) when (mixedPort.HasValue)
             {
-                log?.Invoke("WARN", $"订阅直连下载失败，正在通过本地代理重试；端口={mixedPort}；{ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                log?.Invoke("ERROR", $"订阅下载失败，没有可用的代理回退：{ex.Message}");
-                throw;
             }
         }
 
@@ -370,9 +228,13 @@ public sealed class ProfileService : IDisposable
         {
             Timeout = timeout
         };
-        var proxyResult = await FetchWithClientAsync(proxyClient, url, userAgent, profile.AuthToken, timeout, cancellationToken);
-        log?.Invoke("INFO", "订阅代理下载成功。");
-        return proxyResult;
+        return await FetchWithClientAsync(
+            proxyClient,
+            url,
+            userAgent,
+            profile.AuthToken,
+            timeout,
+            cancellationToken);
     }
 
     private static string EffectiveUserAgent(ProfileItem profile, AppSettings settings) =>
@@ -418,8 +280,7 @@ public sealed class ProfileService : IDisposable
     private static async Task<string> DecryptAgeContentIfNeededAsync(
         string content,
         string? ageSecretKey,
-        CancellationToken cancellationToken,
-        Action<string, string>? log = null)
+        CancellationToken cancellationToken)
     {
         if (!IsAgeArmored(content))
         {
@@ -473,7 +334,6 @@ public sealed class ProfileService : IDisposable
             var output = await outputTask;
             if (process.ExitCode == 0)
             {
-                log?.Invoke("INFO", "订阅 Age 加密内容已解密。");
                 return output;
             }
 
@@ -580,138 +440,4 @@ public sealed class ProfileService : IDisposable
         };
     }
 
-    private static string FormatBytes(long bytes)
-    {
-        if (bytes < 1024)         return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        if (bytes < 1024L * 1024 * 1024) return $"{bytes / 1024.0 / 1024:F2} MB";
-        return $"{bytes / 1024.0 / 1024 / 1024:F2} GB";
-    }
-
-    private static string FormatUrlHostForLog(string url)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
-            return "无效地址";
-        }
-
-        return uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
-    }
-
-    // ──────────────────────────────────────────────
-    // Config 合并（对应 Clash Verge 的 config merge 逻辑）
-    // ──────────────────────────────────────────────
-
-    // 全局配置键：来自 base 模板，不受订阅 YAML 影响
-    private static readonly HashSet<string> GlobalKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "port", "socks-port", "mixed-port", "redir-port", "tproxy-port",
-        "allow-lan", "bind-address", "mode", "log-level", "ipv6",
-        "lan-allowed-ips", "lan-disallowed-ips", "authentication", "skip-auth-prefixes",
-        "external-controller", "external-ui", "secret",
-        "tun", "dns", "hosts", "sniffer",
-        "geox-url", "geodata-mode", "geodata-loader", "geo-auto-update", "geo-update-interval",
-        "profile", "experimental", "unified-delay", "tcp-concurrent",
-        "find-process-mode", "global-client-fingerprint"
-    };
-
-    // 内容键：来自订阅 YAML，订阅说了算
-    private static readonly HashSet<string> ContentKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "proxies", "proxy-providers", "proxy-groups", "rule-providers", "rules"
-    };
-
-    /// <summary>
-    /// 将订阅 YAML（内容）与 base 模板（全局配置）合并，生成最终的 mihomo 运行配置。
-    /// 全局字段取自 base，代理/组/规则取自订阅，同时强制清空 secret。
-    /// </summary>
-    internal static string MergeWithBase(string subscriptionYaml, string baseYaml)
-    {
-        return YamlConfigService.MergeWithBase(subscriptionYaml, baseYaml);
-    }
-
-    /// <summary>
-    /// 兼容旧调用：仅在订阅缺少全局字段时注入默认值（并清空 secret）。
-    /// 完整合并请用 MergeWithBase。
-    /// </summary>
-    internal static string InjectGlobalConfig(string yaml)
-    {
-        return YamlConfigService.EnsureGlobalConfig(yaml);
-    }
-
-    /// <summary>
-    /// 修改 YAML 中 tun 块的 enable 值；没有 tun 块时追加一个完整默认块。
-    /// 用于把 TUN 开关持久化到 base 模板和运行配置（重启后保持状态）。
-    /// </summary>
-    internal static string SetTunEnabled(string yaml, bool enabled)
-    {
-        return YamlConfigService.SetTunEnabled(yaml, enabled);
-    }
-
-    /// <summary>把 TUN 开关写入 base 模板与当前运行配置文件。</summary>
-    public static async Task PersistTunSettingAsync(bool enabled, CancellationToken cancellationToken = default)
-    {
-        await YamlConfigService.PersistTunSettingAsync(enabled, cancellationToken);
-    }
-
-    public static async Task PersistTunSettingAsync(bool enabled, bool enableDns, CancellationToken cancellationToken = default)
-    {
-        await YamlConfigService.PersistTunSettingAsync(enabled, enableDns, cancellationToken);
-    }
-
-    /// <summary>
-    /// 将 YAML 文本按顶层 key 拆分成字典。
-    /// 键：顶层字段名（如 "proxies"、"mixed-port"）；值：该字段含子内容的完整文本块。
-    /// </summary>
-    private static Dictionary<string, string> SplitSections(string yaml)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var lines  = yaml.Replace("\r\n", "\n").Split('\n');
-
-        string? currentKey  = null;
-        System.Text.StringBuilder? currentBody = null;
-
-        void Flush()
-        {
-            if (currentKey is not null && currentBody is not null)
-                result[currentKey] = currentBody.ToString().TrimEnd();
-        }
-
-        foreach (var line in lines)
-        {
-            // 顶层 key：从列 0 开始，不是空行、注释、列表项
-            if (line.Length > 0 && line[0] != ' ' && line[0] != '\t'
-                && line[0] != '#' && line[0] != '-')
-            {
-                var colon = line.IndexOf(':');
-                if (colon > 0)
-                {
-                    Flush();
-                    // 检查 YAML anchor（如 `pr: &a1 {`），忽略 anchor 本身，只取 key
-                    currentKey  = line[..colon].Trim();
-                    currentBody = new System.Text.StringBuilder();
-                    currentBody.AppendLine(line);
-                    continue;
-                }
-            }
-            currentBody?.AppendLine(line);
-        }
-        Flush();
-        return result;
-    }
-}
-
-// ──────────────────────────────────────────────
-// File 扩展：支持 overwrite 参数的 CopyAsync
-// ──────────────────────────────────────────────
-file static class FileEx
-{
-    public static async Task CopyAsync(string src, string dest, bool overwrite, CancellationToken ct)
-    {
-        await using var srcStream  = File.OpenRead(src);
-        await using var destStream = new FileStream(dest, overwrite ? FileMode.Create : FileMode.CreateNew,
-                                                    FileAccess.Write, FileShare.None,
-                                                    bufferSize: 81920, useAsync: true);
-        await srcStream.CopyToAsync(destStream, ct);
-    }
 }

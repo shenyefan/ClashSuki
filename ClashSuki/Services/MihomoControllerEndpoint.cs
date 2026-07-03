@@ -20,7 +20,8 @@ public static class MihomoControllerEndpoint
         enabled ? ResolveHttpAddress(configuredAddress) : "";
 
     /// <summary>
-    /// 按应用设置同步 external-controller；pipe 与 Verge 一致写入 YAML + CLI 双通道。
+    /// 按应用设置同步持久化的 HTTP external-controller。
+    /// pipe 是运行时实现细节，只在启动内核前写入 Runtime。
     /// </summary>
     public static async Task<bool> ApplyPolicyAsync(CancellationToken cancellationToken = default)
     {
@@ -31,9 +32,9 @@ public static class MihomoControllerEndpoint
             configuredAddress);
 
         var currentController = "";
-        if (File.Exists(AppPaths.ConfigPath))
+        if (File.Exists(AppPaths.RuntimeConfigPath))
         {
-            var current = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.ConfigPath, cancellationToken);
+            var current = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.RuntimeConfigPath, cancellationToken);
             currentController = current.ExternalController ?? "";
         }
 
@@ -42,10 +43,9 @@ public static class MihomoControllerEndpoint
             effectiveController.Trim(),
             StringComparison.OrdinalIgnoreCase);
 
-        await YamlConfigService.PersistPatchAsync(new Dictionary<string, object?>
+        await YamlConfigService.PersistBasePatchAsync(new Dictionary<string, object?>
         {
-            ["external-controller"] = effectiveController,
-            ["external-controller-pipe"] = PipePath,
+            ["external-controller"] = effectiveController
         }, cancellationToken);
 
         return changed;
@@ -61,12 +61,25 @@ public static class MihomoControllerEndpoint
         await AppPaths.BootstrapAsync(cancellationToken);
         await ApplyPolicyAsync(cancellationToken);
 
-        var sourcePath = File.Exists(AppPaths.ConfigPath)
-            ? AppPaths.ConfigPath
-            : AppPaths.BaseConfigPath;
-        if (!File.Exists(sourcePath))
+        if (!File.Exists(AppPaths.RuntimeConfigPath))
         {
-            throw new FileNotFoundException("找不到 mihomo 配置文件。", sourcePath);
+            throw new FileNotFoundException("找不到 mihomo 运行时配置文件。", AppPaths.RuntimeConfigPath);
+        }
+
+        await PrepareConfigFileForCoreAsync(
+            AppPaths.RuntimeConfigPath,
+            cancellationToken,
+            tunEnabledOverride);
+    }
+
+    public static async Task PrepareConfigFileForCoreAsync(
+        string configPath,
+        CancellationToken cancellationToken = default,
+        bool? tunEnabledOverride = null)
+    {
+        if (!File.Exists(configPath))
+        {
+            throw new FileNotFoundException("找不到待处理的 mihomo 配置文件。", configPath);
         }
 
         var appSettings = await AppSettingsService.LoadAsync(cancellationToken);
@@ -78,6 +91,14 @@ public static class MihomoControllerEndpoint
         {
             ["external-controller-pipe"] = PipePath,
         };
+        if (File.Exists(AppPaths.BaseConfigPath))
+        {
+            var baseSettings = await YamlConfigService.LoadCoreSettingsAsync(
+                AppPaths.BaseConfigPath,
+                cancellationToken);
+            patch["secret"] = baseSettings.Secret;
+        }
+
         if (tunEnabledOverride.HasValue)
         {
             patch["tun"] = new Dictionary<string, object?>
@@ -95,7 +116,7 @@ public static class MihomoControllerEndpoint
             patch["external-controller"] = httpController;
         }
 
-        var runtimeYaml = await YamlConfigService.BuildPatchedConfigAsync(sourcePath, patch, cancellationToken);
+        var runtimeYaml = await YamlConfigService.BuildPatchedConfigAsync(configPath, patch, cancellationToken);
         var removeKeys = new List<string>(RuntimeOnlyRemovedKeys);
         if (string.IsNullOrWhiteSpace(httpController))
         {
@@ -104,8 +125,7 @@ public static class MihomoControllerEndpoint
 
         runtimeYaml = YamlConfigService.RemoveRootKeys(runtimeYaml, removeKeys);
 
-        Directory.CreateDirectory(Path.GetDirectoryName(AppPaths.RuntimeConfigPath)!);
-        await File.WriteAllTextAsync(AppPaths.RuntimeConfigPath, runtimeYaml, cancellationToken);
+        await File.WriteAllTextAsync(configPath, runtimeYaml, cancellationToken);
     }
 
     private static string ResolveStoredHttpAddress(AppSettings appSettings)

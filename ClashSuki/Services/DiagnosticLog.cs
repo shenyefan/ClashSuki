@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Collections;
 
 namespace ClashSuki.Services;
 
@@ -78,16 +79,61 @@ public static class DiagnosticLog
         string level = "ERROR")
     {
         ArgumentNullException.ThrowIfNull(exception);
-        var message = string.IsNullOrWhiteSpace(context)
-            ? NormalizeMessage(exception.Message)
-            : NormalizeMessage(context);
+        var message = BuildExceptionMessage(context, exception);
         Write(
             AppLogPath,
             source,
             level,
             message,
-            exception.ToString(),
+            BuildExceptionDetails(exception),
             AppEntryWritten);
+    }
+
+    private static string BuildExceptionMessage(string? context, Exception exception)
+    {
+        var normalizedContext = NormalizeMessage(context);
+        var exceptionMessage = exception is AggregateException aggregate
+            ? string.Join(
+                "；",
+                aggregate.Flatten().InnerExceptions
+                    .Select(item => NormalizeMessage(item.Message))
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Distinct(StringComparer.OrdinalIgnoreCase))
+            : NormalizeMessage(exception.Message);
+        if (string.IsNullOrWhiteSpace(normalizedContext))
+        {
+            return string.IsNullOrWhiteSpace(exceptionMessage)
+                ? exception.GetType().Name
+                : exceptionMessage;
+        }
+
+        if (string.IsNullOrWhiteSpace(exceptionMessage) ||
+            normalizedContext.Contains(exceptionMessage, StringComparison.OrdinalIgnoreCase))
+        {
+            return normalizedContext;
+        }
+
+        return $"{normalizedContext}：{exceptionMessage}";
+    }
+
+    private static string BuildExceptionDetails(Exception exception)
+    {
+        var details = new StringBuilder(exception.ToString());
+        foreach (DictionaryEntry item in exception.Data)
+        {
+            if (item.Key is null || item.Value is null)
+            {
+                continue;
+            }
+
+            details
+                .AppendLine()
+                .Append(item.Key)
+                .Append(": ")
+                .Append(item.Value);
+        }
+
+        return details.ToString();
     }
 
     public static void WriteAppExceptionThrottled(

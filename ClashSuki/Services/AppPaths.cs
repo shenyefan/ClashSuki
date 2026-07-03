@@ -13,7 +13,6 @@ public static class AppPaths
     public static string LogDirectory { get; } = Path.Combine(DataRoot, "logs");
 
     public static string ManagedCorePath { get; } = Path.Combine(CoreDirectory, "mihomo.exe");
-    public static string ConfigPath { get; } = Path.Combine(ConfigDirectory, "mihomo.yaml");
     public static string RuntimeConfigPath { get; } = Path.Combine(ConfigDirectory, "mihomo-runtime.yaml");
     public static string BaseConfigPath { get; } = Path.Combine(ConfigDirectory, "config-base.yaml");
     public static string SettingsPath { get; } = Path.Combine(DataRoot, "app-settings.json");
@@ -35,24 +34,16 @@ public static class AppPaths
             await File.WriteAllTextAsync(BaseConfigPath, DefaultBaseConfig, cancellationToken);
         }
 
-        if (File.Exists(ConfigPath))
+        if (File.Exists(RuntimeConfigPath))
         {
-            var existing = await File.ReadAllTextAsync(ConfigPath, cancellationToken);
-            var patched = YamlConfigService.EnsureGlobalConfig(existing);
-            if (patched != existing)
-            {
-                await File.WriteAllTextAsync(ConfigPath, patched, cancellationToken);
-            }
-
             return;
         }
 
-        var looseConfigPath = Path.Combine(AppContext.BaseDirectory, "Assets", "ClashBar.yaml");
-        var content = File.Exists(looseConfigPath)
-            ? await File.ReadAllTextAsync(looseConfigPath, cancellationToken)
-            : DefaultBaseConfig;
-
-        await File.WriteAllTextAsync(ConfigPath, YamlConfigService.EnsureGlobalConfig(content), cancellationToken);
+        var baseConfig = await File.ReadAllTextAsync(BaseConfigPath, cancellationToken);
+        await File.WriteAllTextAsync(
+            RuntimeConfigPath,
+            YamlConfigService.EnsureGlobalConfig(baseConfig),
+            cancellationToken);
     }
 
     private static void EnsureManagedCore()

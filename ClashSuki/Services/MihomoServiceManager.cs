@@ -28,12 +28,17 @@ public sealed class MihomoServiceManager
     {
         await AppPaths.BootstrapAsync(cancellationToken);
 
-        if (!MihomoServiceInstaller.IsInstalled())
+        if (!PackageIdentityService.IsPackaged)
         {
             return MihomoServiceStatus.InstallRequired;
         }
 
-        if (!MihomoServiceInstaller.IsRunning())
+        if (!PackagedServiceController.IsInstalled())
+        {
+            return MihomoServiceStatus.InstallRequired;
+        }
+
+        if (!PackagedServiceController.IsRunning())
         {
             return MihomoServiceStatus.Stopped;
         }
@@ -47,7 +52,12 @@ public sealed class MihomoServiceManager
     {
         await AppPaths.BootstrapAsync(cancellationToken);
 
-        if (!MihomoServiceInstaller.IsInstalled())
+        if (!PackageIdentityService.IsPackaged)
+        {
+            return MihomoServiceStatus.InstallRequired;
+        }
+
+        if (!PackagedServiceController.IsInstalled())
         {
             return MihomoServiceStatus.InstallRequired;
         }
@@ -58,18 +68,16 @@ public sealed class MihomoServiceManager
             return MihomoServiceStatus.Ready;
         }
 
+        Exception? firstStartError = null;
         try
         {
             if (probe.IsReachable)
             {
-                DiagnosticLog.WriteApp(
-                    "SERVICE",
-                    $"服务协议版本不匹配；期望版本={ServiceProtocol.Version}；实际版本={probe.ProtocolVersion?.ToString() ?? "未知"}；正在重启服务。");
-                MihomoServiceInstaller.Restart();
+                PackagedServiceController.Restart();
             }
             else
             {
-                MihomoServiceInstaller.Start();
+                PackagedServiceController.Start();
             }
 
             await WaitUntilReadyAsync(TimeSpan.FromSeconds(15), cancellationToken);
@@ -77,63 +85,48 @@ public sealed class MihomoServiceManager
         }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteAppException("SERVICE", ex, "已安装的服务未就绪，首次启动尝试失败");
+            firstStartError = ex;
         }
 
         try
         {
-            MihomoServiceInstaller.Restart();
+            PackagedServiceController.Restart();
             await WaitUntilReadyAsync(TimeSpan.FromSeconds(15), cancellationToken);
             return MihomoServiceStatus.Ready;
         }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteAppException("SERVICE", ex, "重启已安装的服务失败");
+            var failure = firstStartError is null
+                ? ex
+                : new AggregateException(firstStartError, ex);
+            DiagnosticLog.WriteAppException(
+                LogSources.Service,
+                failure,
+                "服务启动失败");
             return MihomoServiceStatus.Unavailable;
         }
     }
 
-    public async Task InstallAsync(CancellationToken cancellationToken = default)
+    public async Task RepairAsync(CancellationToken cancellationToken = default)
     {
-        if (PackageIdentityService.IsPackaged)
-        {
-            throw new InvalidOperationException("打包版本的服务由 MSIX 注册，请修复或重新安装应用包。");
-        }
-
         await AppPaths.BootstrapAsync(cancellationToken);
-
-        if (MihomoCoreManager.IsElevated)
+        if (!PackageIdentityService.IsPackaged)
         {
-            MihomoServiceInstaller.Install();
-            await WaitUntilReadyAsync(TimeSpan.FromSeconds(10), cancellationToken);
-            return;
+            throw new InvalidOperationException(
+                "服务仅由 MSIX 包管理。请在 Visual Studio 中启动 ClashSuki.Package 项目。");
         }
 
-        await RunElevatedServiceAsync(cancellationToken, "--install-service");
-        await WaitUntilReadyAsync(TimeSpan.FromSeconds(10), cancellationToken);
-    }
-
-    public async Task UninstallAsync(CancellationToken cancellationToken = default)
-    {
-        if (PackageIdentityService.IsPackaged)
+        if (PackagedServiceController.IsRunning())
         {
-            throw new InvalidOperationException("打包版本的服务由 MSIX 管理，卸载应用包时会一并移除。");
+            await StopHostAsync(cancellationToken);
         }
 
-        await AppPaths.BootstrapAsync(cancellationToken);
-
-        if (MihomoCoreManager.IsElevated)
-        {
-            MihomoServiceInstaller.Uninstall();
-            return;
-        }
-
-        await RunElevatedServiceAsync(cancellationToken, "--uninstall-service");
+        await PackageRepairLauncher.StartAfterCurrentProcessExitsAsync(cancellationToken);
     }
 
     public async Task StopHostAsync(CancellationToken cancellationToken = default)
     {
-        if (!MihomoServiceInstaller.IsRunning())
+        if (!PackagedServiceController.IsRunning())
         {
             return;
         }
@@ -154,12 +147,12 @@ public sealed class MihomoServiceManager
                 "WARN");
             try
             {
-                await Task.Run(MihomoServiceInstaller.Stop, cancellationToken);
+                await Task.Run(PackagedServiceController.Stop, cancellationToken);
             }
             catch (Exception fallbackEx)
             {
                 throw new InvalidOperationException(
-                    "无法停止 ClashSuki 服务。请以管理员身份重试或重新安装服务。",
+                    "无法停止 ClashSuki 服务，请修复应用包后重试。",
                     new AggregateException(ex, fallbackEx));
             }
         }
@@ -278,7 +271,7 @@ public sealed class MihomoServiceManager
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (MihomoServiceInstaller.IsRunning() == expectedRunning)
+            if (PackagedServiceController.IsRunning() == expectedRunning)
             {
                 return;
             }
@@ -406,7 +399,7 @@ public sealed class MihomoServiceManager
         var candidates = new[]
         {
             Path.Combine(baseDirectory, "ClashSuki.Service.exe"),
-            Path.Combine(baseDirectory, "AppX", "ClashSuki.Service.exe")
+            Path.GetFullPath(Path.Combine(baseDirectory, "..", "ClashSuki.Service", "ClashSuki.Service.exe"))
         };
 
         return candidates.FirstOrDefault(File.Exists)

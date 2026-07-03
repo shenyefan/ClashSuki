@@ -147,24 +147,17 @@ public sealed class MihomoWsClient : IDisposable, IAsyncDisposable
             catch (Exception ex)
             {
                 DiagnosticLog.WriteAppExceptionThrottled(
-                    $"realtime-websocket:{label}",
+                    "realtime-websocket",
                     LogSources.Realtime,
                     ex,
-                    $"{FormatStreamLabel(label)} WebSocket 连接失败",
+                    "实时数据连接失败，正在重试",
+                    interval: TimeSpan.FromMinutes(1),
                     level: "WARN");
             }
 
             if (cancellationToken.IsCancellationRequested)
             {
                 return;
-            }
-
-            if ((DateTime.UtcNow - lastEvent) >= StaleTimeout)
-            {
-                DiagnosticLog.WriteApp(
-                    "REALTIME",
-                    "WARN",
-                    $"{FormatStreamLabel(label)} WebSocket 已失效，正在重新连接。");
             }
 
             try
@@ -262,10 +255,14 @@ public sealed class MihomoWsClient : IDisposable, IAsyncDisposable
         }
         catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
         {
-            DiagnosticLog.WriteApp(
-                "REALTIME",
-                "WARN",
-                $"实时连接关闭已跳过或超时；异常类型={ex.GetType().Name}");
+            if (ex is TimeoutException)
+            {
+                DiagnosticLog.WriteAppException(
+                    LogSources.Realtime,
+                    ex,
+                    "关闭实时连接超时",
+                    "WARN");
+            }
         }
         catch (Exception ex)
         {

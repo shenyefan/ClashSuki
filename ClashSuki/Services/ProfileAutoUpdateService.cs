@@ -83,7 +83,6 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
             await _updateLock.WaitAsync(token);
             try
             {
-                _log?.Invoke("INFO", $"订阅自动更新开始；名称={profile.Name}");
                 await _updateProfileAsync(profile.Uid, token);
             }
             finally

@@ -81,7 +81,6 @@ public sealed class OverrideAutoUpdateService : IAsyncDisposable
             await _updateLock.WaitAsync(token);
             try
             {
-                _log?.Invoke("INFO", $"覆写自动更新开始；名称={entry.Name}");
                 await _refreshOverrideAsync(entry.Id, token);
             }
             finally

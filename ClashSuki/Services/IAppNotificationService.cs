@@ -5,15 +5,24 @@ namespace ClashSuki.Services;
 
 public interface IAppNotificationService
 {
-    void Success(string message, string title = "操作成功", string source = LogSources.Application);
+    void Success(
+        string message,
+        string title = "操作成功",
+        string source = LogSources.Application,
+        bool writeLog = true);
 
-    void Info(string message, string title = "提示", string source = LogSources.Application);
+    void Info(
+        string message,
+        string title = "提示",
+        string source = LogSources.Application,
+        bool writeLog = true);
 
     void Warning(
         string message,
         string title = "注意",
         string source = LogSources.Application,
-        Exception? exception = null);
+        Exception? exception = null,
+        bool writeLog = true);
 
     void Error(
         string message,

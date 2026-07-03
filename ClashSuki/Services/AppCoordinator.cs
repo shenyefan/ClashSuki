@@ -16,7 +16,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     private readonly MihomoServiceManager _serviceManager = new();
     private readonly WindowsSystemProxyService _systemProxy = new();
     private readonly OverrideService _overrideService = new();
-    private readonly OverrideRuntimeService _overrideRuntime;
+    private readonly RuntimeConfigService _runtimeConfig;
     private readonly GistSyncService _gistSync = new();
     private readonly MihomoWsClient _ws = new();
     private readonly ProfileAutoUpdateService _profileAutoUpdate;
@@ -71,7 +71,8 @@ public sealed class AppCoordinator : IAsyncDisposable
         Rules = rules;
         Profiles = profiles;
         Logs = logs;
-        _overrideRuntime = new OverrideRuntimeService(_overrideService);
+        var overrideRuntime = new OverrideRuntimeService(_overrideService);
+        _runtimeConfig = new RuntimeConfigService(Profiles, overrideRuntime, _core);
         _profileAutoUpdate = new ProfileAutoUpdateService(
             profileService,
             (uid, _) => UpdateProfileAsync(uid),
@@ -188,10 +189,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             var desiredTunEnabled = Runtime.IsTunEnabled;
             var serviceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
-            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus, MihomoCoreManager.IsElevated));
+            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus));
             await _core.EnsureStartedAsync(desiredTunEnabled, _cts.Token);
             serviceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
-            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus, MihomoCoreManager.IsElevated));
+            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus));
             await ReconcileTunStateAfterStartupAsync(desiredTunEnabled, _cts.Token);
 
             await RestoreDesiredSystemProxyAsync(_cts.Token);
@@ -259,6 +260,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         _desiredSystemProxyEnabled = settings.SystemProxyEnabled;
         await Profiles.LoadAsync(_cts.Token);
         ApplyCoreWorkDirectory(Profiles.ActiveUid, settings);
+        await RebuildRuntimeFromSourcesAsync(_cts.Token);
         await SyncSwitchStatesFromConfigAsync(_cts.Token);
         await ReconcileStaleSystemProxyAsync(settings, _cts.Token);
         await EnsureExternalControllerPolicyInYamlAsync(_cts.Token);
@@ -269,6 +271,11 @@ public sealed class AppCoordinator : IAsyncDisposable
             Proxies.SetGlobalOnly(Runtime.IsGlobalMode);
         });
         _startupPrepared = true;
+    }
+
+    private async Task RebuildRuntimeFromSourcesAsync(CancellationToken cancellationToken)
+    {
+        await _runtimeConfig.RebuildAsync(cancellationToken);
     }
 
     public async Task RefreshNowAsync() => await RefreshRuntimeAsync(_cts.Token);
@@ -462,10 +469,9 @@ public sealed class AppCoordinator : IAsyncDisposable
                 ageSecretKey,
                 fileName,
                 Runtime.MixedPortNumber > 0 ? Runtime.MixedPortNumber : null,
-                _cts.Token,
-                LogProfile);
+                _cts.Token);
 
-            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid))
+            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
             {
                 await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
                 throw new InvalidOperationException("订阅配置未能通过校验并激活。");
@@ -502,11 +508,11 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
-            await _dispatcher.RunAsync(() =>
-                Logs.AddApp(
-                    "WARN",
-                    $"切换已生效，但关闭旧连接失败：{ex.Message}",
-                    LogSources.Connection));
+            DiagnosticLog.WriteAppException(
+                LogSources.Connection,
+                ex,
+                "切换已生效，但关闭旧连接失败",
+                "WARN");
         }
     }
 
@@ -558,7 +564,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             var hadActiveProfile = !string.IsNullOrWhiteSpace(Profiles.ActiveUid);
             var profile = await Profiles.ImportLocalAsync(name, fileName, content, _cts.Token);
 
-            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid))
+            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
             {
                 await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
                 throw new InvalidOperationException("本地配置未能通过校验并激活。");
@@ -590,11 +596,10 @@ public sealed class AppCoordinator : IAsyncDisposable
             var profile = await Profiles.UpdateAsync(
                 uid,
                 Runtime.MixedPortNumber > 0 ? Runtime.MixedPortNumber : null,
-                _cts.Token,
-                LogProfile);
+                _cts.Token);
             if (profile.Uid == Profiles.ActiveUid)
             {
-                if (!await ActivateProfileAsync(uid))
+                if (!await ActivateProfileAsync(uid, reportResult: false))
                 {
                     throw new InvalidOperationException("新订阅配置未能激活。");
                 }
@@ -612,7 +617,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                     await Profiles.RestoreUpdateSnapshotAsync(snapshot, CancellationToken.None);
                     if (snapshot.Item.Uid == Profiles.ActiveUid)
                     {
-                        await ActivateProfileAsync(snapshot.Item.Uid);
+                        await ActivateProfileAsync(snapshot.Item.Uid, reportResult: false);
                     }
                 }
                 catch (Exception rollbackEx)
@@ -631,49 +636,79 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
     }
 
-    public async Task<bool> ActivateProfileAsync(string uid)
+    public async Task<bool> ActivateProfileAsync(string uid, bool reportResult = true)
     {
+        var previousUid = Profiles.ActiveUid;
         try
         {
             var settings = await AppSettingsService.LoadAsync(_cts.Token);
             ApplyCoreWorkDirectory(uid, settings);
-            await Profiles.ActivateAsync(
-                uid,
-                _api,
-                _core,
-                _cts.Token,
-                LogProfile,
+            await Profiles.SetActiveAsync(uid, _cts.Token);
+            await RebuildAndApplyRuntimeAsync(
+                startIfStopped: true,
                 settings.UseHotReloadProfile && !settings.DiffWorkDir,
                 settings.HotReloadProfileAutoCloseConnection);
-            await ApplyApiEndpointFromConfigAsync(_cts.Token);
-            await ApplyOverridesToCurrentConfigAsync();
             await ApplyApiEndpointFromConfigAsync(_cts.Token);
             await SyncExternalControllerPolicyAsync(_cts.Token);
             await RefreshRuntimeAsync(_cts.Token);
             await RefreshProxiesAsync(_cts.Token);
             await RefreshRulesAsync(_cts.Token);
             await SyncRuntimeConfigToGistIfEnabledAsync();
-            await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "订阅已启用。", LogSources.Subscription));
+            if (reportResult)
+            {
+                await _dispatcher.RunAsync(() =>
+                    Logs.AddApp("INFO", "订阅已启用。", LogSources.Subscription));
+            }
+
             return true;
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
-            await _dispatcher.RunAsync(() =>
+            if (!string.Equals(previousUid, Profiles.ActiveUid, StringComparison.Ordinal))
             {
-                Runtime.Notifications.Error(
-                    $"订阅启用失败：{ex.Message}",
-                    source: LogSources.Subscription,
-                    exception: ex);
-            });
+                try
+                {
+                    await Profiles.RestoreActiveAsync(previousUid, CancellationToken.None);
+                }
+                catch (Exception rollbackEx)
+                {
+                    DiagnosticLog.WriteAppException(
+                        LogSources.Subscription,
+                        rollbackEx,
+                        "恢复原订阅状态失败");
+                }
+            }
+
+            try
+            {
+                var rollbackSettings = await AppSettingsService.LoadAsync(CancellationToken.None);
+                ApplyCoreWorkDirectory(previousUid, rollbackSettings);
+            }
+            catch (Exception rollbackEx)
+            {
+                DiagnosticLog.WriteAppException(
+                    LogSources.Subscription,
+                    rollbackEx,
+                    "恢复内核工作目录失败");
+            }
+
+            if (reportResult)
+            {
+                await _dispatcher.RunAsync(() =>
+                {
+                    Runtime.Notifications.Error(
+                        $"订阅启用失败：{ex.Message}",
+                        source: LogSources.Subscription,
+                        exception: ex);
+                });
+            }
+
             return false;
         }
     }
 
     public int? GetMixedPortForDownload() =>
         Runtime.MixedPortNumber > 0 ? Runtime.MixedPortNumber : null;
-
-    public void LogDownload(string level, string message) => LogProfile(level, message);
 
     public async Task RefreshOverrideRemoteAsync(
         OverrideConfig config,
@@ -684,27 +719,17 @@ public sealed class AppCoordinator : IAsyncDisposable
             config,
             entry,
             GetMixedPortForDownload(),
-            LogOverride,
             cancellationToken);
     }
 
     public async Task<OverrideApplyResult> ApplyOverridesAsync()
     {
-        if (!string.IsNullOrWhiteSpace(Profiles.ActiveUid))
-        {
-            var settings = await AppSettingsService.LoadAsync(_cts.Token);
-            ApplyCoreWorkDirectory(Profiles.ActiveUid, settings);
-            await Profiles.ActivateAsync(
-                Profiles.ActiveUid,
-                _api,
-                _core,
-                _cts.Token,
-                LogProfile,
-                settings.UseHotReloadProfile && !settings.DiffWorkDir,
-                settings.HotReloadProfileAutoCloseConnection);
-        }
-
-        var result = await ApplyOverridesToCurrentConfigAsync();
+        var settings = await AppSettingsService.LoadAsync(_cts.Token);
+        ApplyCoreWorkDirectory(Profiles.ActiveUid, settings);
+        var result = await RebuildAndApplyRuntimeAsync(
+            startIfStopped: true,
+            settings.UseHotReloadProfile && !settings.DiffWorkDir,
+            settings.HotReloadProfileAutoCloseConnection);
         await ApplyApiEndpointFromConfigAsync(_cts.Token);
         await SyncExternalControllerPolicyAsync(_cts.Token);
         await RefreshRuntimeAsync(_cts.Token);
@@ -714,97 +739,69 @@ public sealed class AppCoordinator : IAsyncDisposable
         return result;
     }
 
-    private async Task<OverrideApplyResult> ApplyOverridesToCurrentConfigAsync()
+    private async Task<OverrideApplyResult> RebuildAndApplyRuntimeAsync(
+        bool startIfStopped,
+        bool useHotReload,
+        bool closeConnectionsBeforeHotReload)
     {
-        var (yaml, result) = await _overrideRuntime.BuildAsync(AppPaths.ConfigPath, _cts.Token);
-        if (result.EnabledCount == 0)
+        var snapshot = await ConfigFileSnapshot.CaptureAsync(
+            [AppPaths.BaseConfigPath, AppPaths.RuntimeConfigPath],
+            _cts.Token);
+        var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
+        var coreWasRunning = _core.RunMode != CoreRunMode.NotRunning || _core.IsRunning;
+        var previousTunEnabled = previousRuntime is not null &&
+                                 YamlConfigService.IsTunEnabled(previousRuntime);
+
+        try
         {
+            var result = await _runtimeConfig.RebuildAsync(_cts.Token);
+            var requireTun = await YamlConfigService.IsTunEnabledAsync(
+                AppPaths.RuntimeConfigPath,
+                _cts.Token);
+
+            if (_core.RunMode != CoreRunMode.NotRunning && useHotReload)
+            {
+                try
+                {
+                    if (closeConnectionsBeforeHotReload)
+                    {
+                        await _api.CloseAllConnectionsAsync(_cts.Token);
+                    }
+
+                    await _api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, _cts.Token);
+                }
+                catch (Exception ex) when (!IsAppCancellation(ex))
+                {
+                    await _core.RestartAsync(requireTun, _cts.Token);
+                }
+            }
+            else if (_core.RunMode != CoreRunMode.NotRunning)
+            {
+                await _core.RestartAsync(requireTun, _cts.Token);
+            }
+            else if (startIfStopped)
+            {
+                await _core.EnsureStartedAsync(requireTun, _cts.Token);
+            }
+
             return result;
         }
-
-        var tempPath = Path.Combine(Path.GetDirectoryName(AppPaths.ConfigPath)!, "mihomo.override.tmp.yaml");
-        await File.WriteAllTextAsync(tempPath, yaml, _cts.Token);
-        try
+        catch
         {
-            await _core.ValidateConfigAsync(tempPath, _cts.Token);
-
-            var snapshot = await ConfigFileSnapshot.CaptureAsync(
-                [AppPaths.ConfigPath, AppPaths.RuntimeConfigPath],
-                _cts.Token);
-            var previousConfig = snapshot.GetContent(AppPaths.ConfigPath);
-            var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
-            var coreWasRunning = _core.RunMode != CoreRunMode.NotRunning || _core.IsRunning;
-            var previousTunEnabled = previousConfig is not null &&
-                                     YamlConfigService.IsTunEnabled(previousConfig);
-
-            try
+            await snapshot.RestoreAsync();
+            if (coreWasRunning && previousRuntime is not null)
             {
-                File.Copy(tempPath, AppPaths.ConfigPath, overwrite: true);
-                await ReloadCurrentConfigAsync();
-                return result;
-            }
-            catch
-            {
-                await snapshot.RestoreAsync();
-                if (coreWasRunning && previousRuntime is not null)
+                try
                 {
-                    try
-                    {
-                        await _api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, CancellationToken.None);
-                    }
-                    catch
-                    {
-                        await _core.RestartAsync(previousTunEnabled, CancellationToken.None);
-                    }
+                    await _api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, CancellationToken.None);
                 }
-
-                throw;
-            }
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempPath))
+                catch
                 {
-                    File.Delete(tempPath);
+                    await _core.RestartAsync(previousTunEnabled, CancellationToken.None);
                 }
             }
-            catch (Exception ex)
-            {
-                DiagnosticLog.WriteAppException("OVERRIDE-TEMP-CLEANUP", ex);
-            }
-        }
-    }
 
-    private async Task ValidatePatchAsync(
-        IReadOnlyDictionary<string, object?> patch,
-        IReadOnlySet<string>? replaceRootMappings = null)
-    {
-        var candidate = await YamlConfigService.BuildPatchedConfigAsync(
-            AppPaths.ConfigPath,
-            patch,
-            _cts.Token,
-            replaceRootMappings);
-        var tempPath = Path.Combine(Path.GetDirectoryName(AppPaths.ConfigPath)!, "mihomo.patch.tmp.yaml");
-        await File.WriteAllTextAsync(tempPath, candidate, _cts.Token);
-        try
-        {
-            await _core.ValidateConfigAsync(tempPath, _cts.Token);
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.WriteAppException("PATCH-TEMP-CLEANUP", ex);
-            }
+            throw;
         }
     }
 
@@ -815,7 +812,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             return;
         }
 
-        var requireTun = await YamlConfigService.IsTunEnabledAsync(AppPaths.ConfigPath, _cts.Token);
+        var requireTun = await YamlConfigService.IsTunEnabledAsync(AppPaths.RuntimeConfigPath, _cts.Token);
         try
         {
             await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(_cts.Token);
@@ -823,11 +820,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
-            await _dispatcher.RunAsync(() =>
-                Logs.AddApp(
-                    "WARN",
-                    $"配置热重载失败，正在重启内核：{ex.Message}",
-                    LogSources.Core));
             await _core.RestartAsync(requireTun, _cts.Token);
         }
     }
@@ -840,7 +832,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await Profiles.DeleteAsync(uid, _cts.Token);
             if (wasActive && !string.IsNullOrWhiteSpace(Profiles.ActiveUid))
             {
-                await ActivateProfileAsync(Profiles.ActiveUid);
+                await ActivateProfileAsync(Profiles.ActiveUid, reportResult: false);
             }
 
             await _dispatcher.RunAsync(() =>
@@ -994,7 +986,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             if (uid == Profiles.ActiveUid)
             {
-                var activated = await ActivateProfileAsync(uid);
+                var activated = await ActivateProfileAsync(uid, reportResult: false);
                 if (!activated)
                 {
                     throw new InvalidOperationException("编辑后的配置未能应用。");
@@ -1014,7 +1006,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                     await File.WriteAllTextAsync(path, previousContent, CancellationToken.None);
                     if (uid == Profiles.ActiveUid)
                     {
-                        await ActivateProfileAsync(uid);
+                        await ActivateProfileAsync(uid, reportResult: false);
                     }
                 }
                 catch (Exception rollbackEx)
@@ -1114,7 +1106,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             var mixedPort = Runtime.MixedPortNumber;
             var settings = await AppSettingsService.LoadAsync(_cts.Token);
-            var snapshot = await Task.Run(() =>
+            await Task.Run(() =>
             {
                 if (enabled)
                 {
@@ -1126,8 +1118,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                     _systemProxy.Disable();
                     _activeSystemProxyPort = null;
                 }
-
-                return _systemProxy.GetSnapshot();
             }, _cts.Token);
 
             _desiredSystemProxyEnabled = enabled;
@@ -1138,11 +1128,9 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.SyncSystemProxyEnabled(enabled);
                 Logs.AddApp(
                     "INFO",
-                    enabled ? $"系统代理已开启：{snapshot}" : $"系统代理已关闭：{snapshot}",
+                    enabled ? "系统代理已开启。" : "系统代理已关闭。",
                     LogSources.SystemProxy);
             });
-
-            _ = Task.Run(() => WriteSystemProxyDiagnostics(mixedPort), CancellationToken.None);
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
@@ -1151,6 +1139,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             _desiredSystemProxyEnabled = actual;
             await AppSettingsService.SetSystemProxyEnabledAsync(actual, _cts.Token);
             await _dispatcher.RunAsync(() => Runtime.SyncSystemProxyEnabled(actual));
+            TryAttachSystemProxyDiagnostics(ex, Runtime.MixedPortNumber);
 
             await _dispatcher.RunAsync(() =>
             {
@@ -1159,20 +1148,18 @@ public sealed class AppCoordinator : IAsyncDisposable
                     source: LogSources.SystemProxy,
                     exception: ex);
             });
-
-            _ = Task.Run(() => WriteSystemProxyDiagnostics(Runtime.MixedPortNumber), CancellationToken.None);
         }
     }
 
-    private void WriteSystemProxyDiagnostics(int mixedPort)
+    private void TryAttachSystemProxyDiagnostics(Exception exception, int mixedPort)
     {
         try
         {
-            DiagnosticLog.WriteApp("SYSTEM-PROXY", _systemProxy.GetDetailedDiagnostics(mixedPort));
+            exception.Data["系统代理诊断"] = _systemProxy.GetDetailedDiagnostics(mixedPort);
         }
-        catch (Exception ex)
+        catch (Exception diagnosticsException)
         {
-            DiagnosticLog.WriteAppException("SYSTEM-PROXY-DIAG", ex);
+            exception.Data["系统代理诊断"] = $"收集失败：{diagnosticsException.Message}";
         }
     }
 
@@ -1196,11 +1183,10 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             var mixedPort = Runtime.MixedPortNumber;
             var settings = await AppSettingsService.LoadAsync(cancellationToken);
-            var snapshot = await Task.Run(() =>
+            await Task.Run(() =>
             {
                 _systemProxy.Enable(mixedPort, settings);
                 _activeSystemProxyPort = mixedPort;
-                return _systemProxy.GetSnapshot();
             }, cancellationToken);
 
             await _dispatcher.RunAsync(() =>
@@ -1208,14 +1194,13 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.SyncSystemProxyEnabled(true);
                 Logs.AddApp(
                     "INFO",
-                    $"系统代理已按上次状态自动恢复：{snapshot}",
+                    "系统代理已按上次状态恢复。",
                     LogSources.SystemProxy);
             });
-
-            _ = Task.Run(() => WriteSystemProxyDiagnostics(mixedPort), CancellationToken.None);
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
+            TryAttachSystemProxyDiagnostics(ex, Runtime.MixedPortNumber);
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.SyncSystemProxyEnabled(false);
@@ -1247,12 +1232,12 @@ public sealed class AppCoordinator : IAsyncDisposable
         AppSettings settings,
         CancellationToken cancellationToken)
     {
-        if (_desiredSystemProxyEnabled || !File.Exists(AppPaths.ConfigPath))
+        if (_desiredSystemProxyEnabled || !File.Exists(AppPaths.RuntimeConfigPath))
         {
             return;
         }
 
-        var coreSettings = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.ConfigPath, cancellationToken);
+        var coreSettings = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.RuntimeConfigPath, cancellationToken);
         if (coreSettings.MixedPort <= 0)
         {
             return;
@@ -1294,7 +1279,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                 config,
                 entry,
                 GetMixedPortForDownload(),
-                LogOverride,
                 token);
             if (entry.Enabled)
             {
@@ -1373,7 +1357,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             (_core.RunMode != CoreRunMode.NotRunning || _core.IsRunning))
         {
             var tunEnabled = await YamlConfigService.IsTunEnabledAsync(
-                AppPaths.ConfigPath,
+                AppPaths.RuntimeConfigPath,
                 cancellationToken);
             await _core.RestartAsync(tunEnabled, cancellationToken);
             await ApplyApiEndpointFromConfigAsync(cancellationToken);
@@ -1391,10 +1375,11 @@ public sealed class AppCoordinator : IAsyncDisposable
         _desiredSystemProxyEnabled = settings.SystemProxyEnabled;
         await Profiles.LoadAsync(cancellationToken);
         ApplyCoreWorkDirectory(Profiles.ActiveUid, settings);
+        await _runtimeConfig.RebuildAsync(cancellationToken);
         await ApplyApiEndpointFromConfigAsync(cancellationToken);
 
         var tunEnabled = await YamlConfigService.IsTunEnabledAsync(
-            AppPaths.ConfigPath,
+            AppPaths.RuntimeConfigPath,
             cancellationToken);
         if (_core.RunMode != CoreRunMode.NotRunning || _core.IsRunning)
         {
@@ -1420,7 +1405,6 @@ public sealed class AppCoordinator : IAsyncDisposable
 
         if (!await _tunLock.WaitAsync(0, _cts.Token))
         {
-            await LogTunAsync($"切换请求已排队；当前切换仍在执行；目标状态={enabled}");
             return;
         }
 
@@ -1472,26 +1456,23 @@ public sealed class AppCoordinator : IAsyncDisposable
     private async Task ApplyTunTargetAsync(bool enabled)
     {
         var previousTunEnabled = !enabled;
-        var previousDnsEnabled = true;
+        ConfigFileSnapshot? snapshot = null;
         try
         {
-            previousTunEnabled = await YamlConfigService.IsTunEnabledAsync(
-                AppPaths.ConfigPath,
+            snapshot = await ConfigFileSnapshot.CaptureAsync(
+                [AppPaths.BaseConfigPath, AppPaths.RuntimeConfigPath],
                 _cts.Token);
-            previousDnsEnabled = (await YamlConfigService.LoadDnsSettingsAsync(
-                AppPaths.ConfigPath,
-                _cts.Token)).Enable;
+            previousTunEnabled = await YamlConfigService.IsTunEnabledAsync(
+                AppPaths.RuntimeConfigPath,
+                _cts.Token);
 
             await _dispatcher.RunAsync(() => Runtime.SyncTunEnabled(enabled));
             var serviceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
-            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus, MihomoCoreManager.IsElevated));
-            await LogTunAsync(
-                $"收到切换请求；目标状态={enabled}；界面状态={Runtime.IsTunEnabled}；内核运行方式={_core.RunMode}；服务状态={serviceStatus}；进程标识={_core.ProcessId}");
+            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus));
 
             if (enabled)
             {
                 EnsureTunActivationPossible();
-                await LogTunAsync("正在确认内核具备虚拟网卡运行能力。");
                 await _core.EnsureStartedAsync(requireTun: true, _cts.Token);
                 await WaitForApiReadyAsync("开启虚拟网卡", TimeSpan.FromSeconds(15), _cts.Token);
                 await ApplyTunConfigAndVerifyAsync(true, _cts.Token);
@@ -1511,7 +1492,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             serviceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
             {
-                Runtime.ApplyTunCapability(serviceStatus, MihomoCoreManager.IsElevated);
+                Runtime.ApplyTunCapability(serviceStatus);
                 Logs.AddApp(
                     "INFO",
                     enabled ? "虚拟网卡已开启。" : "虚拟网卡已关闭。",
@@ -1521,8 +1502,8 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
             await RollBackTunAfterFailureAsync(
+                snapshot,
                 previousTunEnabled,
-                previousDnsEnabled,
                 _cts.Token);
 
             await _dispatcher.RunAsync(() =>
@@ -1536,7 +1517,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await RefreshRuntimeAsync(_cts.Token);
             var currentServiceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
-                Runtime.ApplyTunCapability(currentServiceStatus, MihomoCoreManager.IsElevated));
+                Runtime.ApplyTunCapability(currentServiceStatus));
         }
     }
 
@@ -1798,7 +1779,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task<RuleProviderDocument> OpenRuleProviderDocumentAsync(string provider)
     {
-        var configs = await YamlConfigService.LoadRuleProviderConfigsAsync(AppPaths.ConfigPath, _cts.Token);
+        var configs = await YamlConfigService.LoadRuleProviderConfigsAsync(AppPaths.RuntimeConfigPath, _cts.Token);
         configs.TryGetValue(provider, out var config);
 
         var vehicleType = config?.VehicleType ?? "";
@@ -1807,7 +1788,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         if (vehicleType.Equals("Inline", StringComparison.OrdinalIgnoreCase))
         {
             var content = string.IsNullOrWhiteSpace(config?.Payload) ? "[]" : config.Payload;
-            return new RuleProviderDocument(provider, content, AppPaths.ConfigPath, format);
+            return new RuleProviderDocument(provider, content, AppPaths.RuntimeConfigPath, format);
         }
 
         var sourcePath = ResolveProviderPath(config);
@@ -2096,7 +2077,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             return;
         }
 
-        var requireTun = await YamlConfigService.IsTunEnabledAsync(AppPaths.ConfigPath, _cts.Token);
+        var requireTun = await YamlConfigService.IsTunEnabledAsync(AppPaths.RuntimeConfigPath, _cts.Token);
         await _core.RestartAsync(requireTun, _cts.Token);
         await Task.Delay(1500, _cts.Token);
         await RefreshRuntimeAsync(_cts.Token);
@@ -2117,8 +2098,6 @@ public sealed class AppCoordinator : IAsyncDisposable
 
         try
         {
-            await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", $"开始下载内核：{FormatCoreKind(kind)}", LogSources.Core));
             downloaded = await _coreDownloader.DownloadAsync(
                 new MihomoCoreDownloadRequest(kind, specificVersion),
                 _cts.Token);
@@ -2219,30 +2198,28 @@ public sealed class AppCoordinator : IAsyncDisposable
             }
         };
 
-        await ValidatePatchAsync(patch);
         var snapshot = await ConfigFileSnapshot.CaptureAsync(
             [
                 AppPaths.BaseConfigPath,
-                AppPaths.ConfigPath,
                 AppPaths.RuntimeConfigPath,
                 AppPaths.SettingsPath
             ],
             _cts.Token);
-        var previousConfig = snapshot.GetContent(AppPaths.ConfigPath);
         var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
         var coreWasRunning = _core.RunMode != CoreRunMode.NotRunning || _core.IsRunning;
-        var previousTunEnabled = previousConfig is not null &&
-                                 YamlConfigService.IsTunEnabled(previousConfig);
+        var previousTunEnabled = previousRuntime is not null &&
+                                 YamlConfigService.IsTunEnabled(previousRuntime);
 
         try
         {
-            await YamlConfigService.PersistPatchAsync(patch, _cts.Token);
+            await YamlConfigService.PersistBasePatchAsync(patch, _cts.Token);
             await AppSettingsService.PatchAsync(appSettings =>
             {
                 appSettings.EnableExternalController = enableExternalController;
                 appSettings.ExternalControllerAddress =
                     MihomoControllerEndpoint.ResolveHttpAddress(settings.ExternalController);
             }, _cts.Token);
+            await _runtimeConfig.RebuildAsync(_cts.Token);
             await ApplyApiEndpointFromConfigAsync(_cts.Token);
             await RestartCoreProcessAsync();
             await SyncRuntimeConfigToGistIfEnabledAsync();
@@ -2325,7 +2302,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     private async Task ApplyApiEndpointFromConfigAsync(CancellationToken cancellationToken)
     {
-        var settings = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.ConfigPath, cancellationToken);
+        var settings = await LoadCoreSettingsAsync(cancellationToken);
         var secret = string.IsNullOrWhiteSpace(settings.Secret) ? null : settings.Secret.Trim();
 
         _api.Configure(secret);
@@ -2333,19 +2310,30 @@ public sealed class AppCoordinator : IAsyncDisposable
     }
 
     public Task<YamlConfigService.GeoDataSettings> LoadGeoDataSettingsAsync() =>
-        YamlConfigService.LoadGeoDataSettingsAsync(AppPaths.ConfigPath, _cts.Token);
+        YamlConfigService.LoadGeoDataSettingsAsync(GetSettingsConfigPath(), _cts.Token);
 
     public Task<YamlConfigService.CoreSectionSettings> LoadCoreSettingsAsync() =>
-        YamlConfigService.LoadCoreSettingsAsync(AppPaths.ConfigPath, _cts.Token);
+        LoadCoreSettingsAsync(_cts.Token);
+
+    private static Task<YamlConfigService.CoreSectionSettings> LoadCoreSettingsAsync(
+        CancellationToken cancellationToken)
+    {
+        return YamlConfigService.LoadCoreSettingsAsync(GetSettingsConfigPath(), cancellationToken);
+    }
 
     public Task<YamlConfigService.DnsSectionSettings> LoadDnsSettingsAsync() =>
-        YamlConfigService.LoadDnsSettingsAsync(AppPaths.ConfigPath, _cts.Token);
+        YamlConfigService.LoadDnsSettingsAsync(GetSettingsConfigPath(), _cts.Token);
 
     public Task<YamlConfigService.SnifferSectionSettings> LoadSnifferSettingsAsync() =>
-        YamlConfigService.LoadSnifferSettingsAsync(AppPaths.ConfigPath, _cts.Token);
+        YamlConfigService.LoadSnifferSettingsAsync(GetSettingsConfigPath(), _cts.Token);
 
     public Task<YamlConfigService.TunSectionSettings> LoadTunSettingsAsync() =>
-        YamlConfigService.LoadTunSettingsAsync(AppPaths.ConfigPath, _cts.Token);
+        YamlConfigService.LoadTunSettingsAsync(GetSettingsConfigPath(), _cts.Token);
+
+    private static string GetSettingsConfigPath() =>
+        File.Exists(AppPaths.BaseConfigPath)
+            ? AppPaths.BaseConfigPath
+            : AppPaths.RuntimeConfigPath;
 
     public async Task SaveSnifferSettingsAsync(YamlConfigService.SnifferSectionSettings settings)
     {
@@ -2415,34 +2403,24 @@ public sealed class AppCoordinator : IAsyncDisposable
         bool reloadAfterPatch,
         IReadOnlySet<string>? replaceRootMappings = null)
     {
-        await ValidatePatchAsync(patch, replaceRootMappings);
         var snapshot = await ConfigFileSnapshot.CaptureAsync(
-            [AppPaths.BaseConfigPath, AppPaths.ConfigPath, AppPaths.RuntimeConfigPath],
+            [AppPaths.BaseConfigPath, AppPaths.RuntimeConfigPath],
             _cts.Token);
-        var previousConfig = snapshot.GetContent(AppPaths.ConfigPath);
         var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
         var coreWasRunning = _core.RunMode != CoreRunMode.NotRunning || _core.IsRunning;
-        var previousTunEnabled = previousConfig is not null &&
-                                 YamlConfigService.IsTunEnabled(previousConfig);
+        var previousTunEnabled = previousRuntime is not null &&
+                                 YamlConfigService.IsTunEnabled(previousRuntime);
 
         try
         {
-            if (coreWasRunning)
-            {
-                await _api.PatchConfigAsync(patch, _cts.Token);
-            }
-
-            await YamlConfigService.PersistPatchAsync(
+            await YamlConfigService.PersistBasePatchAsync(
                 patch,
                 _cts.Token,
                 replaceRootMappings);
+            await _runtimeConfig.RebuildAsync(_cts.Token);
             if (reloadAfterPatch && coreWasRunning)
             {
                 await ReloadCurrentConfigAsync();
-            }
-            else
-            {
-                await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(_cts.Token);
             }
 
             if (coreWasRunning)
@@ -2488,117 +2466,45 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public Task FlushFakeIpAsync() => _api.FlushFakeIpAsync(_cts.Token);
 
-    public async Task InstallServiceAsync()
+    public async Task RepairServiceAsync()
     {
         try
         {
-            await _serviceManager.InstallAsync(_cts.Token);
-            var tunEnabled = await YamlConfigService.IsTunEnabledAsync(
-                AppPaths.ConfigPath,
-                _cts.Token);
-            if (tunEnabled)
-            {
-                await TryActivateTunAfterServiceInstallAsync(_cts.Token);
-            }
-            else
-            {
-                await _serviceManager.StopHostAsync(_cts.Token);
-            }
-
-            var status = await _serviceManager.GetStatusAsync(_cts.Token);
+            await _serviceManager.RepairAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
             {
-                Runtime.ApplyTunCapability(status, MihomoCoreManager.IsElevated);
-                Logs.AddApp(
-                    "INFO",
-                    tunEnabled
-                        ? "ClashSuki 服务已安装并用于虚拟网卡模式。"
-                        : "ClashSuki 服务已安装，将在启用虚拟网卡时按需启动。",
-                    LogSources.Service);
+                Runtime.TunServiceStatusText = "正在退出并修复服务";
+                Runtime.IsTunToggleAvailable = false;
+                Logs.AddApp("INFO", "已启动包外修复进程，应用即将退出。", LogSources.Service);
             });
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
             await _dispatcher.RunAsync(() =>
             {
-                Runtime.TunServiceStatusText = "服务安装失败";
-                Runtime.IsTunToggleAvailable = MihomoCoreManager.IsElevated;
-                Runtime.ShowTunServiceInstall = !MihomoCoreManager.IsElevated;
-                Runtime.Notifications.Error(
-                    $"服务安装失败：{ex.Message}",
-                    source: LogSources.Service,
-                    exception: ex);
+                Runtime.TunServiceStatusText = "服务修复失败";
+                Runtime.IsTunToggleAvailable = false;
+                Runtime.ShowTunServiceRepair = true;
             });
+            throw;
         }
     }
 
-    /// <summary>
-    /// 服务安装完成后，若配置中 TUN 为开启状态，则重启内核并验证 TUN 真正生效。
-    /// </summary>
-    private async Task TryActivateTunAfterServiceInstallAsync(CancellationToken cancellationToken)
+    public async Task StopServiceAsync()
     {
-        if (!await YamlConfigService.IsTunEnabledAsync(AppPaths.ConfigPath, cancellationToken))
+        if (await YamlConfigService.IsTunEnabledAsync(AppPaths.RuntimeConfigPath, _cts.Token))
         {
-            return;
+            await SetTunAsync(false);
         }
 
-        var status = await _serviceManager.GetStatusAsync(cancellationToken);
-        if (status != MihomoServiceStatus.Ready)
+        await _serviceManager.StopHostAsync(_cts.Token);
+        var status = await _serviceManager.GetStatusAsync(_cts.Token);
+        await _dispatcher.RunAsync(() =>
         {
-            return;
-        }
-
-        await _dispatcher.RunAsync(() => Runtime.SyncTunEnabled(true));
-        await LogTunAsync("服务安装完成且配置要求启用虚拟网卡，正在以虚拟网卡模式重启内核。");
-
-        try
-        {
-            await _core.EnsureStartedAsync(requireTun: true, cancellationToken);
-            await ReconcileTunStateAfterStartupAsync(desiredEnabled: true, cancellationToken);
-            await RefreshRuntimeAsync(cancellationToken);
-            await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "虚拟网卡已随服务安装后启动。", LogSources.Tun));
-        }
-        catch (Exception ex) when (!IsAppCancellation(ex))
-        {
-            await _dispatcher.RunAsync(() =>
-            {
-                Runtime.Notifications.Error(
-                    $"服务已安装，但虚拟网卡未能启动：{ex.Message}",
-                    source: LogSources.Tun,
-                    exception: ex);
-            });
-        }
-    }
-
-    public async Task UninstallServiceAsync()
-    {
-        var desiredTunEnabled = await YamlConfigService.IsTunEnabledAsync(
-            AppPaths.ConfigPath,
-            _cts.Token);
-        var coreStopped = false;
-        try
-        {
-            await _core.StopAsync(_cts.Token);
-            coreStopped = true;
-            await _serviceManager.UninstallAsync(_cts.Token);
-        }
-        finally
-        {
-            if (coreStopped)
-            {
-                await _core.EnsureStartedAsync(desiredTunEnabled, _cts.Token);
-                await WaitForApiReadyBestEffortAsync(
-                    "service uninstall",
-                    TimeSpan.FromSeconds(15),
-                    _cts.Token);
-            }
-
-            var status = await _serviceManager.GetStatusAsync(_cts.Token);
-            await _dispatcher.RunAsync(() =>
-                Runtime.ApplyTunCapability(status, MihomoCoreManager.IsElevated));
-            await RefreshRuntimeAsync(_cts.Token);
-        }
+            Runtime.ApplyTunCapability(status);
+            Logs.AddApp("INFO", "ClashSuki 服务已停止，将在启用虚拟网卡时按需启动。", LogSources.Service);
+        });
+        await RefreshRuntimeAsync(_cts.Token);
     }
 
     private async Task RunRuntimeLoopAsync(CancellationToken cancellationToken)
@@ -2691,7 +2597,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             if (settings.DisableDnsOnPauseSsid && !_ssidDnsDisabled)
             {
                 _ssidDnsEnabledBeforeDirect = (await YamlConfigService.LoadDnsSettingsAsync(
-                    AppPaths.ConfigPath,
+                    AppPaths.RuntimeConfigPath,
                     cancellationToken)).Enable;
                 if (_ssidDnsEnabledBeforeDirect)
                 {
@@ -2904,8 +2810,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                 EnsureTunActivationPossible();
             }
 
-            await LogTunAsync(
-                $"启动状态同步：内核实际状态与持久化状态不一致；正在应用目标状态={desiredEnabled}");
             await ApplyTunConfigAndVerifyAsync(desiredEnabled, cancellationToken);
             await SyncSwitchStatesFromRealityAsync(cancellationToken);
         }
@@ -2924,8 +2828,8 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     private async Task SyncSwitchStatesFromConfigAsync(CancellationToken cancellationToken)
     {
-        var tunEnabled = await YamlConfigService.IsTunEnabledAsync(AppPaths.ConfigPath, cancellationToken);
-        var allowLan = await YamlConfigService.IsAllowLanEnabledAsync(AppPaths.ConfigPath, cancellationToken);
+        var tunEnabled = await YamlConfigService.IsTunEnabledAsync(AppPaths.RuntimeConfigPath, cancellationToken);
+        var allowLan = await YamlConfigService.IsAllowLanEnabledAsync(AppPaths.RuntimeConfigPath, cancellationToken);
         await _dispatcher.RunAsync(() =>
         {
             if (!_tunTransitionInProgress)
@@ -2943,22 +2847,19 @@ public sealed class AppCoordinator : IAsyncDisposable
     }
 
     private async Task RollBackTunAfterFailureAsync(
+        ConfigFileSnapshot? snapshot,
         bool previousTunEnabled,
-        bool previousDnsEnabled,
         CancellationToken cancellationToken)
     {
         try
         {
-            await LogTunAsync(
-                $"开始回滚；虚拟网卡状态={previousTunEnabled}；DNS 状态={previousDnsEnabled}");
             await SafeVoid(
                 _api.PatchTunAsync(previousTunEnabled, cancellationToken),
                 "TUN-ROLLBACK-PATCH");
-            await YamlConfigService.PersistTunStateAsync(
-                previousTunEnabled,
-                previousDnsEnabled,
-                cancellationToken);
-            await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(cancellationToken);
+            if (snapshot is not null)
+            {
+                await snapshot.RestoreAsync();
+            }
             try
             {
                 await _api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, cancellationToken);
@@ -2997,7 +2898,6 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     private async Task WaitForApiReadyAsync(string reason, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        await LogTunAsync($"正在等待 API 就绪；场景={reason}；超时={timeout.TotalSeconds:0.#} 秒");
         var deadline = DateTime.UtcNow + timeout;
         Exception? lastError = null;
 
@@ -3012,8 +2912,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                     Runtime.ApplyConnected(null, config, _core.RunMode, _core.ProcessId, syncTun: !_tunTransitionInProgress);
                     KeepPendingSwitchTargetsVisible();
                 });
-                await LogTunAsync(
-                    $"API 已就绪；场景={reason}；虚拟网卡状态={config.Tun?.Enable}；代理模式={config.Mode}；混合端口={config.MixedPort ?? config.Port}");
                 return;
             }
             catch (Exception ex) when (!IsAppCancellation(ex))
@@ -3029,25 +2927,17 @@ public sealed class AppCoordinator : IAsyncDisposable
     private async Task PatchTunAndVerifyAsync(bool enabled, CancellationToken cancellationToken)
     {
         Exception? patchError = null;
-        await LogTunAsync($"正在请求修改运行时配置；虚拟网卡状态={enabled}");
         try
         {
             await _api.PatchTunAsync(enabled, cancellationToken);
-            await LogTunAsync($"运行时配置修改请求成功；虚拟网卡状态={enabled}");
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
             patchError = ex;
-            DiagnosticLog.WriteAppException(
-                LogSources.Tun,
-                ex,
-                $"运行时虚拟网卡配置修改失败；目标状态={enabled}",
-                "WARN");
         }
 
         if (await WaitForTunStateAsync(enabled, TimeSpan.FromSeconds(12), cancellationToken))
         {
-            await LogTunAsync($"虚拟网卡状态验证通过；实际状态={enabled}");
             return;
         }
 
@@ -3061,8 +2951,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         const int verifySeconds = 3;
         var verifyTimeout = TimeSpan.FromSeconds(verifySeconds);
 
-        await LogTunAsync(
-            $"正在持久化配置；虚拟网卡状态={enabled}；DNS 状态={(enabled ? "启用" : "保持不变")}");
         var patch = new Dictionary<string, object?>
         {
             ["tun"] = new Dictionary<string, object?> { ["enable"] = enabled }
@@ -3072,8 +2960,8 @@ public sealed class AppCoordinator : IAsyncDisposable
             patch["dns"] = new Dictionary<string, object?> { ["enable"] = true };
         }
 
-        await ValidatePatchAsync(patch);
-        await ProfileService.PersistTunSettingAsync(enabled, enableDns: enabled, cancellationToken);
+        await YamlConfigService.PersistBasePatchAsync(patch, cancellationToken);
+        await _runtimeConfig.RebuildAsync(cancellationToken, enabled);
 
         if (!enabled)
         {
@@ -3083,11 +2971,6 @@ public sealed class AppCoordinator : IAsyncDisposable
             }
             catch (Exception ex) when (!IsAppCancellation(ex))
             {
-                DiagnosticLog.WriteAppException(
-                    LogSources.Tun,
-                    ex,
-                    "关闭运行时虚拟网卡失败",
-                    "WARN");
             }
 
             if (await WaitForTunStateAsync(false, verifyTimeout, cancellationToken))
@@ -3095,7 +2978,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                 return;
             }
 
-            await LogTunAsync("运行时关闭未生效，将重启一次内核以关闭虚拟网卡。");
             await _core.RestartAsync(requireTun: false, cancellationToken);
             await WaitForApiReadyAsync("重启后关闭虚拟网卡", TimeSpan.FromSeconds(10), cancellationToken);
             if (await WaitForTunStateAsync(false, verifyTimeout, cancellationToken))
@@ -3110,30 +2992,21 @@ public sealed class AppCoordinator : IAsyncDisposable
 
         try
         {
-            await LogTunAsync($"正在重载配置；路径={AppPaths.RuntimeConfigPath}");
             await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(cancellationToken);
             await _api.ReloadConfigAsync(AppPaths.RuntimeConfigPath, cancellationToken);
             if (await WaitForTunStateAsync(true, verifyTimeout, cancellationToken))
             {
-                await LogTunAsync("配置重载后虚拟网卡状态验证通过。");
                 return;
             }
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
-            DiagnosticLog.WriteAppException(
-                LogSources.Tun,
-                ex,
-                "重载虚拟网卡配置失败",
-                "WARN");
         }
 
-        await LogTunAsync("配置重载后虚拟网卡仍未启用，将重启一次内核。");
         await _core.RestartAsync(requireTun: true, cancellationToken);
         await WaitForApiReadyAsync("重启后开启虚拟网卡", TimeSpan.FromSeconds(10), cancellationToken);
         if (await WaitForTunStateAsync(true, verifyTimeout, cancellationToken))
         {
-            await LogTunAsync("内核重启后虚拟网卡状态验证通过。");
             return;
         }
 
@@ -3143,8 +3016,6 @@ public sealed class AppCoordinator : IAsyncDisposable
     private async Task<bool> WaitForTunStateAsync(bool expected, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + timeout;
-        Exception? lastError = null;
-        bool? lastActual = null;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -3153,7 +3024,6 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 var config = await _api.GetConfigsAsync(TimeSpan.FromSeconds(1), cancellationToken);
                 var actual = config.Tun?.Enable ?? false;
-                lastActual = actual;
                 await _dispatcher.RunAsync(() =>
                 {
                     if (actual == expected)
@@ -3171,33 +3041,14 @@ public sealed class AppCoordinator : IAsyncDisposable
                     return true;
                 }
             }
-            catch (Exception ex) when (!IsAppCancellation(ex))
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
-                lastError = ex;
             }
 
             await Task.Delay(500, cancellationToken);
         }
 
-        if (lastActual.HasValue)
-        {
-            await LogTunAsync(
-                $"虚拟网卡状态验证超时；期望状态={expected}；实际状态={lastActual.Value}；超时={timeout.TotalSeconds:0.#} 秒");
-        }
-        else if (lastError is not null)
-        {
-            DiagnosticLog.WriteAppException(
-                LogSources.Tun,
-                lastError,
-                $"虚拟网卡状态验证失败；期望状态={expected}");
-        }
-
         return false;
-    }
-
-    private async Task LogTunAsync(string message)
-    {
-        await _dispatcher.RunAsync(() => Logs.AddApp("INFO", message, LogSources.Tun));
     }
 
     private void KeepPendingSwitchTargetsVisible()
@@ -3331,7 +3182,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             var providers = await providersTask;
 
             _cachedGroupOrder ??= await SafeOrder(
-                () => YamlConfigService.GetProxyGroupOrderAsync(AppPaths.ConfigPath, cancellationToken));
+                () => YamlConfigService.GetProxyGroupOrderAsync(AppPaths.RuntimeConfigPath, cancellationToken));
 
             await _dispatcher.RunAsync(() =>
             {
@@ -3342,7 +3193,11 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteAppException("PROXY-REFRESH", ex);
+            DiagnosticLog.WriteAppExceptionThrottled(
+                "proxy-refresh",
+                LogSources.Proxy,
+                ex,
+                "刷新代理数据失败");
         }
     }
 
@@ -3375,7 +3230,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 LogSources.Rule,
                 "读取规则提供者失败");
             var providerConfigTask = Safe(
-                YamlConfigService.LoadRuleProviderConfigsAsync(AppPaths.ConfigPath, cancellationToken),
+                YamlConfigService.LoadRuleProviderConfigsAsync(AppPaths.RuntimeConfigPath, cancellationToken),
                 "RULE-PROVIDER-CONFIG",
                 LogSources.Rule,
                 "读取规则提供者配置失败");
@@ -3388,7 +3243,11 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteAppException("RULES-REFRESH", ex);
+            DiagnosticLog.WriteAppExceptionThrottled(
+                "rules-refresh",
+                LogSources.Rule,
+                ex,
+                "刷新规则数据失败");
         }
     }
 
@@ -3416,7 +3275,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await RefreshRuntimeAsync(_cts.Token);
             await RestoreDesiredSystemProxyAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "自动恢复已触发。", LogSources.Core));
+                Logs.AddApp("INFO", "内核已自动恢复。", LogSources.Core));
         }
         catch (Exception ex)
         {
@@ -3425,15 +3284,19 @@ public sealed class AppCoordinator : IAsyncDisposable
                 await _core.EnsureStartedAsync(requireTun: false, _cts.Token);
                 await RefreshRuntimeAsync(_cts.Token);
                 await RestoreDesiredSystemProxyAsync(_cts.Token);
-                await _dispatcher.RunAsync(() =>
-                    Logs.AddApp("INFO", "自动恢复已触发（非 TUN 模式）。", LogSources.Core));
+                DiagnosticLog.WriteAppException(
+                    LogSources.Core,
+                    ex,
+                    "虚拟网卡恢复失败，内核已以普通模式恢复",
+                    "WARN");
             }
             catch (Exception fallbackEx)
             {
-                DiagnosticLog.WriteAppException(LogSources.Core, fallbackEx, "内核自动恢复失败");
+                DiagnosticLog.WriteAppException(
+                    LogSources.Core,
+                    new AggregateException(ex, fallbackEx),
+                    "内核自动恢复失败");
             }
-
-            DiagnosticLog.WriteAppException(LogSources.Core, ex, "内核首次自动恢复失败");
         }
     }
 
@@ -3508,7 +3371,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
         catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
         {
-            DiagnosticLog.WriteApp("EXIT", $"网络状态清理已跳过或超时；异常类型={ex.GetType().Name}");
+            if (ex is TimeoutException)
+            {
+                DiagnosticLog.WriteAppException("EXIT", ex, "退出时清理网络状态超时", "WARN");
+            }
         }
         catch (Exception ex)
         {
@@ -3533,7 +3399,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
         catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
         {
-            DiagnosticLog.WriteApp("EXIT", $"后台循环停止已跳过或超时；异常类型={ex.GetType().Name}");
+            if (ex is TimeoutException)
+            {
+                DiagnosticLog.WriteAppException("EXIT", ex, "退出时停止后台任务超时", "WARN");
+            }
         }
         catch (Exception ex)
         {
@@ -3556,15 +3425,11 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 _systemProxy.Disable();
                 _activeSystemProxyPort = null;
-                DiagnosticLog.WriteApp("EXIT", "退出时已关闭系统代理。");
             }).WaitAsync(TimeSpan.FromSeconds(2));
         }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteApp(
-                "EXIT",
-                "WARN",
-                $"退出时恢复系统代理已跳过或失败：{ex.Message}");
+            DiagnosticLog.WriteAppException("EXIT", ex, "退出时恢复系统代理失败", "WARN");
         }
     }
 
@@ -3576,14 +3441,10 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 using var tunTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
                 await _api.PatchTunAsync(false, tunTimeout.Token);
-                DiagnosticLog.WriteApp("EXIT", "停止内核前已临时关闭虚拟网卡。");
             }
             catch (Exception ex)
             {
-                DiagnosticLog.WriteApp(
-                    "EXIT",
-                    "WARN",
-                    $"停止内核前关闭虚拟网卡已跳过或失败：{ex.Message}");
+                DiagnosticLog.WriteAppException("EXIT", ex, "退出时关闭虚拟网卡失败", "WARN");
             }
         }
 
@@ -3591,14 +3452,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             await _core.StopAsync(timeout.Token);
-            DiagnosticLog.WriteApp("EXIT", "退出时已停止内核。");
         }
         catch (Exception ex)
         {
-            DiagnosticLog.WriteApp(
-                "EXIT",
-                "WARN",
-                $"退出时停止内核已跳过或失败：{ex.Message}");
+            DiagnosticLog.WriteAppException("EXIT", ex, "退出时停止内核失败", "WARN");
         }
     }
 }

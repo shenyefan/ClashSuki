@@ -20,7 +20,9 @@ public sealed class GistSyncService
             throw new InvalidOperationException("请先填写 GitHub Token。");
         }
 
-        var path = File.Exists(AppPaths.RuntimeConfigPath) ? AppPaths.RuntimeConfigPath : AppPaths.ConfigPath;
+        var path = File.Exists(AppPaths.RuntimeConfigPath)
+            ? AppPaths.RuntimeConfigPath
+            : AppPaths.BaseConfigPath;
         if (!File.Exists(path))
         {
             throw new FileNotFoundException("运行时配置文件不存在。", path);

@@ -16,26 +16,38 @@ public sealed class AppNotificationService : IAppNotificationService
         _dispatcher = dispatcher;
     }
 
-    public void Success(string message, string title = "操作成功", string source = LogSources.Application) =>
-        Publish(title, message, source, "INFO", InfoBarSeverity.Success);
+    public void Success(
+        string message,
+        string title = "操作成功",
+        string source = LogSources.Application,
+        bool writeLog = true) =>
+        Publish(title, message, source, "INFO", InfoBarSeverity.Success, writeLog);
 
-    public void Info(string message, string title = "提示", string source = LogSources.Application) =>
-        Publish(title, message, source, "INFO", InfoBarSeverity.Informational);
+    public void Info(
+        string message,
+        string title = "提示",
+        string source = LogSources.Application,
+        bool writeLog = true) =>
+        Publish(title, message, source, "INFO", InfoBarSeverity.Informational, writeLog);
 
     public void Warning(
         string message,
         string title = "注意",
         string source = LogSources.Application,
-        Exception? exception = null)
+        Exception? exception = null,
+        bool writeLog = true)
     {
-        var context = FormatMessage(title, message);
-        if (exception is null)
+        if (writeLog)
         {
-            DiagnosticLog.WriteApp(source, "WARN", context);
-        }
-        else
-        {
-            DiagnosticLog.WriteAppException(source, exception, context, "WARN");
+            var context = FormatMessage(title, message);
+            if (exception is null)
+            {
+                DiagnosticLog.WriteApp(source, "WARN", context);
+            }
+            else
+            {
+                DiagnosticLog.WriteAppException(source, exception, context, "WARN");
+            }
         }
 
         Enqueue(title, message, InfoBarSeverity.Warning);
@@ -108,15 +120,7 @@ public sealed class AppNotificationService : IAppNotificationService
         try
         {
             dialog.XamlRoot = xamlRoot;
-            var result = await dialog.ShowAsync();
-            var resultText = result switch
-            {
-                ContentDialogResult.Primary => "已确认",
-                ContentDialogResult.Secondary => "已执行次要操作",
-                _ => "已取消"
-            };
-            DiagnosticLog.WriteApp(source, "INFO", $"{Normalize(action)}：{resultText}");
-            return result;
+            return await dialog.ShowAsync();
         }
         catch (Exception ex)
         {
@@ -130,9 +134,14 @@ public sealed class AppNotificationService : IAppNotificationService
         string message,
         string source,
         string level,
-        InfoBarSeverity severity)
+        InfoBarSeverity severity,
+        bool writeLog = true)
     {
-        DiagnosticLog.WriteApp(source, level, FormatMessage(title, message));
+        if (writeLog)
+        {
+            DiagnosticLog.WriteApp(source, level, FormatMessage(title, message));
+        }
+
         Enqueue(title, message, severity);
     }
 

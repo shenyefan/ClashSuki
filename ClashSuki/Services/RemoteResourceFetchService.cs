@@ -24,7 +24,6 @@ public sealed class RemoteResourceFetchService : IDisposable
         string url,
         RemoteFetchRequest request,
         int? mixedPort,
-        Action<string, string>? log = null,
         CancellationToken cancellationToken = default)
     {
         if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
@@ -46,13 +45,11 @@ public sealed class RemoteResourceFetchService : IDisposable
                     request,
                     mixedPort,
                     settings,
-                    log,
                     cancellationToken);
             }
             catch (Exception ex) when (attemptUrl != urls[^1])
             {
                 lastError = ex;
-                log?.Invoke("WARN", $"GitHub 下载代理失败，正在尝试原始地址：{ex.Message}");
             }
         }
 
@@ -64,7 +61,6 @@ public sealed class RemoteResourceFetchService : IDisposable
         RemoteFetchRequest request,
         int? mixedPort,
         AppSettings settings,
-        Action<string, string>? log,
         CancellationToken cancellationToken)
     {
         var timeoutSeconds = request.TimeoutSeconds is > 0
@@ -74,12 +70,8 @@ public sealed class RemoteResourceFetchService : IDisposable
         var userAgent = EffectiveUserAgent(request.UserAgent, settings);
         var useProxy = settings.ProfileUseProxy;
 
-        log?.Invoke("INFO", $"远程资源下载地址；主机={FormatUrlHostForLog(url)}");
-        log?.Invoke("INFO", $"远程资源下载参数；User-Agent={userAgent}");
-
         if (!useProxy)
         {
-            log?.Invoke("INFO", "正在直连下载远程资源。");
             try
             {
                 var (content, _) = await FetchWithClientAsync(
@@ -89,17 +81,10 @@ public sealed class RemoteResourceFetchService : IDisposable
                     request.AuthToken,
                     timeout,
                     cancellationToken);
-                log?.Invoke("INFO", $"远程资源直连下载成功；内容大小={content.Length:N0} 字节");
                 return content;
             }
-            catch (Exception ex) when (mixedPort.HasValue)
+            catch (Exception) when (mixedPort.HasValue)
             {
-                log?.Invoke("WARN", $"远程资源直连下载失败，正在通过本地代理重试；端口={mixedPort}；{ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                log?.Invoke("ERROR", $"远程资源下载失败，没有可用的代理回退：{ex.Message}");
-                throw;
             }
         }
 
@@ -124,7 +109,6 @@ public sealed class RemoteResourceFetchService : IDisposable
             request.AuthToken,
             timeout,
             cancellationToken);
-        log?.Invoke("INFO", $"远程资源代理下载成功；内容大小={proxyContent.Length:N0} 字节");
         return proxyContent;
     }
 
@@ -151,11 +135,6 @@ public sealed class RemoteResourceFetchService : IDisposable
             : string.IsNullOrWhiteSpace(settings.UserAgent)
                 ? DefaultUserAgent
                 : settings.UserAgent.Trim();
-
-    private static string FormatUrlHostForLog(string url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            ? uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped)
-            : "无效地址";
 
     private static async Task<(string Content, Dictionary<string, string> Headers)> FetchWithClientAsync(
         HttpClient client,
