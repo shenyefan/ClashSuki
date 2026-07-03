@@ -6,14 +6,6 @@ internal static class ServiceCommandLine
     {
         return arguments switch
         {
-            ["--install-service"] => Execute(
-                "安装服务",
-                ServiceInstaller.Install,
-                "服务安装成功。"),
-            ["--uninstall-service"] => Execute(
-                "卸载服务",
-                ServiceInstaller.Uninstall,
-                "服务卸载成功。"),
             ["--replace-core", var sourcePath, var destinationPath] => Execute(
                 "替换内核",
                 () => CoreReplacer.Replace(sourcePath, destinationPath),

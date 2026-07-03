@@ -18,7 +18,7 @@ internal static class NamedPipeFactory
             AccessControlType.Deny));
         pipeSecurity.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
-            PipeAccessRights.ReadData | PipeAccessRights.WriteData | PipeAccessRights.Synchronize,
+            PipeAccessRights.ReadWrite | PipeAccessRights.Synchronize,
             AccessControlType.Allow));
         pipeSecurity.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),

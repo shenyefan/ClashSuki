@@ -1,4 +1,5 @@
 using ClashSuki.Service;
+using ClashSuki.ServiceContract;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 {
@@ -19,13 +20,13 @@ try
     var builder = Host.CreateDefaultBuilder(args)
         .UseWindowsService(options =>
         {
-            options.ServiceName = ServiceInstaller.ServiceName;
+            options.ServiceName = ServiceProtocol.ServiceName;
         })
         .ConfigureLogging(logging =>
         {
             logging.AddEventLog(settings =>
             {
-                settings.SourceName = ServiceInstaller.ServiceName;
+                settings.SourceName = ServiceProtocol.ServiceName;
             });
         })
         .ConfigureServices(services =>
