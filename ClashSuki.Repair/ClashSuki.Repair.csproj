@@ -8,9 +8,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ApplicationIcon>..\ClashSuki\Assets\Img\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\LogMessageFormatter.cs" Link="Logging\LogMessageFormatter.cs" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using ClashSuki.Shared;
 using Windows.Management.Deployment;
 
 namespace ClashSuki.Repair;
@@ -92,7 +93,7 @@ internal static class Program
             Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
             File.AppendAllText(
                 LogPath,
-                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [服务修复] {message}{Environment.NewLine}");
+                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [服务修复] {LogMessageFormatter.Normalize(message)}{Environment.NewLine}");
         }
         catch
         {

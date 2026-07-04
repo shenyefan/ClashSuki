@@ -1,8 +1,5 @@
 {
   "profiles": {
-    "ClashSuki (Package)": {
-      "commandName": "MsixPackage"
-    },
     "ClashSuki (Unpackaged)": {
       "commandName": "Project"
     }

@@ -102,14 +102,14 @@ if ($LASTEXITCODE -ne 0)
     throw "MSIX 生成失败，MSBuild 退出码：$LASTEXITCODE"
 }
 
-$packageDirectory = Join-Path $projectDirectory "..\artifacts\msix"
-$package = Get-ChildItem -LiteralPath $packageDirectory -Filter "*.msix" -File |
+$packageDirectory = Join-Path $projectDirectory "AppPackages"
+$package = Get-ChildItem -LiteralPath $packageDirectory -Filter "*.msix" -File -Recurse |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
 
 if ($null -eq $package)
 {
-    throw "MSIX 构建完成，但未在 artifacts\msix 中找到包文件。"
+    throw "MSIX 生成完成，但未在 ClashSuki.Package\\AppPackages 中找到安装包"
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
