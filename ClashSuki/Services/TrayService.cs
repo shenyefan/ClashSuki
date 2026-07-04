@@ -9,7 +9,6 @@ using H.NotifyIcon.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using DrawingIcon = System.Drawing.Icon;
 
 namespace ClashSuki.Services;
 
@@ -28,7 +27,7 @@ public sealed class TrayService : IDisposable
     private ToggleMenuFlyoutItem? _ruleModeItem;
     private ToggleMenuFlyoutItem? _globalModeItem;
     private ToggleMenuFlyoutItem? _directModeItem;
-    private string? _currentIconName;
+    private TrayIconState? _currentIconState;
     private bool _disposed;
 
     public TrayService(Window window, DashboardViewModel dashboard)
@@ -48,13 +47,13 @@ public sealed class TrayService : IDisposable
 
         try
         {
-            var iconName = ResolveIconName();
+            var iconState = ResolveIconState();
             var menu = BuildContextMenu();
             _trayIcon = new TaskbarIcon
             {
                 ContextFlyout = menu,
                 ContextMenuMode = ContextMenuMode.PopupMenu,
-                Icon = GetIcon(iconName),
+                IconSource = AppIconProvider.CreateTrayIcon(iconState),
                 LeftClickCommand = new RelayCommand(ToggleWindow),
                 MenuActivation = PopupActivationMode.RightClick,
                 NoLeftClickDelay = true,
@@ -62,7 +61,7 @@ public sealed class TrayService : IDisposable
                 ToolTipText = BuildToolTip()
             };
 
-            _currentIconName = iconName;
+            _currentIconState = iconState;
             _dashboard.Runtime.PropertyChanged += Runtime_PropertyChanged;
             if (_themeRoot is not null)
             {
@@ -272,36 +271,24 @@ public sealed class TrayService : IDisposable
             return;
         }
 
-        var iconName = ResolveIconName();
-        if (string.Equals(_currentIconName, iconName, StringComparison.Ordinal))
+        var iconState = ResolveIconState();
+        if (_currentIconState == iconState)
         {
             return;
         }
 
-        _trayIcon.Icon = GetIcon(iconName);
-        _currentIconName = iconName;
+        _trayIcon.IconSource = AppIconProvider.CreateTrayIcon(iconState);
+        _currentIconState = iconState;
     }
 
-    private string ResolveIconName()
+    private TrayIconState ResolveIconState()
         => (_dashboard.Runtime.IsSystemProxyEnabled, _dashboard.Runtime.IsTunEnabled) switch
         {
-            (true, true) => "red.ico",
-            (false, true) => "green.ico",
-            (true, false) => "orange.ico",
-            _ => "logo.ico"
+            (true, true) => TrayIconState.SystemProxyAndTun,
+            (false, true) => TrayIconState.Tun,
+            (true, false) => TrayIconState.SystemProxy,
+            _ => TrayIconState.Default
         };
-
-    private DrawingIcon GetIcon(string iconName)
-    {
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Img", iconName);
-        if (!File.Exists(iconPath))
-        {
-            throw new FileNotFoundException($"找不到托盘图标：{iconPath}", iconPath);
-        }
-
-        var iconSize = Math.Max(16, GetSystemMetrics(SmCxSmallIcon));
-        return new DrawingIcon(iconPath, iconSize, iconSize);
-    }
 
     private void UpdateToolTip()
     {
@@ -415,8 +402,4 @@ public sealed class TrayService : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    private const int SmCxSmallIcon = 49;
-
-    [DllImport("user32.dll")]
-    private static extern int GetSystemMetrics(int nIndex);
 }

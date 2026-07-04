@@ -236,8 +236,26 @@ namespace ClashSuki
             SetTitleBar(titleBar);
             AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
             _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            titleBar.IconSource = AppIconProvider.CreateTitleBarIcon();
+            SetWindowIcon();
             SetWindowSubclass(_hwnd, _windowSubclassProc, 1, IntPtr.Zero);
             EnsureMinimumWindowSize();
+        }
+
+        private void SetWindowIcon()
+        {
+            try
+            {
+                AppIconProvider.ApplyWindowIcon(AppWindow);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.WriteAppException(
+                    LogSources.UserInterface,
+                    ex,
+                    "设置窗口图标失败",
+                    "WARN");
+            }
         }
 
         private void EnsureMinimumWindowSize()

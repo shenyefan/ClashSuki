@@ -53,16 +53,9 @@ public sealed partial class IconActionButton : UserControl
                 }
             }));
 
-    public static readonly DependencyProperty SelectedBackgroundProperty =
+    public static readonly DependencyProperty SelectedIconForegroundProperty =
         DependencyProperty.Register(
-            nameof(SelectedBackground),
-            typeof(Brush),
-            typeof(IconActionButton),
-            new PropertyMetadata(null, OnSelectionAppearanceChanged));
-
-    public static readonly DependencyProperty SelectedForegroundProperty =
-        DependencyProperty.Register(
-            nameof(SelectedForeground),
+            nameof(SelectedIconForeground),
             typeof(Brush),
             typeof(IconActionButton),
             new PropertyMetadata(null, OnSelectionAppearanceChanged));
@@ -101,16 +94,10 @@ public sealed partial class IconActionButton : UserControl
         set => SetValue(IsSelectedProperty, value);
     }
 
-    public Brush? SelectedBackground
+    public Brush? SelectedIconForeground
     {
-        get => (Brush?)GetValue(SelectedBackgroundProperty);
-        set => SetValue(SelectedBackgroundProperty, value);
-    }
-
-    public Brush? SelectedForeground
-    {
-        get => (Brush?)GetValue(SelectedForegroundProperty);
-        set => SetValue(SelectedForegroundProperty, value);
+        get => (Brush?)GetValue(SelectedIconForegroundProperty);
+        set => SetValue(SelectedIconForegroundProperty, value);
     }
 
     public ICommand? Command
@@ -220,23 +207,10 @@ public sealed partial class IconActionButton : UserControl
 
     private void UpdateSelectionState()
     {
-        ActionButton.ClearValue(Control.BackgroundProperty);
-        ActionButton.ClearValue(Control.ForegroundProperty);
-        VisualStateManager.GoToState(this, IsSelected ? "Selected" : "Unselected", false);
-
-        if (!IsSelected)
+        ActionIcon.ClearValue(IconElement.ForegroundProperty);
+        if (IsSelected && SelectedIconForeground is not null)
         {
-            return;
-        }
-
-        if (SelectedBackground is not null)
-        {
-            ActionButton.Background = SelectedBackground;
-        }
-
-        if (SelectedForeground is not null)
-        {
-            ActionButton.Foreground = SelectedForeground;
+            ActionIcon.Foreground = SelectedIconForeground;
         }
     }
 }

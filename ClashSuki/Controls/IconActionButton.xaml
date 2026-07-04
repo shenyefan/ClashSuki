@@ -4,17 +4,6 @@
     x:Name="Root"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <VisualStateManager.VisualStateGroups>
-        <VisualStateGroup x:Name="SelectionStates">
-            <VisualState x:Name="Unselected" />
-            <VisualState x:Name="Selected">
-                <VisualState.Setters>
-                    <Setter Target="ActionButton.Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                    <Setter Target="ActionButton.Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
-                </VisualState.Setters>
-            </VisualState>
-        </VisualStateGroup>
-    </VisualStateManager.VisualStateGroups>
     <Button
         x:Name="ActionButton"
         Padding="4"
@@ -30,6 +19,7 @@
                 IsActive="{x:Bind IsLoading, Mode=OneWay}"
                 Visibility="{x:Bind IsLoading, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
             <FontIcon
+                x:Name="ActionIcon"
                 FontSize="{StaticResource IconActionButtonIconFontSize}"
                 Glyph="{x:Bind Glyph, Mode=OneWay}"
                 Visibility="{x:Bind IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVis}}" />
