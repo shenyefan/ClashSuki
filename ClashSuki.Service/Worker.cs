@@ -16,7 +16,7 @@ internal sealed class Worker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("ClashSuki 服务已启动，正在监听命名管道 {PipeName}。", ServiceProtocol.PipeName);
+        logger.LogInformation("ClashSuki 服务已启动，正在监听命名管道 {PipeName}", ServiceProtocol.PipeName);
 
         try
         {
@@ -34,7 +34,7 @@ internal sealed class Worker(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "处理管道客户端时发生错误。");
+                    logger.LogError(ex, "处理管道客户端时发生错误");
                     await Task.Delay(500, stoppingToken);
                 }
             }
@@ -47,10 +47,10 @@ internal sealed class Worker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "服务停止时关闭内核失败。");
+                logger.LogError(ex, "服务停止时关闭内核失败");
             }
 
-            logger.LogInformation("ClashSuki 服务已停止。");
+            logger.LogInformation("ClashSuki 服务已停止");
         }
     }
 
@@ -85,12 +85,12 @@ internal sealed class Worker(
         }
         catch (JsonException ex)
         {
-            logger.LogWarning(ex, "服务 IPC 请求不是有效的 JSON。");
+            logger.LogWarning(ex, "服务 IPC 请求不是有效的 JSON");
             result = ServiceCommandResult.Failure("请求格式无效。");
         }
         catch (InvalidDataException ex)
         {
-            logger.LogWarning(ex, "服务 IPC 请求超出限制。");
+            logger.LogWarning(ex, "服务 IPC 请求超出限制");
             result = ServiceCommandResult.Failure(ex.Message);
         }
 

@@ -10,7 +10,7 @@ internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorize
     {
         if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle.DangerousGetHandle(), out var processId))
         {
-            reason = $"无法读取管道客户端进程标识，Win32={Marshal.GetLastWin32Error()}。";
+            reason = $"无法读取管道客户端进程标识，Win32 错误码: {Marshal.GetLastWin32Error()}";
             return false;
         }
 
@@ -20,7 +20,7 @@ internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorize
             var clientPath = process.MainModule?.FileName;
             if (string.IsNullOrWhiteSpace(clientPath))
             {
-                reason = $"无法读取客户端进程路径，PID={processId}。";
+                reason = $"无法读取客户端进程路径，进程标识: {processId}";
                 return false;
             }
 
@@ -31,13 +31,13 @@ internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorize
                 return true;
             }
 
-            reason = $"拒绝非 ClashSuki 客户端，PID={processId}，路径={normalizedClientPath}。";
+            reason = $"拒绝非 ClashSuki 客户端，进程标识: {processId}，路径: {normalizedClientPath}";
             return false;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "验证管道客户端失败；进程标识={ProcessId}", processId);
-            reason = $"无法验证客户端进程，PID={processId}。";
+            logger.LogWarning(ex, "验证管道客户端失败，进程标识: {ProcessId}", processId);
+            reason = $"无法验证客户端进程，进程标识: {processId}";
             return false;
         }
     }

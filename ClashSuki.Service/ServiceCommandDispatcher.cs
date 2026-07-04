@@ -34,7 +34,7 @@ internal sealed class ServiceCommandDispatcher(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "服务命令执行失败；命令={Command}", request.Command);
+            logger.LogError(ex, "服务命令执行失败，命令: {Command}", request.Command);
             return ServiceCommandResult.Failure(ToClientMessage(ex));
         }
     }

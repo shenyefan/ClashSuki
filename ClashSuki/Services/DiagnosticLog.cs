@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Collections;
+using ClashSuki.Shared;
 
 namespace ClashSuki.Services;
 
@@ -19,16 +20,16 @@ public static class DiagnosticLog
     public static event Action<DiagnosticLogEntry>? AppEntryWritten;
 
     public static void WriteApp(string source, string message) =>
-        Write(AppLogPath, source, "INFO", message, null, AppEntryWritten);
+        Write(AppLogPath, source, "INFO", message, null, true, AppEntryWritten);
 
     public static void WriteApp(string source, string level, string message) =>
-        Write(AppLogPath, source, level, message, null, AppEntryWritten);
+        Write(AppLogPath, source, level, message, null, true, AppEntryWritten);
 
     public static void WriteMihomo(string source, string message) =>
-        Write(MihomoLogPath, source, "INFO", message, null);
+        Write(MihomoLogPath, source, "INFO", message, null, false);
 
     public static void WriteMihomo(string source, string level, string message) =>
-        Write(MihomoLogPath, source, level, message, null);
+        Write(MihomoLogPath, source, level, message, null, false);
 
     private static void Write(
         string path,
@@ -36,6 +37,7 @@ public static class DiagnosticLog
         string level,
         string message,
         string? details,
+        bool normalizeAppMessage,
         Action<DiagnosticLogEntry>? entryWritten = null)
     {
         try
@@ -45,7 +47,9 @@ public static class DiagnosticLog
                 DateTimeOffset.Now,
                 NormalizeLevel(level),
                 NormalizeSource(source),
-                NormalizeMessage(message),
+                normalizeAppMessage
+                    ? LogMessageFormatter.Normalize(message)
+                    : NormalizeMessage(message),
                 NormalizeDetails(details));
             var output = new StringBuilder()
                 .Append(entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff zzz"))
@@ -86,6 +90,7 @@ public static class DiagnosticLog
             level,
             message,
             BuildExceptionDetails(exception),
+            true,
             AppEntryWritten);
     }
 

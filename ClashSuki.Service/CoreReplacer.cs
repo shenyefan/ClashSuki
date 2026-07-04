@@ -88,7 +88,7 @@ internal static class CoreReplacer
             {
                 ServiceDiagnostics.Write(
                     "停止占用内核文件的进程",
-                    $"进程标识={process.Id}；{ex.Message}",
+                    $"进程标识: {process.Id}，{ex.Message}",
                     "WARN");
             }
             finally
@@ -109,7 +109,7 @@ internal static class CoreReplacer
         }
         catch (Exception ex)
         {
-            ServiceDiagnostics.Write("删除内核备份", $"删除文件失败；路径={path}；{ex.Message}", "WARN");
+            ServiceDiagnostics.Write("删除内核备份", $"删除文件失败，路径: {path}，{ex.Message}", "WARN");
         }
     }
 }

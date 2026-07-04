@@ -34,7 +34,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
             await KillOrphanCoresAsync(options.CorePath, cancellationToken);
 
             logger.LogInformation(
-                "正在启动内核；内核路径={CorePath}；配置路径={ConfigPath}；控制管道={PipePath}",
+                "正在启动内核，内核路径: {CorePath}，配置路径: {ConfigPath}，控制管道: {PipePath}",
                 options.CorePath,
                 options.ConfigPath,
                 options.ControlPipePath);
@@ -66,14 +66,14 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
             {
                 if (!process.Start())
                 {
-                    throw new InvalidOperationException("无法启动 mihomo 内核进程。");
+                    throw new InvalidOperationException("无法启动 mihomo 内核进程");
                 }
 
                 _process = process;
                 _exitedHandler = exitedHandler;
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
-                logger.LogInformation("内核进程已启动；进程标识={Pid}", process.Id);
+                logger.LogInformation("内核进程已启动，进程标识: {Pid}", process.Id);
             }
             catch
             {
@@ -141,7 +141,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
             TryCancelOutputRead(process);
             if (!process.HasExited)
             {
-                logger.LogInformation("正在停止内核进程；进程标识={Pid}", process.Id);
+                logger.LogInformation("正在停止内核进程，进程标识: {Pid}", process.Id);
                 process.Kill(entireProcessTree: true);
                 await WaitForExitAsync(process, ProcessExitTimeout, cancellationToken);
             }
@@ -172,12 +172,12 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
                 _lifecycleGate.Release();
             }
 
-            logger.LogWarning("内核进程已退出；退出代码={ExitCode}", SafeExitCode(process));
+            logger.LogWarning("内核进程已退出，退出代码: {ExitCode}", SafeExitCode(process));
             DetachOutputAndDispose(process);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "处理内核退出事件失败。");
+            logger.LogWarning(ex, "处理内核退出事件失败");
         }
     }
 
@@ -212,7 +212,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
                     continue;
                 }
 
-                logger.LogWarning("正在停止遗留的受管内核进程；进程标识={Pid}", process.Id);
+                logger.LogWarning("正在停止遗留的受管内核进程，进程标识: {Pid}", process.Id);
                 process.Kill(entireProcessTree: true);
                 await WaitForExitAsync(process, ProcessExitTimeout, cancellationToken);
             }
@@ -223,7 +223,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
                     throw new InvalidOperationException($"停止遗留的受管内核进程 {process.Id} 失败。", ex);
                 }
 
-                logger.LogWarning(ex, "检查疑似遗留的内核进程失败；进程标识={Pid}", process.Id);
+                logger.LogWarning(ex, "检查疑似遗留的内核进程失败，进程标识: {Pid}", process.Id);
             }
             finally
             {
@@ -255,7 +255,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "取消内核标准输出读取失败。");
+            logger.LogDebug(ex, "取消内核标准输出读取失败");
         }
 
         try
@@ -264,7 +264,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "取消内核标准错误读取失败。");
+            logger.LogDebug(ex, "取消内核标准错误读取失败");
         }
     }
 
@@ -283,7 +283,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "读取内核退出代码失败。");
+            logger.LogDebug(ex, "读取内核退出代码失败");
             return "未知";
         }
     }

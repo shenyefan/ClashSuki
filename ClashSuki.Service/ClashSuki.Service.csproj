@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ApplicationIcon>..\ClashSuki\Assets\Img\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,5 +16,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\ServiceProtocol.cs" Link="ServiceContract\ServiceProtocol.cs" />
+    <Compile Include="..\Shared\LogMessageFormatter.cs" Link="Logging\LogMessageFormatter.cs" />
   </ItemGroup>
 </Project>

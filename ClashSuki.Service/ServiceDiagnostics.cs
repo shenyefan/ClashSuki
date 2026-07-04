@@ -1,4 +1,5 @@
 using System.Text;
+using ClashSuki.Shared;
 
 namespace ClashSuki.Service;
 
@@ -25,8 +26,8 @@ internal static class ServiceDiagnostics
                 "DEBUG" or "INFO" or "WARN" or "ERROR" or "FATAL" => level.Trim().ToUpperInvariant(),
                 _ => "INFO"
             };
-            var normalizedOperation = operation.ReplaceLineEndings(" ").Trim();
-            var normalizedMessage = message.ReplaceLineEndings(" ").Trim();
+            var normalizedOperation = LogMessageFormatter.Normalize(operation);
+            var normalizedMessage = LogMessageFormatter.Normalize(message);
             var line =
                 $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{normalizedLevel}] [服务] {normalizedOperation}：{normalizedMessage}{Environment.NewLine}";
             File.AppendAllText(LogPath, line, Encoding.UTF8);
