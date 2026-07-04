@@ -1,5 +1,4 @@
 using System.Text;
-using ClashSuki.Shared;
 
 namespace ClashSuki.Service;
 
@@ -14,7 +13,11 @@ internal static class ServiceDiagnostics
         "ClashSuki",
         "service-install.log");
 
-    public static void Write(string operation, string message, string level = "INFO")
+    public static void Write(
+        string operation,
+        string message,
+        string level = "INFO",
+        string? details = null)
     {
         try
         {
@@ -26,15 +29,29 @@ internal static class ServiceDiagnostics
                 "DEBUG" or "INFO" or "WARN" or "ERROR" or "FATAL" => level.Trim().ToUpperInvariant(),
                 _ => "INFO"
             };
-            var normalizedOperation = LogMessageFormatter.Normalize(operation);
-            var normalizedMessage = LogMessageFormatter.Normalize(message);
+            var normalizedOperation = operation.ReplaceLineEndings(" ").Trim();
+            var normalizedMessage = message.ReplaceLineEndings(" ").Trim();
             var line =
                 $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{normalizedLevel}] [服务] {normalizedOperation}：{normalizedMessage}{Environment.NewLine}";
             File.AppendAllText(LogPath, line, Encoding.UTF8);
+            if (!string.IsNullOrWhiteSpace(details))
+            {
+                File.AppendAllText(LogPath, details.TrimEnd() + Environment.NewLine, Encoding.UTF8);
+            }
         }
         catch
         {
             // 诊断日志为尽力而为，不能因写日志失败再次抛出。
         }
+    }
+
+    public static void WriteException(
+        string operation,
+        string message,
+        Exception exception,
+        string level = "ERROR")
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        Write(operation, message, level, exception.ToString());
     }
 }

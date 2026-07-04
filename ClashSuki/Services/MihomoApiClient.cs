@@ -193,7 +193,7 @@ public sealed class MihomoApiClient : IDisposable
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"mihomo API 请求超时；超时={timeout.TotalSeconds:0.#} 秒；方法={method}；路径={pathAndQuery}",
+                $"mihomo API 请求超时，超时: {timeout.TotalSeconds:0.#} 秒，方法: {method}，路径: {pathAndQuery}",
                 ex);
         }
     }

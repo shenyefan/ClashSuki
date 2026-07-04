@@ -84,7 +84,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 App.CurrentWindow?.ApplyBackdrop(Settings.Backdrop);
             }
 
-            Runtime.Notifications.Success("设置已保存。", source: LogSources.Settings);
+            Runtime.Notifications.Success("设置已保存", source: LogSources.Settings);
         }
         catch (Exception ex)
         {
@@ -112,7 +112,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                $"设置保存失败：{ex.Message}",
+                "设置保存失败",
                 source: LogSources.Settings,
                 exception: ex);
         }
@@ -144,7 +144,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             await LoadAsync();
             await ApplyRestoredRuntimeStateAsync();
             Runtime.Notifications.Success(
-                "已恢复最新备份，建议重启应用。",
+                "已恢复最新备份，建议重启应用",
                 source: LogSources.Settings);
         }, "恢复备份", LogSources.Settings);
 
@@ -159,7 +159,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 UseShellExecute = true
             });
             Runtime.Notifications.Info(
-                "备份目录已打开。",
+                "备份目录已打开",
                 source: LogSources.Settings,
                 writeLog: false);
         }, "打开备份目录", LogSources.Settings);
@@ -175,7 +175,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             await LoadAsync();
             await ApplyRestoredRuntimeStateAsync();
             Runtime.Notifications.Success(
-                "软件设置已重置，数据已自动备份。",
+                "软件设置已重置，数据已自动备份",
                 source: LogSources.Settings);
         }, "重置软件", LogSources.Settings);
 
@@ -195,7 +195,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Settings.GistId = gistId;
             await AppSettingsService.SaveAsync(Settings);
             Runtime.Notifications.Success(
-                "运行时配置已同步到 Gist。",
+                "运行时配置已同步到 Gist",
                 source: LogSources.Gist);
         }, "同步运行时配置到 Gist", LogSources.Gist);
 
@@ -207,7 +207,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Settings.GistAgeSecretKey = keyPair.SecretKey;
             Settings.GistAgeRecipient = keyPair.Recipient;
             OnPropertyChanged(nameof(Settings));
-            Runtime.Notifications.Success("Age 密钥对已生成。", source: LogSources.Gist);
+            Runtime.Notifications.Success("Age 密钥对已生成", source: LogSources.Gist);
         }, "生成 Age 密钥对", LogSources.Gist);
 
     [RelayCommand]

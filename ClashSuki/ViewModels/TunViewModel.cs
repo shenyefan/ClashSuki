@@ -46,7 +46,7 @@ public sealed partial class TunViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"服务修复失败：{ex.Message}",
+                "服务修复失败",
                 source: LogSources.Service,
                 exception: ex);
         }
@@ -59,14 +59,14 @@ public sealed partial class TunViewModel : ObservableObject
         {
             await _coordinator.StopServiceAsync();
             Runtime.Notifications.Success(
-                "服务已停止。",
+                "服务已停止",
                 source: LogSources.Service,
                 writeLog: false);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"服务停止失败：{ex.Message}",
+                "服务停止失败",
                 source: LogSources.Service,
                 exception: ex);
         }
@@ -103,7 +103,7 @@ public sealed partial class TunViewModel : ObservableObject
             };
             if (!int.TryParse(Mtu, out var mtuValue) || mtuValue <= 0)
             {
-                throw new InvalidOperationException("MTU 必须是大于 0 的数字。");
+                throw new InvalidOperationException("MTU 必须是大于 0 的数字");
             }
 
             await _coordinator.SaveTunSettingsAsync(new YamlConfigService.TunSectionSettings(
@@ -117,13 +117,13 @@ public sealed partial class TunViewModel : ObservableObject
                 ConfigTextCodec.ParseLines(RouteExcludeAddress)));
 
             Runtime.Notifications.Success(
-                "虚拟网卡配置已保存。",
+                "虚拟网卡配置已保存",
                 source: LogSources.Tun);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"虚拟网卡配置保存失败：{ex.Message}",
+                "虚拟网卡配置保存失败",
                 source: LogSources.Tun,
                 exception: ex);
             await LoadAsync();
@@ -157,20 +157,20 @@ public sealed partial class TunViewModel : ObservableObject
         {
             await _coordinator.SetupTunFirewallAsync();
             Runtime.Notifications.Success(
-                "防火墙规则已重置。",
+                "防火墙规则已重置",
                 source: LogSources.Tun);
         }
         catch (OperationCanceledException)
         {
             Runtime.Notifications.Info(
-                "已取消防火墙规则配置。",
+                "已取消防火墙规则配置",
                 source: LogSources.Tun,
                 writeLog: false);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"防火墙规则配置失败：{ex.Message}",
+                "防火墙规则配置失败",
                 source: LogSources.Network,
                 exception: ex);
         }

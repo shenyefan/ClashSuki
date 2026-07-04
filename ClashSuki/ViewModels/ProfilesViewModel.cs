@@ -45,7 +45,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(NewProfileUrl))
         {
             Runtime.Notifications.Warning(
-                "订阅地址不能为空。",
+                "订阅地址不能为空",
                 source: LogSources.Subscription,
                 writeLog: false);
             return;

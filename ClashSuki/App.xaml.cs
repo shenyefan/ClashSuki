@@ -41,7 +41,7 @@ public partial class App : Application
                 try
                 {
                     ViewModel?.Runtime.Notifications.Error(
-                        "界面操作发生异常，本次操作已取消。详细信息已写入程序日志。",
+                        "界面操作发生异常，本次操作已取消，详细信息已写入程序日志",
                         "界面异常",
                         LogSources.UserInterface,
                         e.Exception);
@@ -81,7 +81,7 @@ public partial class App : Application
         if (ViewModel is not null)
         {
             ViewModel.Runtime.Notifications.Error(
-                "后台任务发生未处理异常，详细信息已写入程序日志。",
+                "后台任务发生未处理异常，详细信息已写入程序日志",
                 "后台任务异常",
                 LogSources.Application,
                 e.Exception);
@@ -183,7 +183,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"启动准备失败：{ex.Message}",
+                "启动准备失败",
                 source: LogSources.Application,
                 exception: ex);
         }
@@ -225,7 +225,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"启动失败：{ex.Message}",
+                "启动失败",
                 source: LogSources.Core,
                 exception: ex);
         }

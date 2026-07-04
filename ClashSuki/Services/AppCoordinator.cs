@@ -75,12 +75,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         _runtimeConfig = new RuntimeConfigService(Profiles, overrideRuntime, _core);
         _profileAutoUpdate = new ProfileAutoUpdateService(
             profileService,
-            (uid, _) => UpdateProfileAsync(uid),
-            LogProfile);
+            (uid, _) => UpdateProfileAsync(uid));
         _overrideAutoUpdate = new OverrideAutoUpdateService(
             _overrideService,
-            AutoUpdateOverrideAsync,
-            LogOverride);
+            AutoUpdateOverrideAsync);
 
         _core.AppLogReceived += (level, message) =>
             _ = _dispatcher.RunAsync(() => Logs.AddApp(level, message, LogSources.Core));
@@ -221,7 +219,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 await _dispatcher.RunAsync(() =>
                 {
                     Runtime.Notifications.Warning(
-                        "虚拟网卡不可用，内核已以普通模式运行（系统代理仍可用）。",
+                        "虚拟网卡不可用，内核已以普通模式运行（系统代理仍可用）",
                         source: LogSources.Tun,
                         exception: ex);
                 });
@@ -233,7 +231,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 {
                     Runtime.CoreStatusText = "内核启动失败";
                     Runtime.Notifications.Error(
-                        $"内核启动失败：{ex.Message}",
+                        "内核启动失败",
                         source: LogSources.Core,
                         exception: ex);
                 });
@@ -317,7 +315,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                     await _dispatcher.RunAsync(() =>
                     {
                         Runtime.Notifications.Error(
-                            $"模式切换失败：{ex.Message}",
+                            "模式切换失败",
                             source: LogSources.Core,
                             exception: ex);
                     });
@@ -355,7 +353,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"配置更新失败：{ex.Message}",
+                    "配置更新失败",
                     source: LogSources.Core,
                     exception: ex);
             });
@@ -441,7 +439,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 }
 
                 Runtime.Notifications.Error(
-                    $"节点切换失败：{ex.Message}",
+                    "节点切换失败",
                     source: LogSources.Proxy,
                     exception: ex);
             });
@@ -474,7 +472,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
             {
                 await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
-                throw new InvalidOperationException("订阅配置未能通过校验并激活。");
+                throw new InvalidOperationException("订阅配置未能通过校验并激活");
             }
 
             await _dispatcher.RunAsync(() =>
@@ -486,7 +484,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"订阅添加失败：{ex.Message}",
+                    "订阅添加失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -541,7 +539,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 autoUpdate,
                 _cts.Token);
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "订阅信息已保存。", LogSources.Subscription));
+                Logs.AddApp("INFO", "订阅信息已保存", LogSources.Subscription));
             return true;
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
@@ -549,7 +547,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"订阅设置保存失败：{ex.Message}",
+                    "订阅设置保存失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -567,7 +565,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
             {
                 await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
-                throw new InvalidOperationException("本地配置未能通过校验并激活。");
+                throw new InvalidOperationException("本地配置未能通过校验并激活");
             }
 
             await _dispatcher.RunAsync(() =>
@@ -579,7 +577,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"本地配置导入失败：{ex.Message}",
+                    "本地配置导入失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -601,7 +599,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 if (!await ActivateProfileAsync(uid, reportResult: false))
                 {
-                    throw new InvalidOperationException("新订阅配置未能激活。");
+                    throw new InvalidOperationException("新订阅配置未能激活");
                 }
             }
 
@@ -629,7 +627,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"订阅更新失败：{ex.Message}",
+                    "订阅更新失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -657,7 +655,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             if (reportResult)
             {
                 await _dispatcher.RunAsync(() =>
-                    Logs.AddApp("INFO", "订阅已启用。", LogSources.Subscription));
+                    Logs.AddApp("INFO", "订阅已启用", LogSources.Subscription));
             }
 
             return true;
@@ -697,7 +695,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 await _dispatcher.RunAsync(() =>
                 {
                     Runtime.Notifications.Error(
-                        $"订阅启用失败：{ex.Message}",
+                        "订阅启用失败",
                         source: LogSources.Subscription,
                         exception: ex);
                 });
@@ -836,14 +834,14 @@ public sealed class AppCoordinator : IAsyncDisposable
             }
 
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "订阅已删除。", LogSources.Subscription));
+                Logs.AddApp("INFO", "订阅已删除", LogSources.Subscription));
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"订阅删除失败：{ex.Message}",
+                    "订阅删除失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -861,7 +859,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"打开{label}失败：{ex.Message}",
+                    $"打开{label}失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -874,14 +872,14 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            throw new FileNotFoundException($"{label}不存在。", path);
+            throw new FileNotFoundException($"{label}不存在", path);
         }
 
         var isUri = Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
                     uri.Scheme is "http" or "https";
         if (!isUri && !File.Exists(path) && !Directory.Exists(path))
         {
-            throw new FileNotFoundException($"{label}不存在。", path);
+            throw new FileNotFoundException($"{label}不存在", path);
         }
 
         Process.Start(new ProcessStartInfo
@@ -899,7 +897,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             var path = Profiles.GetProfileFilePath(uid);
             if (!File.Exists(path))
             {
-                throw new FileNotFoundException("配置文件不存在。", path);
+                throw new FileNotFoundException("配置文件不存在", path);
             }
 
             return await File.ReadAllTextAsync(path, _cts.Token);
@@ -909,7 +907,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"读取配置文件失败：{ex.Message}",
+                    "读取配置文件失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -923,7 +921,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             if (!File.Exists(path))
             {
-                throw new FileNotFoundException("本地配置文件不存在。", path);
+                throw new FileNotFoundException("本地配置文件不存在", path);
             }
 
             var content = await File.ReadAllTextAsync(path, _cts.Token);
@@ -937,7 +935,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"本地配置导入失败：{ex.Message}",
+                    "本地配置导入失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -989,12 +987,12 @@ public sealed class AppCoordinator : IAsyncDisposable
                 var activated = await ActivateProfileAsync(uid, reportResult: false);
                 if (!activated)
                 {
-                    throw new InvalidOperationException("编辑后的配置未能应用。");
+                    throw new InvalidOperationException("编辑后的配置未能应用");
                 }
             }
 
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "订阅配置文件已保存。", LogSources.Subscription));
+                Logs.AddApp("INFO", "订阅配置文件已保存", LogSources.Subscription));
             return true;
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
@@ -1018,7 +1016,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"保存配置文件失败：{ex.Message}",
+                    "保存配置文件失败",
                     source: LogSources.Subscription,
                     exception: ex);
             });
@@ -1089,7 +1087,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                     "读取系统代理对应的内核配置失败");
                 if (config is null)
                 {
-                    throw new InvalidOperationException("mihomo 内核尚未就绪，无法开启系统代理。");
+                    throw new InvalidOperationException("mihomo 内核尚未就绪，无法开启系统代理");
                 }
 
                 await _dispatcher.RunAsync(() =>
@@ -1101,7 +1099,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             if (enabled && Runtime.MixedPortNumber <= 0)
             {
-                throw new InvalidOperationException("混合端口不可用，无法开启系统代理。");
+                throw new InvalidOperationException("混合端口不可用，无法开启系统代理");
             }
 
             var mixedPort = Runtime.MixedPortNumber;
@@ -1128,7 +1126,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.SyncSystemProxyEnabled(enabled);
                 Logs.AddApp(
                     "INFO",
-                    enabled ? "系统代理已开启。" : "系统代理已关闭。",
+                    enabled ? "系统代理已开启" : "系统代理已关闭",
                     LogSources.SystemProxy);
             });
         }
@@ -1144,7 +1142,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"系统代理切换失败：{ex.Message}",
+                    "系统代理切换失败",
                     source: LogSources.SystemProxy,
                     exception: ex);
             });
@@ -1178,7 +1176,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             if (Runtime.MixedPortNumber <= 0)
             {
-                throw new InvalidOperationException("混合端口不可用，无法恢复系统代理。");
+                throw new InvalidOperationException("混合端口不可用，无法恢复系统代理");
             }
 
             var mixedPort = Runtime.MixedPortNumber;
@@ -1194,7 +1192,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.SyncSystemProxyEnabled(true);
                 Logs.AddApp(
                     "INFO",
-                    "系统代理已按上次状态恢复。",
+                    "系统代理已按上次状态恢复",
                     LogSources.SystemProxy);
             });
         }
@@ -1205,7 +1203,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 Runtime.SyncSystemProxyEnabled(false);
                 Runtime.Notifications.Error(
-                    $"系统代理自动恢复失败：{ex.Message}",
+                    "系统代理自动恢复失败",
                     source: LogSources.SystemProxy,
                     exception: ex);
             });
@@ -1253,14 +1251,8 @@ public sealed class AppCoordinator : IAsyncDisposable
 
         await Task.Run(() => _systemProxy.Disable(), cancellationToken);
         _activeSystemProxyPort = null;
-        DiagnosticLog.WriteApp("SYSTEM-PROXY", "启动时已清理 ClashSuki 遗留的系统代理设置。");
+        DiagnosticLog.WriteApp("SYSTEM-PROXY", "启动时已清理 ClashSuki 遗留的系统代理设置");
     }
-
-    private void LogProfile(string level, string message) =>
-        _ = _dispatcher.RunAsync(() => Logs.AddApp(level, message, LogSources.Subscription));
-
-    private void LogOverride(string level, string message) =>
-        _ = _dispatcher.RunAsync(() => Logs.AddApp(level, message, LogSources.Override));
 
     private async Task AutoUpdateOverrideAsync(string id, CancellationToken token)
     {
@@ -1286,7 +1278,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             }
 
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", $"覆写自动更新完成：{entry.Name}", LogSources.Override));
+                Logs.AddApp("INFO", $"覆写自动更新完成，名称: {entry.Name}", LogSources.Override));
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
@@ -1301,7 +1293,10 @@ public sealed class AppCoordinator : IAsyncDisposable
                 DiagnosticLog.WriteAppException("OVERRIDE-UPDATE-ROLLBACK", rollbackEx);
             }
 
-            LogOverride("ERROR", $"覆写自动更新失败：{entry.Name}；{ex.Message}");
+            DiagnosticLog.WriteAppException(
+                LogSources.Override,
+                ex,
+                $"覆写自动更新失败，名称: {entry.Name}");
         }
     }
 
@@ -1321,14 +1316,14 @@ public sealed class AppCoordinator : IAsyncDisposable
                 await AppSettingsService.PatchAsync(item => item.GistId = gistId, _cts.Token);
             }
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "运行时配置已同步到 Gist。", LogSources.Gist));
+                Logs.AddApp("INFO", "运行时配置已同步到 Gist", LogSources.Gist));
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
         {
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Warning(
-                    $"运行时配置同步到 Gist 失败：{ex.Message}",
+                    "运行时配置同步到 Gist 失败",
                     source: LogSources.Gist,
                     exception: ex);
             });
@@ -1495,7 +1490,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.ApplyTunCapability(serviceStatus);
                 Logs.AddApp(
                     "INFO",
-                    enabled ? "虚拟网卡已开启。" : "虚拟网卡已关闭。",
+                    enabled ? "虚拟网卡已开启" : "虚拟网卡已关闭",
                     LogSources.Tun);
             });
         }
@@ -1509,7 +1504,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"虚拟网卡切换失败：{ex.Message}",
+                    "虚拟网卡切换失败",
                     source: LogSources.Tun,
                     exception: ex);
             });
@@ -1586,7 +1581,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"允许局域网切换失败：{ex.Message}",
+                    "允许局域网切换失败",
                     source: LogSources.Network,
                     exception: ex);
             });
@@ -1673,7 +1668,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"测速失败：{ex.Message}",
+                    "测速失败",
                     source: LogSources.Proxy,
                     exception: ex);
             });
@@ -1704,7 +1699,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"取消固定节点失败：{ex.Message}",
+                    "取消固定节点失败",
                     source: LogSources.Proxy,
                     exception: ex);
             });
@@ -1749,7 +1744,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"节点测速失败：{ex.Message}",
+                    "节点测速失败",
                     source: LogSources.Proxy,
                     exception: ex);
             });
@@ -1795,7 +1790,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
         {
             throw new FileNotFoundException(string.IsNullOrWhiteSpace(sourcePath)
-                ? "未找到规则集合文件路径。"
+                ? "未找到规则集合文件路径"
                 : $"规则集合文件不存在：{sourcePath}", sourcePath);
         }
 
@@ -1817,7 +1812,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Error(
-                    $"规则状态更新失败：{ex.Message}",
+                    "规则状态更新失败",
                     source: LogSources.Rule,
                     exception: ex);
             });
@@ -1829,7 +1824,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         if (!File.Exists(AppPaths.ManagedCorePath))
         {
-            throw new FileNotFoundException("mihomo 内核不存在，无法转换 MRS 规则集合。", AppPaths.ManagedCorePath);
+            throw new FileNotFoundException("mihomo 内核不存在，无法转换 MRS 规则集合", AppPaths.ManagedCorePath);
         }
 
         var tempPath = Path.Combine(Path.GetTempPath(), $"clashsuki-mrs-{Guid.NewGuid():N}.txt");
@@ -1851,7 +1846,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             startInfo.ArgumentList.Add(tempPath);
 
             using var process = Process.Start(startInfo) ??
-                                throw new InvalidOperationException("无法启动 mihomo 转换 MRS 规则集合。");
+                                throw new InvalidOperationException("无法启动 mihomo 转换 MRS 规则集合");
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync(_cts.Token);
@@ -1990,7 +1985,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             DiagnosticLog.WriteAppException(
                 LogSources.Rule,
                 ex,
-                $"删除规则转换临时文件失败；路径={path}",
+                $"删除规则转换临时文件失败，路径: {path}",
                 "WARN");
         }
     }
@@ -2009,7 +2004,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             DiagnosticLog.WriteAppException(
                 LogSources.Core,
                 ex,
-                $"删除内核下载临时目录失败；路径={path}",
+                $"删除内核下载临时目录失败，路径: {path}",
                 "WARN");
         }
     }
@@ -2266,7 +2261,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
             {
                 Runtime.Notifications.Warning(
-                    "请先开启外部控制后再打开 WebUI。",
+                    "请先开启外部控制后再打开 WebUI",
                     source: LogSources.Core);
             });
             return;
@@ -2475,7 +2470,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 Runtime.TunServiceStatusText = "正在退出并修复服务";
                 Runtime.IsTunToggleAvailable = false;
-                Logs.AddApp("INFO", "已启动包外修复进程，应用即将退出。", LogSources.Service);
+                Logs.AddApp("INFO", "已启动包外修复进程，应用即将退出", LogSources.Service);
             });
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
@@ -2502,7 +2497,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         await _dispatcher.RunAsync(() =>
         {
             Runtime.ApplyTunCapability(status);
-            Logs.AddApp("INFO", "ClashSuki 服务已停止，将在启用虚拟网卡时按需启动。", LogSources.Service);
+            Logs.AddApp("INFO", "ClashSuki 服务已停止，将在启用虚拟网卡时按需启动", LogSources.Service);
         });
         await RefreshRuntimeAsync(_cts.Token);
     }
@@ -2575,7 +2570,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 await _dispatcher.RunAsync(() =>
                     Logs.AddApp(
                         "INFO",
-                        $"SSID {currentSsid} 命中直连规则，切换到 DIRECT。",
+                        $"SSID {currentSsid} 命中直连规则，切换到 DIRECT",
                         LogSources.Network));
                 await SwitchModeAsync("direct");
                 if (!Runtime.CurrentMode.Equals("direct", StringComparison.OrdinalIgnoreCase))
@@ -2619,7 +2614,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
                 Logs.AddApp(
                     "INFO",
-                    $"SSID 直连规则已离开，恢复 {restoreMode.ToUpperInvariant()} 模式。",
+                    $"SSID 直连规则已离开，恢复 {restoreMode.ToUpperInvariant()} 模式",
                     LogSources.Network));
             await SwitchModeAsync(restoreMode);
             if (!Runtime.CurrentMode.Equals(restoreMode, StringComparison.OrdinalIgnoreCase))
@@ -2727,7 +2722,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 Runtime.ApplyDisconnected();
                 Runtime.Notifications.Error(
-                    $"刷新运行状态失败：{ex.Message}",
+                    "刷新运行状态失败",
                     source: LogSources.Realtime,
                     exception: ex);
             });
@@ -2786,7 +2781,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         if (!Runtime.IsTunToggleAvailable)
         {
-            throw new InvalidOperationException("TUN 需要安装 ClashSuki 服务或以管理员身份运行。");
+            throw new InvalidOperationException("TUN 需要安装 ClashSuki 服务或以管理员身份运行");
         }
     }
 
@@ -2819,8 +2814,8 @@ public sealed class AppCoordinator : IAsyncDisposable
             await _dispatcher.RunAsync(() =>
                 Runtime.Notifications.Warning(
                     desiredEnabled
-                        ? "虚拟网卡未能恢复，内核已以普通模式运行（系统代理仍可用）。"
-                        : "检测到虚拟网卡残留状态，但自动关闭失败。请重启内核或服务。",
+                        ? "虚拟网卡未能恢复，内核已以普通模式运行（系统代理仍可用）"
+                        : "检测到虚拟网卡残留状态但自动关闭失败，请重启内核或服务",
                     source: LogSources.Tun,
                     exception: ex));
         }
@@ -2891,7 +2886,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 $"tun-api-ready:{reason}",
                 LogSources.Tun,
                 ex,
-                $"等待内核 API 就绪失败；场景={reason}",
+                $"等待内核 API 就绪失败，场景: {reason}",
                 level: "WARN");
         }
     }
@@ -3275,7 +3270,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             await RefreshRuntimeAsync(_cts.Token);
             await RestoreDesiredSystemProxyAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
-                Logs.AddApp("INFO", "内核已自动恢复。", LogSources.Core));
+                Logs.AddApp("INFO", "内核已自动恢复", LogSources.Core));
         }
         catch (Exception ex)
         {

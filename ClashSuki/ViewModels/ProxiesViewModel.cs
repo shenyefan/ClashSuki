@@ -208,7 +208,7 @@ public sealed partial class ProxiesViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Warning(
-                $"代理组偏好加载失败：{ex.Message}",
+                "代理组偏好加载失败",
                 source: LogSources.Proxy,
                 exception: ex);
         }
@@ -258,7 +258,7 @@ public sealed partial class ProxiesViewModel : ObservableObject
         {
             _preferencesSavePending = false;
             Runtime.Notifications.Warning(
-                $"代理组偏好保存失败：{ex.Message}",
+                "代理组偏好保存失败",
                 source: LogSources.Proxy,
                 exception: ex);
         }

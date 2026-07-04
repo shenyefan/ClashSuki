@@ -50,7 +50,7 @@ public sealed class AppNotificationService : IAppNotificationService
             }
         }
 
-        Enqueue(title, message, InfoBarSeverity.Warning);
+        Enqueue(title, BuildDisplayMessage(message, exception), InfoBarSeverity.Warning);
     }
 
     public void Error(
@@ -69,7 +69,7 @@ public sealed class AppNotificationService : IAppNotificationService
             DiagnosticLog.WriteAppException(source, exception, context);
         }
 
-        Enqueue(title, message, InfoBarSeverity.Error);
+        Enqueue(title, BuildDisplayMessage(message, exception), InfoBarSeverity.Error);
     }
 
     public async Task<bool> ConfirmAsync(
@@ -103,7 +103,7 @@ public sealed class AppNotificationService : IAppNotificationService
         }
         catch (Exception ex)
         {
-            Error("无法显示确认对话框。", $"{action}失败", source, ex);
+            Error("无法显示确认对话框", $"{action}失败", source, ex);
             return false;
         }
     }
@@ -124,7 +124,7 @@ public sealed class AppNotificationService : IAppNotificationService
         }
         catch (Exception ex)
         {
-            Error("无法显示对话框。", $"{action}失败", source, ex);
+            Error("无法显示对话框", $"{action}失败", source, ex);
             return ContentDialogResult.None;
         }
     }
@@ -158,7 +158,7 @@ public sealed class AppNotificationService : IAppNotificationService
             DiagnosticLog.WriteApp(
                 LogSources.UserInterface,
                 "WARN",
-                $"显示全局提示失败：界面调度队列已关闭；标题={Normalize(title)}");
+                $"显示全局提示失败，界面调度队列已关闭，标题: {Normalize(title)}");
         }
     }
 
@@ -173,4 +173,15 @@ public sealed class AppNotificationService : IAppNotificationService
 
     private static string Normalize(string value) =>
         value.ReplaceLineEndings(" ").Trim();
+
+    private static string BuildDisplayMessage(string message, Exception? exception)
+    {
+        var normalizedMessage = Normalize(message);
+        if (exception is null || string.IsNullOrWhiteSpace(exception.Message))
+        {
+            return normalizedMessage;
+        }
+
+        return $"{normalizedMessage}：{Normalize(exception.Message)}";
+    }
 }

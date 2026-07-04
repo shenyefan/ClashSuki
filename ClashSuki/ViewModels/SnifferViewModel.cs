@@ -64,13 +64,13 @@ public sealed partial class SnifferViewModel : ObservableObject
                 ConfigTextCodec.ParseLines(SkipDstAddress),
                 ConfigTextCodec.ParseLines(SkipSrcAddress)));
             Runtime.Notifications.Success(
-                "嗅探配置已保存并重载。",
+                "嗅探配置已保存并重载",
                 source: LogSources.Sniffer);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"嗅探配置保存失败：{ex.Message}",
+                "嗅探配置保存失败",
                 source: LogSources.Sniffer,
                 exception: ex);
             await LoadAsync();

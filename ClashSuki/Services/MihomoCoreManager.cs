@@ -74,7 +74,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             await _serviceManager.StopHostAsync(cancellationToken);
             serviceStatus = MihomoServiceStatus.Stopped;
             _runMode = CoreRunMode.NotRunning;
-            EmitAppLog("虚拟网卡未启用，服务已停止，内核将使用子进程模式。");
+            EmitAppLog("虚拟网卡未启用，服务已停止，内核将使用子进程模式");
         }
 
         if (_runMode == CoreRunMode.Service)
@@ -92,7 +92,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             PackagedServiceController.IsInstalled())
         {
             throw new InvalidOperationException(
-                "ClashSuki 服务已安装但当前不可用。为避免同时启动多个 mihomo 内核，已取消 sidecar 回退；请修复应用包后重试。");
+                "ClashSuki 服务已安装但当前不可用，为避免同时启动多个 mihomo 内核，已取消 sidecar 回退，请修复应用包后重试");
         }
 
         if (requireTun &&
@@ -106,7 +106,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         if (!File.Exists(AppPaths.ManagedCorePath))
         {
             throw new FileNotFoundException(
-                $"找不到 mihomo 内核，请将 mihomo.exe 放到 {Path.Combine("ClashSuki", "Assets", "Core", "mihomo.exe")} 或 {AppPaths.ManagedCorePath}。",
+                $"找不到 mihomo 内核，请将 mihomo.exe 放到 {Path.Combine("ClashSuki", "Assets", "Core", "mihomo.exe")} 或 {AppPaths.ManagedCorePath}",
                 AppPaths.ManagedCorePath);
         }
 
@@ -131,7 +131,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             if (!CanRunTun(serviceStatus))
             {
                 EmitAppLog(
-                    "虚拟网卡需要安装 ClashSuki 服务或管理员权限，内核继续以子进程模式运行（系统代理仍可用）。",
+                    "虚拟网卡需要安装 ClashSuki 服务或管理员权限，内核继续以子进程模式运行（系统代理仍可用）",
                     "WARN");
                 return;
             }
@@ -160,7 +160,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         if (requireTun && !CanRunTun(serviceStatus))
         {
             EmitAppLog(
-                "虚拟网卡不可用，内核将以普通子进程模式启动（系统代理仍可用）。",
+                "虚拟网卡不可用，内核将以普通子进程模式启动（系统代理仍可用）",
                 "WARN");
             await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(
                 cancellationToken,
@@ -224,7 +224,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
                 if (string.Equals(path, AppPaths.ManagedCorePath, StringComparison.OrdinalIgnoreCase))
                 {
                     process.Kill(entireProcessTree: true);
-                    EmitAppLog($"已清理上次遗留的 mihomo 进程；进程标识={process.Id}");
+                    EmitAppLog($"已清理上次遗留的 mihomo 进程，进程标识: {process.Id}");
                 }
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 5)
@@ -284,7 +284,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         Directory.CreateDirectory(WorkDirectory);
         await _serviceManager.StartCoreAsync(WorkDirectory, cancellationToken);
         _runMode = CoreRunMode.Service;
-        EmitAppLog("mihomo 已以服务模式启动。");
+        EmitAppLog("mihomo 已以服务模式启动");
     }
 
     private async Task<bool> IsServiceCoreRunningAsync(CancellationToken cancellationToken)
@@ -333,7 +333,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
 
         if (!process.Start())
         {
-            throw new InvalidOperationException("无法启动 mihomo 内核。");
+            throw new InvalidOperationException("无法启动 mihomo 内核");
         }
 
         process.BeginOutputReadLine();
@@ -341,7 +341,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         _process = process;
         _runMode = CoreRunMode.Sidecar;
         await ApplyPriorityAsync(process);
-        EmitAppLog("mihomo 已启动。");
+        EmitAppLog("mihomo 已启动");
     }
 
     private static async Task ApplyPriorityAsync(Process process)
@@ -418,7 +418,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         ClearProxyEnvironment(startInfo);
 
         using var process = Process.Start(startInfo)
-                            ?? throw new InvalidOperationException("无法运行 mihomo 配置测试。");
+                            ?? throw new InvalidOperationException("无法运行 mihomo 配置测试");
 
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -429,7 +429,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(output)
-                ? $"mihomo 配置测试失败；退出代码={process.ExitCode}"
+                ? $"mihomo 配置测试失败，退出代码: {process.ExitCode}"
                 : output);
         }
     }
@@ -567,7 +567,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
                 _processExitedHandler = null;
             }
 
-            EmitAppLog($"mihomo 子进程异常退出；退出代码={SafeExitCode(process)}", "WARN");
+            EmitAppLog($"mihomo 子进程异常退出，退出代码: {SafeExitCode(process)}", "WARN");
         }
         catch (Exception ex)
         {
@@ -605,7 +605,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             DiagnosticLog.WriteApp(
                 "CORE-STOP",
                 "WARN",
-                $"等待内核进程正常退出超时；超时={timeout.TotalSeconds:0.#} 秒；将继续强制停止");
+                $"等待内核进程正常退出超时，超时: {timeout.TotalSeconds:0.#} 秒，将继续强制停止");
         }
     }
 

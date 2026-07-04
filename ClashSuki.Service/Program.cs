@@ -3,9 +3,10 @@ using ClashSuki.ServiceContract;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 {
-    ServiceDiagnostics.Write(
+    ServiceDiagnostics.WriteException(
         "未处理异常",
-        (e.ExceptionObject as Exception)?.ToString() ?? "没有可用的异常信息。",
+        "服务发生未处理异常",
+        e.ExceptionObject as Exception ?? new InvalidOperationException("没有可用的异常信息"),
         "FATAL");
 };
 
@@ -43,6 +44,6 @@ try
 }
 catch (Exception ex)
 {
-    ServiceDiagnostics.Write("服务宿主", ex.ToString(), "FATAL");
+    ServiceDiagnostics.WriteException("服务宿主", "服务宿主运行失败", ex, "FATAL");
     return 1;
 }

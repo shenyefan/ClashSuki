@@ -52,7 +52,7 @@ public static class ProxyIconProvider
                         DiagnosticLog.WriteApp(
                             LogSources.Proxy,
                             "WARN",
-                            $"代理图标下载失败；状态码={(int)response.StatusCode}；图标={DescribeIcon(key)}");
+                            $"代理图标下载失败，状态码: {(int)response.StatusCode}，图标: {DescribeIcon(key)}");
                         return null;
                     }
 
@@ -110,7 +110,7 @@ public static class ProxyIconProvider
                 $"proxy-icon:{HashKey(key)}",
                 LogSources.Proxy,
                 ex,
-                $"加载代理图标失败；图标={DescribeIcon(key)}",
+                $"加载代理图标失败，图标: {DescribeIcon(key)}",
                 level: "WARN");
             return null;
         }

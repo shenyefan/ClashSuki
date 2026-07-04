@@ -150,20 +150,20 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
             var kind = CoreReleaseKind;
             await _coordinator.ApplyCoreReleaseAsync(kind, CoreSpecificVersion);
             Runtime.Notifications.Success(
-                $"已应用 {FormatCoreReleaseLabel(kind)} 内核并启动。",
+                $"已应用 {FormatCoreReleaseLabel(kind)} 内核并启动",
                 source: LogSources.Core);
         }
         catch (OperationCanceledException)
         {
             Runtime.Notifications.Warning(
-                "已取消管理员权限请求，内核未替换。",
+                "已取消管理员权限请求，内核未替换",
                 source: LogSources.Core,
                 writeLog: false);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"内核应用失败：{ex.Message}",
+                "内核应用失败",
                 source: LogSources.Core,
                 exception: ex);
         }
@@ -178,12 +178,12 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         try
         {
             await _coordinator.ValidateCurrentConfigAsync();
-            Runtime.Notifications.Success("配置校验通过。", source: LogSources.Core);
+            Runtime.Notifications.Success("配置校验通过", source: LogSources.Core);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"配置校验失败：{ex.Message}",
+                "配置校验失败",
                 source: LogSources.Core,
                 exception: ex);
         }
@@ -195,12 +195,12 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         try
         {
             await _coordinator.UpdateGeoAsync();
-            Runtime.Notifications.Success("GeoData 已更新。", source: LogSources.Resource);
+            Runtime.Notifications.Success("GeoData 已更新", source: LogSources.Resource);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"GeoData 更新失败：{ex.Message}",
+                "GeoData 更新失败",
                 source: LogSources.Resource,
                 exception: ex);
         }
@@ -212,12 +212,12 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         try
         {
             await _coordinator.FlushFakeIpAsync();
-            Runtime.Notifications.Success("Fake-IP 缓存已清空。", source: LogSources.Dns);
+            Runtime.Notifications.Success("Fake-IP 缓存已清空", source: LogSources.Dns);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"Fake-IP 缓存清理失败：{ex.Message}",
+                "Fake-IP 缓存清理失败",
                 source: LogSources.Dns,
                 exception: ex);
         }
@@ -251,7 +251,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         if (EnableExternalController && string.IsNullOrWhiteSpace(Secret))
         {
             Runtime.Notifications.Warning(
-                "开启外部控制时请设置 Secret。",
+                "开启外部控制时请设置 Secret",
                 source: LogSources.Core,
                 writeLog: false);
             return;
@@ -289,7 +289,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
                 StoreSelected,
                 StoreFakeIp), EnableExternalController);
             Runtime.Notifications.Success(
-                "核心配置已保存，内核已重启。",
+                "核心配置已保存，内核已重启",
                 source: LogSources.Core);
         }
         catch (Exception ex)
@@ -304,7 +304,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                $"核心配置保存失败：{ex.Message}",
+                "核心配置保存失败",
                 source: LogSources.Core,
                 exception: ex);
             await LoadAsync();
@@ -365,7 +365,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(NewWebUiName) || string.IsNullOrWhiteSpace(NewWebUiUrl))
         {
             Runtime.Notifications.Warning(
-                "WebUI 名称和地址不能为空。",
+                "WebUI 名称和地址不能为空",
                 source: LogSources.Core,
                 writeLog: false);
             return;
@@ -435,7 +435,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"版本列表获取失败：{ex.Message}",
+                "版本列表获取失败",
                 source: LogSources.Core,
                 exception: ex);
         }

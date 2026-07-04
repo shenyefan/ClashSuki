@@ -32,7 +32,6 @@
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
     <Compile Include="..\Shared\ServiceProtocol.cs" Link="ServiceContract\ServiceProtocol.cs" />
-    <Compile Include="..\Shared\LogMessageFormatter.cs" Link="Logging\LogMessageFormatter.cs" />
   </ItemGroup>
 
   <ItemGroup>

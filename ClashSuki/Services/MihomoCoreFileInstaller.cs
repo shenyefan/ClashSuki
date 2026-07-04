@@ -88,7 +88,7 @@ public static class MihomoCoreFileInstaller
                 DiagnosticLog.WriteAppException(
                     LogSources.Core,
                     ex,
-                    $"停止占用内核文件的进程失败；进程标识={process.Id}",
+                    $"停止占用内核文件的进程失败，进程标识: {process.Id}",
                     "WARN");
             }
             finally
@@ -156,7 +156,7 @@ public static class MihomoCoreFileInstaller
                 DiagnosticLog.WriteAppException(
                     LogSources.Core,
                     ex,
-                    $"等待内核文件可写时访问被拒绝；路径={path}",
+                    $"等待内核文件可写时访问被拒绝，路径: {path}",
                     "WARN");
                 return;
             }
@@ -165,7 +165,7 @@ public static class MihomoCoreFileInstaller
         DiagnosticLog.WriteApp(
             LogSources.Core,
             "WARN",
-            $"等待内核文件可写超时；路径={path}；超时={timeoutMs} 毫秒");
+            $"等待内核文件可写超时，路径: {path}，超时: {timeoutMs} 毫秒");
     }
 
     private static bool IsAccessDenied(Exception ex) =>
@@ -186,7 +186,7 @@ public static class MihomoCoreFileInstaller
             DiagnosticLog.WriteAppException(
                 LogSources.Core,
                 ex,
-                $"删除内核临时文件失败；路径={path}",
+                $"删除内核临时文件失败，路径: {path}",
                 "WARN");
         }
     }

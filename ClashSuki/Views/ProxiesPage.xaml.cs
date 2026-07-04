@@ -38,7 +38,7 @@ public sealed partial class ProxiesPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Warning(
-                $"代理组展开状态保存失败：{ex.Message}",
+                "代理组展开状态保存失败",
                 source: LogSources.Proxy,
                 exception: ex);
         }

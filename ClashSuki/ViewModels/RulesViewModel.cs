@@ -82,7 +82,7 @@ public sealed partial class RulesViewModel : ObservableObject
         {
             rule.SetEnabledFromCore(previous);
             Runtime.Notifications.Error(
-                $"规则状态更新失败：{ex.Message}",
+                "规则状态更新失败",
                 source: LogSources.Rule,
                 exception: ex);
         }

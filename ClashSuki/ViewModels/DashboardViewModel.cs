@@ -128,7 +128,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"服务修复失败：{ex.Message}",
+                "服务修复失败",
                 source: LogSources.Service,
                 exception: ex);
         }
@@ -154,7 +154,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         package.SetText(text);
         Clipboard.SetContent(package);
         Runtime.Notifications.Success(
-            "代理环境变量已复制。",
+            "代理环境变量已复制",
             source: LogSources.SystemProxy,
             writeLog: false);
     }
@@ -199,12 +199,12 @@ public sealed partial class DashboardViewModel : ObservableObject
                 await _coordinator.SetSystemProxyAsync(true);
                 if (!Runtime.IsSystemProxyEnabled)
                 {
-                    throw new InvalidOperationException("新的系统代理设置未能应用。");
+                    throw new InvalidOperationException("新的系统代理设置未能应用");
                 }
             }
 
             Runtime.Notifications.Success(
-                "系统代理设置已保存。",
+                "系统代理设置已保存",
                 source: LogSources.SystemProxy);
         }
         catch (Exception ex)
@@ -222,7 +222,7 @@ public sealed partial class DashboardViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                $"系统代理设置保存失败：{ex.Message}",
+                "系统代理设置保存失败",
                 source: LogSources.SystemProxy,
                 exception: ex);
             await LoadSystemProxySettingsAsync();
@@ -252,21 +252,21 @@ public sealed partial class DashboardViewModel : ObservableObject
         {
             await UwpLoopbackToolService.OpenAsync();
             Runtime.Notifications.Info(
-                "UWP 工具已打开。",
+                "UWP 工具已打开",
                 source: LogSources.Tun,
                 writeLog: false);
         }
         catch (OperationCanceledException)
         {
             Runtime.Notifications.Info(
-                "已取消打开 UWP 工具。",
+                "已取消打开 UWP 工具",
                 source: LogSources.Tun,
                 writeLog: false);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"打开 UWP 工具失败：{ex.Message}",
+                "打开 UWP 工具失败",
                 source: LogSources.Network,
                 exception: ex);
         }

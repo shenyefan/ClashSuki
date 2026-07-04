@@ -185,7 +185,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
     {
         if (!string.IsNullOrWhiteSpace(args.Data))
         {
-            logger.LogDebug("mihomo：{Message}", args.Data);
+            logger.LogDebug("mihomo: {Message}", args.Data);
         }
     }
 

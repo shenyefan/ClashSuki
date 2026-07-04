@@ -12,7 +12,6 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
 
     private readonly ProfileService _profileService;
     private readonly Func<string, CancellationToken, Task> _updateProfileAsync;
-    private readonly Action<string, string>? _log;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
     private CancellationTokenSource? _cts;
@@ -20,12 +19,10 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
 
     public ProfileAutoUpdateService(
         ProfileService profileService,
-        Func<string, CancellationToken, Task> updateProfileAsync,
-        Action<string, string>? log = null)
+        Func<string, CancellationToken, Task> updateProfileAsync)
     {
         _profileService = profileService;
         _updateProfileAsync = updateProfileAsync;
-        _log = log;
     }
 
     public void Start(CancellationToken appToken)
@@ -54,7 +51,11 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _log?.Invoke("WARN", $"订阅自动更新检查失败：{ex.Message}");
+                DiagnosticLog.WriteAppException(
+                    LogSources.Subscription,
+                    ex,
+                    "订阅自动更新检查失败",
+                    "WARN");
             }
         }
     }
@@ -108,7 +109,11 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
             }
             catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
             {
-                _log?.Invoke("WARN", $"订阅自动更新停止超时：{ex.GetType().Name}");
+                DiagnosticLog.WriteAppException(
+                    LogSources.Subscription,
+                    ex,
+                    "订阅自动更新停止超时",
+                    "WARN");
             }
         }
 

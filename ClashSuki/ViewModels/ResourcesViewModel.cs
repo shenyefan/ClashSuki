@@ -113,7 +113,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"GeoData 配置读取失败：{ex.Message}",
+                "GeoData 配置读取失败",
                 source: LogSources.Resource,
                 exception: ex);
         }
@@ -148,13 +148,13 @@ public sealed partial class ResourcesViewModel : ObservableObject
         {
             await _coordinator.UpdateGeoAsync();
             Runtime.Notifications.Success(
-                "GeoData 已更新。",
+                "GeoData 已更新",
                 source: LogSources.Resource);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"GeoData 更新失败：{ex.Message}",
+                "GeoData 更新失败",
                 source: LogSources.Resource,
                 exception: ex);
         }
@@ -187,13 +187,13 @@ public sealed partial class ResourcesViewModel : ObservableObject
             if (failedCount == 0)
             {
                 Runtime.Notifications.Success(
-                    "规则集合已全部更新。",
+                    "规则集合已全部更新",
                     source: LogSources.Resource);
             }
             else
             {
                 Runtime.Notifications.Warning(
-                    $"规则集合更新完成，其中 {failedCount} 项失败。",
+                    $"规则集合更新完成，其中 {failedCount} 项失败",
                     source: LogSources.Resource);
             }
         }
@@ -225,7 +225,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
             if (showNotification)
             {
                 Runtime.Notifications.Success(
-                    $"规则集合「{provider.Name}」已更新。",
+                    $"规则集合「{provider.Name}」已更新",
                     source: LogSources.Resource);
             }
             return true;
@@ -235,7 +235,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
             if (showNotification)
             {
                 Runtime.Notifications.Error(
-                    $"规则集合更新失败：{ex.Message}",
+                    "规则集合更新失败",
                     source: LogSources.Resource,
                     exception: ex);
             }
@@ -244,7 +244,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
                 DiagnosticLog.WriteAppException(
                     LogSources.Resource,
                     ex,
-                    $"更新规则集合失败；名称={provider.Name}");
+                    $"更新规则集合失败，名称: {provider.Name}");
             }
             return false;
         }
@@ -297,7 +297,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                $"读取规则集合失败：{ex.Message}",
+                "读取规则集合失败",
                 source: LogSources.Resource,
                 exception: ex);
             _viewerProvider = null;
@@ -402,7 +402,7 @@ public sealed partial class ResourcesViewModel : ObservableObject
         {
             _geoSavePending = false;
             Runtime.Notifications.Error(
-                $"GeoData 配置保存失败：{ex.Message}",
+                "GeoData 配置保存失败",
                 source: LogSources.Resource,
                 exception: ex);
             ApplyGeoData(_savedGeoData);

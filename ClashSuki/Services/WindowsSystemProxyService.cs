@@ -73,7 +73,7 @@ public sealed class WindowsSystemProxyService
         var autoDetect = Convert.ToString(key?.GetValue("AutoDetect") ?? "");
         var autoConfig = Convert.ToString(key?.GetValue("AutoConfigURL") ?? "");
         var overrideText = Convert.ToString(key?.GetValue("ProxyOverride") ?? "");
-        return $"ProxyEnable={enabled}; ProxyServer={server}; MigrateProxy={migrateProxy}; AutoDetect={autoDetect}; AutoConfigURL={autoConfig}; ProxyOverride={overrideText}";
+        return $"代理启用: {enabled}，代理服务器: {server}，迁移标记: {migrateProxy}，自动检测: {autoDetect}，PAC 地址: {autoConfig}，绕过列表: {overrideText}";
     }
 
     public void VerifyEnabled(int mixedPort)
@@ -91,12 +91,12 @@ public sealed class WindowsSystemProxyService
 
         if (!enabled)
         {
-            throw new InvalidOperationException($"系统代理写入后校验失败：ProxyEnable 不是 1。当前：{GetSnapshot()}");
+            throw new InvalidOperationException($"系统代理写入后校验失败，代理启用状态不是 1，当前状态: {GetSnapshot()}");
         }
 
         if (!ProxyServerMatches(server, expected))
         {
-            throw new InvalidOperationException($"系统代理写入后校验失败：ProxyServer 不是 {expected}。当前：{GetSnapshot()}");
+            throw new InvalidOperationException($"系统代理写入后校验失败，代理服务器不是 {expected}，当前状态: {GetSnapshot()}");
         }
 
         EnsureProxyPortReachable(mixedPort);
@@ -106,10 +106,10 @@ public sealed class WindowsSystemProxyService
     {
         var parts = new[]
         {
-            $"WinINET 状态：{GetSnapshot()}",
-            $"连接设置：{GetConnectionSettingsSnapshot()}",
-            $"端口探测：地址=127.0.0.1:{mixedPort}；可连接={CanConnect(mixedPort)}",
-            $"代理探测：{ProbeHttpProxy(mixedPort)}",
+            $"WinINET 状态: {GetSnapshot()}",
+            $"连接设置: {GetConnectionSettingsSnapshot()}",
+            $"端口探测，地址: 127.0.0.1:{mixedPort}，可连接: {CanConnect(mixedPort)}",
+            $"代理探测: {ProbeHttpProxy(mixedPort)}",
             DiagnosticLog.RunProcess("netsh.exe", "winhttp", "show", "proxy"),
             DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Google\Chrome", "/v", "ProxyMode"),
             DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Google\Chrome", "/v", "ProxyServer"),
@@ -210,11 +210,11 @@ public sealed class WindowsSystemProxyService
         using var key = Registry.CurrentUser.OpenSubKey(InternetConnectionsKey, writable: false);
         if (key is null)
         {
-            return "Connections key missing";
+            return "连接设置注册表项不存在";
         }
 
-        return string.Join("; ", new[] { "DefaultConnectionSettings", "SavedLegacySettings" }
-            .Select(name => $"{name}={FormatBinaryValue(key.GetValue(name) as byte[])}"));
+        return string.Join("，", new[] { "DefaultConnectionSettings", "SavedLegacySettings" }
+            .Select(name => $"{name}: {FormatBinaryValue(key.GetValue(name) as byte[])}"));
     }
 
     private static string FormatBinaryValue(byte[]? bytes)
@@ -285,7 +285,7 @@ public sealed class WindowsSystemProxyService
             if (!InternetSetOption(IntPtr.Zero, InternetOptionPerConnectionOption, ref optionList, optionList.Size))
             {
                 throw new InvalidOperationException(
-                    $"WinINET 按连接写入代理设置失败；Win32 错误码={Marshal.GetLastWin32Error()}");
+                    $"WinINET 按连接写入代理设置失败，Win32 错误码: {Marshal.GetLastWin32Error()}");
             }
 
             _ = InternetSetOption(IntPtr.Zero, InternetOptionProxySettingsChanged, IntPtr.Zero, 0);
@@ -348,7 +348,7 @@ public sealed class WindowsSystemProxyService
         var autoConfigUrl = Convert.ToString(key.GetValue("AutoConfigURL") ?? "");
         if (!IsOwnPacUrl(autoConfigUrl))
         {
-            throw new InvalidOperationException($"系统代理写入后校验失败：AutoConfigURL 不是 {PacFileUrl}。当前：{GetStaticSnapshot()}");
+            throw new InvalidOperationException($"系统代理写入后校验失败，PAC 地址不是 {PacFileUrl}，当前状态: {GetStaticSnapshot()}");
         }
     }
 
@@ -361,7 +361,7 @@ public sealed class WindowsSystemProxyService
         var autoDetect = Convert.ToString(key?.GetValue("AutoDetect") ?? "");
         var autoConfig = Convert.ToString(key?.GetValue("AutoConfigURL") ?? "");
         var overrideText = Convert.ToString(key?.GetValue("ProxyOverride") ?? "");
-        return $"ProxyEnable={enabled}; ProxyServer={server}; MigrateProxy={migrateProxy}; AutoDetect={autoDetect}; AutoConfigURL={autoConfig}; ProxyOverride={overrideText}";
+        return $"代理启用: {enabled}，代理服务器: {server}，迁移标记: {migrateProxy}，自动检测: {autoDetect}，PAC 地址: {autoConfig}，绕过列表: {overrideText}";
     }
 
     private static bool ProxyServerMatches(string? actual, string expected)
@@ -409,7 +409,7 @@ public sealed class WindowsSystemProxyService
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
-            throw new InvalidOperationException($"127.0.0.1:{port} 连接失败：{ex.Message}", ex);
+            throw new InvalidOperationException($"代理端口连接失败，地址: 127.0.0.1:{port}", ex);
         }
     }
 

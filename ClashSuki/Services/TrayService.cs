@@ -76,7 +76,7 @@ public sealed class TrayService : IDisposable
         {
             Dispose();
             _dashboard.Runtime.Notifications.Error(
-                $"托盘初始化失败：{ex.Message}",
+                "托盘初始化失败",
                 source: LogSources.Tray,
                 exception: ex);
         }
@@ -175,7 +175,7 @@ public sealed class TrayService : IDisposable
         catch (Exception ex)
         {
             _dashboard.Runtime.Notifications.Error(
-                $"托盘操作失败：{ex.Message}",
+                "托盘操作失败",
                 source: LogSources.Tray,
                 exception: ex);
         }

@@ -105,7 +105,7 @@ public sealed class OverrideRuntimeService
         catch (Exception ex)
         {
             await WriteScriptLogAsync(entry, logs, ex, cancellationToken);
-            throw new InvalidOperationException($"JS 覆写 [{entry.Name}] 执行失败：{ex.Message}", ex);
+            throw new InvalidOperationException($"JS 覆写执行失败，名称: {entry.Name}", ex);
         }
     }
 

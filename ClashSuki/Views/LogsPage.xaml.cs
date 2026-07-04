@@ -36,7 +36,7 @@ public sealed partial class LogsPage : Page
         if (DataContext is LogsViewModel viewModel)
         {
             viewModel.Runtime.Notifications.Success(
-                "已复制这一行日志。",
+                "已复制这一行日志",
                 "复制成功",
                 LogSources.Application,
                 writeLog: false);

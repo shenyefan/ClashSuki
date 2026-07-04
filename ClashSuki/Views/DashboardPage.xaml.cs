@@ -28,7 +28,7 @@ public sealed partial class DashboardPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"系统代理切换失败：{ex.Message}",
+                "系统代理切换失败",
                 source: LogSources.SystemProxy,
                 exception: ex);
             toggle.IsOn = viewModel.Runtime.IsSystemProxyEnabled;
@@ -51,7 +51,7 @@ public sealed partial class DashboardPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"虚拟网卡切换失败：{ex.Message}",
+                "虚拟网卡切换失败",
                 source: LogSources.Tun,
                 exception: ex);
             toggle.IsOn = viewModel.Runtime.IsTunEnabled;

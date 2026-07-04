@@ -58,7 +58,7 @@ internal sealed class Worker(
     {
         if (!clientAuthorizer.IsAuthorized(pipe, out var denialReason))
         {
-            logger.LogWarning("拒绝命名管道客户端：{Reason}", denialReason);
+            logger.LogWarning("拒绝命名管道客户端，原因: {Reason}", denialReason);
             await WriteResponseAsync(pipe, ServiceResponse.Failure("无权访问 ClashSuki 服务。"), stoppingToken);
             return;
         }

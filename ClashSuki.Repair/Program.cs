@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using ClashSuki.Shared;
 using Windows.Management.Deployment;
 
 namespace ClashSuki.Repair;
@@ -22,12 +21,12 @@ internal static class Program
             await WaitForProcessExitAsync(options.WaitProcessId, TimeSpan.FromMinutes(2));
             await RegisterPackageAsync(options.PackageFullName);
             StartApplication(options.AppUserModelId);
-            WriteLog("INFO", "应用包重新注册完成，已重新启动 ClashSuki。");
+            WriteLog("INFO", "应用包重新注册完成，已重新启动 ClashSuki");
             return 0;
         }
         catch (Exception ex)
         {
-            WriteLog("ERROR", $"应用包修复失败：{ex}");
+            WriteLog("ERROR", "应用包修复失败", ex.ToString());
             return 1;
         }
     }
@@ -86,14 +85,18 @@ internal static class Program
             ?? throw new InvalidOperationException("应用包已修复，但无法重新启动 ClashSuki。");
     }
 
-    private static void WriteLog(string level, string message)
+    private static void WriteLog(string level, string message, string? details = null)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
             File.AppendAllText(
                 LogPath,
-                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [服务修复] {LogMessageFormatter.Normalize(message)}{Environment.NewLine}");
+                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [服务修复] {message.ReplaceLineEndings(" ").Trim()}{Environment.NewLine}");
+            if (!string.IsNullOrWhiteSpace(details))
+            {
+                File.AppendAllText(LogPath, details.TrimEnd() + Environment.NewLine);
+            }
         }
         catch
         {

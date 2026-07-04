@@ -29,7 +29,7 @@ public sealed partial class SnifferPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"嗅探配置加载失败：{ex.Message}",
+                "嗅探配置加载失败",
                 source: LogSources.Sniffer,
                 exception: ex);
         }

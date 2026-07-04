@@ -104,7 +104,7 @@ public sealed partial class ConnectionsViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Warning(
-                "连接列表筛选失败，已保留当前列表。",
+                "连接列表筛选失败，已保留当前列表",
                 source: LogSources.Connection,
                 exception: ex);
         }
@@ -129,13 +129,13 @@ public sealed partial class ConnectionsViewModel : ObservableObject
         {
             await _coordinator.CloseAllConnectionsAsync();
             Runtime.Notifications.Success(
-                "全部活动连接已关闭。",
+                "全部活动连接已关闭",
                 source: LogSources.Connection);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"关闭全部连接失败：{ex.Message}",
+                "关闭全部连接失败",
                 source: LogSources.Connection,
                 exception: ex);
         }
@@ -154,7 +154,7 @@ public sealed partial class ConnectionsViewModel : ObservableObject
             catch (Exception ex)
             {
                 Runtime.Notifications.Error(
-                    $"关闭连接失败：{ex.Message}",
+                    "关闭连接失败",
                     source: LogSources.Connection,
                     exception: ex);
             }

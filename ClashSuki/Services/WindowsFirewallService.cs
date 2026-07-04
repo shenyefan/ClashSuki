@@ -34,7 +34,7 @@ public static class WindowsFirewallService
                 DiagnosticLog.WriteAppException(
                     LogSources.Network,
                     ex,
-                    $"删除防火墙配置临时脚本失败；路径={scriptPath}",
+                    $"删除防火墙配置临时脚本失败，路径: {scriptPath}",
                     "WARN");
             }
         }

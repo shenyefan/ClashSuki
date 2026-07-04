@@ -73,7 +73,7 @@ public static class ProcessIconProvider
                 $"process-icon:{processPath}",
                 LogSources.Connection,
                 ex,
-                $"读取进程图标失败；路径={processPath}",
+                $"读取进程图标失败，路径: {processPath}",
                 level: "WARN");
             return null;
         }

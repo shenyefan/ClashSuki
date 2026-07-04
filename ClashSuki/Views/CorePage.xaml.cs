@@ -30,7 +30,7 @@ public sealed partial class CorePage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"核心配置加载失败：{ex.Message}",
+                "核心配置加载失败",
                 source: LogSources.Core,
                 exception: ex);
         }
@@ -67,7 +67,7 @@ public sealed partial class CorePage : Page
         if (viewModel.CoreReleaseIndex == 3 && string.IsNullOrWhiteSpace(viewModel.CoreSpecificVersion))
         {
             viewModel.Runtime.Notifications.Warning(
-                "请先选择指定版本。",
+                "请先选择指定版本",
                 source: LogSources.Core,
                 writeLog: false);
             return;

@@ -113,7 +113,7 @@ public sealed class MihomoServiceManager
         if (!PackageIdentityService.IsPackaged)
         {
             throw new InvalidOperationException(
-                "服务仅由 MSIX 包管理。请在 Visual Studio 中启动 ClashSuki.Package 项目。");
+                "服务仅由 MSIX 包管理，请在 Visual Studio 中启动 ClashSuki.Package 项目");
         }
 
         if (PackagedServiceController.IsRunning())
@@ -152,7 +152,7 @@ public sealed class MihomoServiceManager
             catch (Exception fallbackEx)
             {
                 throw new InvalidOperationException(
-                    "无法停止 ClashSuki 服务，请修复应用包后重试。",
+                    "无法停止 ClashSuki 服务，请修复应用包后重试",
                     new AggregateException(ex, fallbackEx));
             }
         }
@@ -186,7 +186,7 @@ public sealed class MihomoServiceManager
             await Task.Delay(500, cancellationToken);
         }
 
-        throw new TimeoutException("服务已安装，但 IPC 管道未就绪。请检查 Windows 服务 ClashSukiService 是否启动成功。");
+        throw new TimeoutException("服务已安装但 IPC 管道未就绪，请检查 Windows 服务 ClashSukiService 是否启动成功");
     }
 
     public async Task StartCoreAsync(
@@ -257,7 +257,7 @@ public sealed class MihomoServiceManager
         var target = expectedRunning ? "启动" : "停止";
         throw new TimeoutException(
             lastError is null
-                ? $"等待服务内核{target}超时。"
+                ? $"等待服务内核{target}超时"
                 : $"等待服务内核{target}超时：{lastError.Message}",
             lastError);
     }
@@ -280,8 +280,8 @@ public sealed class MihomoServiceManager
         }
 
         throw new TimeoutException(expectedRunning
-            ? "等待服务启动超时。"
-            : "等待服务停止超时。");
+            ? "等待服务启动超时"
+            : "等待服务停止超时");
     }
 
     private async Task<bool> CanConnectIpcAsync(CancellationToken cancellationToken)
@@ -339,7 +339,7 @@ public sealed class MihomoServiceManager
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            throw new OperationCanceledException("已取消管理员权限请求。", ex, cancellationToken);
+            throw new OperationCanceledException("已取消管理员权限请求", ex, cancellationToken);
         }
 
         using (process)
@@ -356,7 +356,7 @@ public sealed class MihomoServiceManager
                 var command = CommandLineFormatter.Format(Path.GetFileName(exePath), arguments);
                 var detail = ReadServiceInstallLogTail();
                 var baseMessage = hint is null
-                    ? $"{command} 执行失败，退出码为 {process.ExitCode}。"
+                    ? $"{command} 执行失败，退出码为 {process.ExitCode}"
                     : $"{command} 失败（退出码 {process.ExitCode}）：{hint}";
                 throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
                     ? baseMessage
@@ -404,7 +404,7 @@ public sealed class MihomoServiceManager
 
         return candidates.FirstOrDefault(File.Exists)
                ?? throw new FileNotFoundException(
-                   "找不到 ClashSuki.Service.exe，请重新生成 ClashSuki。",
+                   "找不到 ClashSuki.Service.exe，请重新生成 ClashSuki",
                    candidates[0]);
     }
 }

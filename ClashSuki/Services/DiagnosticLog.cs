@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Collections;
-using ClashSuki.Shared;
 
 namespace ClashSuki.Services;
 
@@ -20,16 +19,16 @@ public static class DiagnosticLog
     public static event Action<DiagnosticLogEntry>? AppEntryWritten;
 
     public static void WriteApp(string source, string message) =>
-        Write(AppLogPath, source, "INFO", message, null, true, AppEntryWritten);
+        Write(AppLogPath, source, "INFO", message, null, AppEntryWritten);
 
     public static void WriteApp(string source, string level, string message) =>
-        Write(AppLogPath, source, level, message, null, true, AppEntryWritten);
+        Write(AppLogPath, source, level, message, null, AppEntryWritten);
 
     public static void WriteMihomo(string source, string message) =>
-        Write(MihomoLogPath, source, "INFO", message, null, false);
+        Write(MihomoLogPath, source, "INFO", message, null);
 
     public static void WriteMihomo(string source, string level, string message) =>
-        Write(MihomoLogPath, source, level, message, null, false);
+        Write(MihomoLogPath, source, level, message, null);
 
     private static void Write(
         string path,
@@ -37,7 +36,6 @@ public static class DiagnosticLog
         string level,
         string message,
         string? details,
-        bool normalizeAppMessage,
         Action<DiagnosticLogEntry>? entryWritten = null)
     {
         try
@@ -47,9 +45,7 @@ public static class DiagnosticLog
                 DateTimeOffset.Now,
                 NormalizeLevel(level),
                 NormalizeSource(source),
-                normalizeAppMessage
-                    ? LogMessageFormatter.Normalize(message)
-                    : NormalizeMessage(message),
+                NormalizeMessage(message),
                 NormalizeDetails(details));
             var output = new StringBuilder()
                 .Append(entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff zzz"))
@@ -90,7 +86,6 @@ public static class DiagnosticLog
             level,
             message,
             BuildExceptionDetails(exception),
-            true,
             AppEntryWritten);
     }
 
@@ -99,7 +94,7 @@ public static class DiagnosticLog
         var normalizedContext = NormalizeMessage(context);
         var exceptionMessage = exception is AggregateException aggregate
             ? string.Join(
-                "；",
+                "，",
                 aggregate.Flatten().InnerExceptions
                     .Select(item => NormalizeMessage(item.Message))
                     .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -112,13 +107,7 @@ public static class DiagnosticLog
                 : exceptionMessage;
         }
 
-        if (string.IsNullOrWhiteSpace(exceptionMessage) ||
-            normalizedContext.Contains(exceptionMessage, StringComparison.OrdinalIgnoreCase))
-        {
-            return normalizedContext;
-        }
-
-        return $"{normalizedContext}：{exceptionMessage}";
+        return normalizedContext;
     }
 
     private static string BuildExceptionDetails(Exception exception)
@@ -173,7 +162,7 @@ public static class DiagnosticLog
         }
         catch (Exception ex)
         {
-            return $"读取日志失败：{ex.Message}";
+            return $"读取日志失败: {ex.Message}";
         }
     }
 
@@ -271,7 +260,7 @@ public static class DiagnosticLog
                 .GetAwaiter()
                 .GetResult();
             var output = streams[0] + streams[1];
-            return $"命令执行完成：{commandLine}；退出代码={process.ExitCode}；输出={output.Trim()}";
+            return $"命令执行完成: {commandLine}，退出代码: {process.ExitCode}，输出: {output.Trim()}";
         }
         catch (Exception ex)
         {

@@ -152,7 +152,7 @@ public sealed class MihomoCoreDownloadService
                 DiagnosticLog.WriteAppException(
                     LogSources.Core,
                     ex,
-                    $"内核下载地址失败，将尝试下一个地址；地址={candidate}",
+                    $"内核下载地址失败，将尝试下一个地址，地址: {candidate}",
                     "WARN");
             }
         }

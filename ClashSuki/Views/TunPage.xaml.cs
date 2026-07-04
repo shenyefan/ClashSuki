@@ -29,7 +29,7 @@ public sealed partial class TunPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"虚拟网卡配置加载失败：{ex.Message}",
+                "虚拟网卡配置加载失败",
                 source: LogSources.Tun,
                 exception: ex);
         }
@@ -115,7 +115,7 @@ public sealed partial class TunPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"虚拟网卡切换失败：{ex.Message}",
+                "虚拟网卡切换失败",
                 source: LogSources.Tun,
                 exception: ex);
             toggle.IsOn = viewModel.Runtime.IsTunEnabled;

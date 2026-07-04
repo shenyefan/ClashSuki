@@ -29,7 +29,7 @@ public sealed partial class SysProxyPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"系统代理设置加载失败：{ex.Message}",
+                "系统代理设置加载失败",
                 source: LogSources.SystemProxy,
                 exception: ex);
         }
@@ -73,7 +73,7 @@ public sealed partial class SysProxyPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"系统代理切换失败：{ex.Message}",
+                "系统代理切换失败",
                 source: LogSources.SystemProxy,
                 exception: ex);
             toggle.IsOn = viewModel.Runtime.IsSystemProxyEnabled;

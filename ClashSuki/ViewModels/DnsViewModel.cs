@@ -97,12 +97,12 @@ public sealed partial class DnsViewModel : ObservableObject
                 ConfigTextCodec.ParseLines(FallbackIpCidr),
                 ConfigTextCodec.ParseLines(FallbackDomain),
                 ConfigTextCodec.ParseMapping(Hosts)));
-            Runtime.Notifications.Success("DNS 配置已保存。", source: LogSources.Dns);
+            Runtime.Notifications.Success("DNS 配置已保存", source: LogSources.Dns);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"DNS 配置保存失败：{ex.Message}",
+                "DNS 配置保存失败",
                 source: LogSources.Dns,
                 exception: ex);
             await LoadAsync();

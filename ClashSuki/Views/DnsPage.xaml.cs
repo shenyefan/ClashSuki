@@ -29,7 +29,7 @@ public sealed partial class DnsPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                $"DNS 配置加载失败：{ex.Message}",
+                "DNS 配置加载失败",
                 source: LogSources.Dns,
                 exception: ex);
         }

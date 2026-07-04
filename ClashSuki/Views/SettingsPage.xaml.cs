@@ -29,7 +29,7 @@ public sealed partial class SettingsPage : Page
         catch (Exception ex)
         {
             vm.Runtime.Notifications.Error(
-                $"设置加载失败：{ex.Message}",
+                "设置加载失败",
                 source: LogSources.Settings,
                 exception: ex);
         }

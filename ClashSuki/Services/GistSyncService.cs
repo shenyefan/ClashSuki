@@ -190,7 +190,7 @@ public sealed class GistSyncService
             DiagnosticLog.WriteAppException(
                 LogSources.Gist,
                 ex,
-                $"删除 Gist 同步临时文件失败；路径={path}",
+                $"删除 Gist 同步临时文件失败，路径: {path}",
                 "WARN");
         }
     }

@@ -140,7 +140,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(ImportUrl))
         {
             Runtime.Notifications.Warning(
-                "请输入覆写 URL。",
+                "请输入覆写 URL",
                 source: LogSources.Override,
                 writeLog: false);
             return;
@@ -160,7 +160,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             ImportUserAgent = "";
             ImportAuthToken = "";
             OnPropertyChanged(nameof(ItemCount));
-            Runtime.Notifications.Success("覆写已导入。", source: LogSources.Override);
+            Runtime.Notifications.Success("覆写已导入", source: LogSources.Override);
             if (entry.Enabled)
             {
                 await ApplyAsync();
@@ -169,7 +169,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"覆写导入失败：{ex.Message}",
+                "覆写导入失败",
                 source: LogSources.Override,
                 exception: ex);
         }
@@ -182,12 +182,12 @@ public sealed partial class OverrideViewModel : ObservableObject
             var entry = await _service.ImportLocalFileAsync(_config, path);
             Items.Add(new OverrideItemViewModel(entry));
             OnPropertyChanged(nameof(ItemCount));
-            Runtime.Notifications.Success("覆写文件已导入。", source: LogSources.Override);
+            Runtime.Notifications.Success("覆写文件已导入", source: LogSources.Override);
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"覆写文件导入失败：{ex.Message}",
+                "覆写文件导入失败",
                 source: LogSources.Override,
                 exception: ex);
         }
@@ -215,7 +215,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         var entry = await _service.CreateAsync(_config, name, ext, content);
         Items.Add(new OverrideItemViewModel(entry));
         OnPropertyChanged(nameof(ItemCount));
-        Runtime.Notifications.Success($"{name} 已创建。", source: LogSources.Override);
+        Runtime.Notifications.Success($"{name} 已创建", source: LogSources.Override);
     }
 
     public async Task BeginEditAsync(OverrideItemViewModel item)
@@ -252,7 +252,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(InfoName))
         {
             Runtime.Notifications.Warning(
-                "显示名称不能为空。",
+                "显示名称不能为空",
                 source: LogSources.Override,
                 writeLog: false);
             return false;
@@ -261,7 +261,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         if (_infoEditingItem.IsRemote && string.IsNullOrWhiteSpace(InfoUrl))
         {
             Runtime.Notifications.Warning(
-                "远程覆写地址不能为空。",
+                "远程覆写地址不能为空",
                 source: LogSources.Override,
                 writeLog: false);
             return false;
@@ -293,7 +293,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             }
 
             _infoEditingItem.RefreshDetail();
-            Runtime.Notifications.Success("覆写信息已保存。", source: LogSources.Override);
+            Runtime.Notifications.Success("覆写信息已保存", source: LogSources.Override);
             return true;
         }
         catch (Exception ex)
@@ -302,7 +302,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             await _service.SaveAsync(_config);
             _infoEditingItem.RefreshDetail();
             Runtime.Notifications.Error(
-                $"覆写信息保存失败：{ex.Message}",
+                "覆写信息保存失败",
                 source: LogSources.Override,
                 exception: ex);
             return false;
@@ -336,11 +336,11 @@ public sealed partial class OverrideViewModel : ObservableObject
             await _service.SaveAsync(_config);
             if (!await ApplyAsync())
             {
-                throw new InvalidOperationException("覆写内容未能应用。");
+                throw new InvalidOperationException("覆写内容未能应用");
             }
 
             _editingItem.RefreshDetail();
-            Runtime.Notifications.Success("覆写已保存。", source: LogSources.Override);
+            Runtime.Notifications.Success("覆写已保存", source: LogSources.Override);
             return true;
         }
         catch (Exception ex)
@@ -350,7 +350,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             await _service.SaveAsync(_config);
             _editingItem.RefreshDetail();
             Runtime.Notifications.Error(
-                $"覆写保存失败：{ex.Message}",
+                "覆写保存失败",
                 source: LogSources.Override,
                 exception: ex);
             return false;
@@ -375,7 +375,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             item.Enabled = previous;
             await _service.SaveAsync(_config);
             Runtime.Notifications.Error(
-                $"切换覆写失败：{ex.Message}",
+                "切换覆写失败",
                 source: LogSources.Override,
                 exception: ex);
         }
@@ -388,7 +388,7 @@ public sealed partial class OverrideViewModel : ObservableObject
         await _service.DeleteAsync(_config, item.Entry);
         Items.Remove(item);
         OnPropertyChanged(nameof(ItemCount));
-        Runtime.Notifications.Success("覆写已删除。", source: LogSources.Override);
+        Runtime.Notifications.Success("覆写已删除", source: LogSources.Override);
         if (wasEnabled)
         {
             await ApplyAsync();
@@ -412,10 +412,10 @@ public sealed partial class OverrideViewModel : ObservableObject
             item.RefreshDetail();
             if (!await ApplyAsync())
             {
-                throw new InvalidOperationException("更新后的覆写未能应用。");
+                throw new InvalidOperationException("更新后的覆写未能应用");
             }
 
-            Runtime.Notifications.Success("远程覆写已更新。", source: LogSources.Override);
+            Runtime.Notifications.Success("远程覆写已更新", source: LogSources.Override);
         }
         catch (Exception ex)
         {
@@ -432,7 +432,7 @@ public sealed partial class OverrideViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                $"远程覆写更新失败：{ex.Message}",
+                "远程覆写更新失败",
                 source: LogSources.Override,
                 exception: ex);
         }
@@ -454,15 +454,15 @@ public sealed partial class OverrideViewModel : ObservableObject
             var result = await _coordinator.ApplyOverridesAsync();
             Runtime.Notifications.Success(
                 result.EnabledCount == 0
-                    ? "已恢复为当前订阅配置。"
-                    : $"覆写已应用：YAML {result.YamlCount}，JS {result.ScriptCount}。",
+                    ? "已恢复为当前订阅配置"
+                    : $"覆写已应用，YAML: {result.YamlCount}，JS: {result.ScriptCount}",
                 source: LogSources.Override);
             return true;
         }
         catch (Exception ex)
         {
             Runtime.Notifications.Error(
-                $"应用覆写失败：{ex.Message}",
+                "应用覆写失败",
                 source: LogSources.Override,
                 exception: ex);
             return false;
