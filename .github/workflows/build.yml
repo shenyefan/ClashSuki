@@ -1,0 +1,89 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      NUGET_XMLDOC_MODE: skip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Show SDK information
+        shell: pwsh
+        run: dotnet --info
+
+      - name: Build and validate MSIX
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "ClashSuki.pfx"
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64)
+
+          try {
+            if ($hasCertificate) {
+              [IO.File]::WriteAllBytes(
+                $certificatePath,
+                [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+
+              .\ClashSuki.Package\Build-Package.ps1 `
+                -Configuration Release `
+                -Platform x64 `
+                -CertificatePath $certificatePath `
+                -CertificatePassword $env:WINDOWS_CERTIFICATE_PASSWORD
+
+              $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                $certificatePath,
+                $env:WINDOWS_CERTIFICATE_PASSWORD,
+                [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+              [IO.File]::WriteAllBytes(
+                "ClashSuki.Package\AppPackages\ClashSuki.cer",
+                $certificate.Export(
+                  [Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+            }
+            else {
+              .\ClashSuki.Package\Build-Package.ps1 `
+                -Configuration Release `
+                -Platform x64
+            }
+          }
+          finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v7
+        with:
+          name: ClashSuki-msix-x64-${{ github.sha }}
+          path: |
+            ClashSuki.Package/AppPackages/**/*.msix
+            ClashSuki.Package/AppPackages/**/*.cer
+          if-no-files-found: error
+          retention-days: 14

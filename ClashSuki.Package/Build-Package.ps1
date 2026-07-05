@@ -79,12 +79,14 @@ $arguments = @(
 if ([string]::IsNullOrWhiteSpace($CertificatePath))
 {
     $arguments += "/p:AppxPackageSigningEnabled=false"
+    $arguments += "/p:PackageCertificateThumbprint="
 }
 else
 {
     $resolvedCertificatePath = (Resolve-Path -LiteralPath $CertificatePath).Path
     $arguments += "/p:AppxPackageSigningEnabled=true"
     $arguments += "/p:PackageCertificateKeyFile=$resolvedCertificatePath"
+    $arguments += "/p:PackageCertificateThumbprint="
     if (-not [string]::IsNullOrWhiteSpace($CertificatePassword))
     {
         $arguments += "/p:PackageCertificatePassword=$CertificatePassword"
