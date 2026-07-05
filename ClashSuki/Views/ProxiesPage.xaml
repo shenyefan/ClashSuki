@@ -92,26 +92,40 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="vm:ProxyGroupItemViewModel">
-                        <controls:SettingsExpander Description="{Binding SubtitleText, Mode=OneWay}"
-                                                   IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
+                        <controls:SettingsExpander IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
                                                    ItemsSource="{x:Bind FilteredNodes}">
                             <controls:SettingsExpander.Header>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Grid Width="20" Height="20">
-                                        <FontIcon Glyph="&#xE968;"
-                                                  FontSize="14"
-                                                  Opacity="0.35"
-                                                  Visibility="{Binding IconUri, Converter={StaticResource NullToVis}}" />
-                                        <Image Width="20"
-                                               Height="20"
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="32"
+                                          Height="32"
+                                          VerticalAlignment="Center">
+                                        <Image Width="32"
+                                               Height="32"
                                                Source="{Binding IconUri}"
                                                Stretch="Uniform"
-                                               Visibility="{Binding IconUri, Converter={StaticResource NotNullToVis}}" />
+                                               Visibility="{x:Bind HasGroupIcon, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                                        <TextBlock Text="{x:Bind LeadingEmoji, Mode=OneWay}"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="24"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{x:Bind ShowLeadingEmoji, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
                                     </Grid>
-                                    <TextBlock Text="{x:Bind Name}"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Spacing="2"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind SubtitleText, Mode=OneWay}"
+                                                   Style="{StaticResource MutedCaptionTextStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Grid>
                             </controls:SettingsExpander.Header>
                             <StackPanel Orientation="Horizontal"
                                         Spacing="8"

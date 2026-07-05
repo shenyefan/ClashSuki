@@ -32,8 +32,35 @@ public sealed partial class ProxyGroupItemViewModel : ObservableObject
     public string NodeCountDisplay => $"{FilteredNodes.Count}/{NodeCount}";
     public bool IsGroupDelayRunning => Nodes.Any(n => n.IsGroupDelayPending);
     public string SubtitleText => $"{Type} · {CurrentNode}";
+    public bool HasGroupIcon => IconUri is not null;
+    public string LeadingEmoji => EmojiText.GetLeadingEmoji(Name);
+    public bool ShowLeadingEmoji =>
+        IconUri is null &&
+        string.IsNullOrWhiteSpace(Icon) &&
+        !string.IsNullOrEmpty(LeadingEmoji);
+    public string DisplayName => ShowLeadingEmoji ? EmojiText.RemoveLeadingEmoji(Name) : Name;
 
     public ObservableCollection<NodeItemViewModel> FilteredNodes { get; } = [];
+
+    partial void OnNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(LeadingEmoji));
+        OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(DisplayName));
+    }
+
+    partial void OnIconChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(DisplayName));
+    }
+
+    partial void OnIconUriChanged(Uri? value)
+    {
+        OnPropertyChanged(nameof(HasGroupIcon));
+        OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(DisplayName));
+    }
 
     partial void OnCurrentNodeChanged(string value) => OnPropertyChanged(nameof(SubtitleText));
 
