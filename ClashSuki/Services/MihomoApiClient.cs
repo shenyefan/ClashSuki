@@ -55,15 +55,35 @@ public sealed class MihomoApiClient : IDisposable
     public async Task<int?> TestProxyDelayAsync(string proxyName, string url, int timeoutMs, CancellationToken cancellationToken)
     {
         var path = $"/proxies/{Escape(proxyName)}/delay?url={Uri.EscapeDataString(url)}&timeout={timeoutMs}";
-        var reqTimeout = TimeSpan.FromMilliseconds(timeoutMs + 5000);
+        var reqTimeout = TimeSpan.FromMilliseconds(timeoutMs + 2000);
         try
         {
-            var result = await GetAsync<DelayResult>(path, reqTimeout, cancellationToken);
-            return result.Delay ?? result.MeanDelay;
+            using var response = await SendAsync(
+                HttpMethod.Get,
+                path,
+                null,
+                reqTimeout,
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return 0;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var result = await JsonSerializer.DeserializeAsync<DelayResult>(
+                stream,
+                JsonOptions,
+                cancellationToken);
+            var delay = result?.Delay ?? result?.MeanDelay;
+            return delay is > 0 ? delay : 0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
-            return null;
+            return 0;
         }
     }
 
