@@ -65,7 +65,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
     {
         var settings = await _coordinator.LoadCoreSettingsAsync();
         var appSettings = await AppSettingsService.LoadAsync();
-        EnableExternalController = appSettings.EnableExternalController;
+        EnableExternalController = !string.IsNullOrWhiteSpace(settings.ExternalController);
         Ipv6 = settings.Ipv6;
         UnifiedDelay = settings.UnifiedDelay;
         TcpConcurrent = settings.TcpConcurrent;
@@ -88,11 +88,9 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         HttpPort = settings.HttpPort;
         RedirPort = settings.RedirPort;
         TproxyPort = settings.TproxyPort;
-        ExternalController = string.IsNullOrWhiteSpace(appSettings.ExternalControllerAddress)
-            ? (string.IsNullOrWhiteSpace(settings.ExternalController)
-                ? MihomoControllerEndpoint.DefaultHttpAddress
-                : settings.ExternalController)
-            : appSettings.ExternalControllerAddress;
+        ExternalController = string.IsNullOrWhiteSpace(settings.ExternalController)
+            ? MihomoControllerEndpoint.DefaultHttpAddress
+            : settings.ExternalController;
         Secret = settings.Secret;
         AllowLan = settings.AllowLan;
         LanAllowedIps = ConfigTextCodec.FormatLines(settings.LanAllowedIps);
@@ -263,8 +261,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
             await _coordinator.SaveCoreAppSettingsAsync(
                 NormalizePositiveInt(MaxLogDays),
                 NormalizePositiveInt(MaxLogFileSizeMb),
-                WebUiPanels.Select(panel => new WebUiPanelSetting { Name = panel.Name, Url = panel.Url }).ToList(),
-                EnableExternalController);
+                WebUiPanels.Select(panel => new WebUiPanelSetting { Name = panel.Name, Url = panel.Url }).ToList());
             await _coordinator.SaveCoreDownloadSettingsAsync(
                 CoreReleaseKind,
                 CoreSpecificVersion);
@@ -296,7 +293,8 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         {
             try
             {
-                await AppSettingsService.SaveAsync(previousAppSettings);
+                await AppSettingsService.PatchAsync(
+                    current => CopyCoreAppSettings(previousAppSettings, current));
             }
             catch (Exception rollbackEx)
             {
@@ -400,6 +398,21 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
 
     private static int NormalizePositiveInt(double value) =>
         double.IsFinite(value) && value > 0 ? (int)Math.Round(value) : 1;
+
+    private static void CopyCoreAppSettings(AppSettings source, AppSettings target)
+    {
+        target.MaxLogDays = source.MaxLogDays;
+        target.MaxLogFileSizeMb = source.MaxLogFileSizeMb;
+        target.CoreReleaseChannel = source.CoreReleaseChannel;
+        target.CoreSpecificVersion = source.CoreSpecificVersion;
+        target.WebUiPanels = source.WebUiPanels
+            .Select(panel => new WebUiPanelSetting
+            {
+                Name = panel.Name,
+                Url = panel.Url
+            })
+            .ToList();
+    }
 
     private static string NormalizeController(string value) =>
         string.IsNullOrWhiteSpace(value) ? MihomoControllerEndpoint.DefaultHttpAddress : value.Trim();

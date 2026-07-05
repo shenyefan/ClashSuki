@@ -150,28 +150,18 @@ public sealed class MihomoCoreManager : IAsyncDisposable
 
         if (requireTun && serviceStatus == MihomoServiceStatus.Ready)
         {
-            await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(
-                cancellationToken,
-                tunEnabledOverride: requireTun ? null : false);
+            await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(cancellationToken);
             await StartByServiceAsync(cancellationToken);
             return;
         }
 
         if (requireTun && !CanRunTun(serviceStatus))
         {
-            EmitAppLog(
-                "虚拟网卡不可用，内核将以普通子进程模式启动（系统代理仍可用）",
-                "WARN");
-            await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(
-                cancellationToken,
-                tunEnabledOverride: false);
-            await StartBySidecarAsync();
-            return;
+            throw new InvalidOperationException(
+                "虚拟网卡服务不可用，无法按当前配置启动 TUN");
         }
 
-        await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(
-            cancellationToken,
-            tunEnabledOverride: requireTun ? null : false);
+        await MihomoControllerEndpoint.PrepareRuntimeConfigForCoreAsync(cancellationToken);
         await StartBySidecarAsync();
     }
 
@@ -365,8 +355,17 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         }
     }
 
-    public async Task ApplyPriorityToRunningSidecarAsync()
+    public async Task ApplyPriorityToRunningCoreAsync()
     {
+        var settings = await AppSettingsService.LoadAsync(CancellationToken.None);
+        if (_runMode == CoreRunMode.Service)
+        {
+            await _serviceManager.SetCorePriorityAsync(
+                settings.MihomoCpuPriority,
+                CancellationToken.None);
+            return;
+        }
+
         if (_runMode != CoreRunMode.Sidecar || !IsRunning)
         {
             return;

@@ -27,6 +27,7 @@ internal sealed class ServiceCommandDispatcher(
                 }),
                 ServiceCommands.GetStatus => await GetStatusAsync(cancellationToken),
                 ServiceCommands.StartCore => await StartCoreAsync(request, cancellationToken),
+                ServiceCommands.SetCorePriority => await SetCorePriorityAsync(request, cancellationToken),
                 ServiceCommands.StopCore => await StopCoreAsync(cancellationToken),
                 ServiceCommands.StopService => await StopServiceAsync(cancellationToken),
                 _ => ServiceCommandResult.Failure($"未知命令：{request.Command}")
@@ -61,6 +62,16 @@ internal sealed class ServiceCommandDispatcher(
     private async Task<ServiceCommandResult> StopCoreAsync(CancellationToken cancellationToken)
     {
         await coreSupervisor.StopAsync(cancellationToken);
+        return ServiceCommandResult.Success(ServiceResponse.Success());
+    }
+
+    private async Task<ServiceCommandResult> SetCorePriorityAsync(
+        ServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        await coreSupervisor.SetPriorityAsync(
+            CoreLaunchRequestValidator.NormalizePriority(request.CorePriority),
+            cancellationToken);
         return ServiceCommandResult.Success(ServiceResponse.Success());
     }
 

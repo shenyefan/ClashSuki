@@ -32,7 +32,7 @@ public sealed class ProfileService : IDisposable
     private readonly HttpClient _directClient = new(
         new HttpClientHandler { UseProxy = false }, disposeHandler: true)
     {
-        Timeout = TimeSpan.FromSeconds(30)
+        Timeout = Timeout.InfiniteTimeSpan
     };
 
     public void Dispose()
@@ -195,46 +195,64 @@ public sealed class ProfileService : IDisposable
         var timeout = TimeSpan.FromSeconds(Math.Max(1, settings.SubscriptionTimeout));
         var userAgent = EffectiveUserAgent(profile, settings);
         var useProxy = settings.ProfileUseProxy;
+        Exception? lastError = null;
 
-        // 1. 直连（复用 _directClient，禁用系统代理）
-        if (!useProxy)
+        foreach (var candidate in GitHubProxyUrlService.BuildCandidates(url, settings))
         {
+            if (!useProxy)
+            {
+                try
+                {
+                    return await FetchWithClientAsync(
+                        _directClient,
+                        candidate,
+                        userAgent,
+                        profile.AuthToken,
+                        timeout,
+                        cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    lastError = ex;
+                }
+            }
+
+            if (!mixedPort.HasValue)
+            {
+                continue;
+            }
+
             try
             {
+                using var proxyHandler = new HttpClientHandler
+                {
+                    Proxy = new System.Net.WebProxy($"http://127.0.0.1:{mixedPort}"),
+                    UseProxy = true
+                };
+                using var proxyClient = new HttpClient(proxyHandler)
+                {
+                    Timeout = Timeout.InfiniteTimeSpan
+                };
                 return await FetchWithClientAsync(
-                    _directClient,
-                    url,
+                    proxyClient,
+                    candidate,
                     userAgent,
                     profile.AuthToken,
                     timeout,
                     cancellationToken);
             }
-            catch (Exception) when (mixedPort.HasValue)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                lastError = ex;
             }
         }
 
-        if (!mixedPort.HasValue)
+        if (!mixedPort.HasValue && useProxy)
         {
-            throw new InvalidOperationException("未获取到 mixed-port，无法通过代理下载订阅。");
+            throw new InvalidOperationException("未获取到 mixed-port，无法通过代理下载订阅");
         }
 
-        using var proxyHandler = new HttpClientHandler
-        {
-            Proxy    = new System.Net.WebProxy($"http://127.0.0.1:{mixedPort}"),
-            UseProxy = true
-        };
-        using var proxyClient = new HttpClient(proxyHandler, disposeHandler: false)
-        {
-            Timeout = timeout
-        };
-        return await FetchWithClientAsync(
-            proxyClient,
-            url,
-            userAgent,
-            profile.AuthToken,
-            timeout,
-            cancellationToken);
+        throw new InvalidOperationException("订阅下载失败", lastError);
     }
 
     private static string EffectiveUserAgent(ProfileItem profile, AppSettings settings) =>

@@ -16,50 +16,14 @@ public static class MihomoControllerEndpoint
     public static string ResolveHttpAddress(string? configured) =>
         string.IsNullOrWhiteSpace(configured) ? DefaultHttpAddress : configured.Trim();
 
-    public static string ResolvePersistedExternalController(bool enabled, string? configuredAddress) =>
-        enabled ? ResolveHttpAddress(configuredAddress) : "";
-
     /// <summary>
-    /// 按应用设置同步持久化的 HTTP external-controller。
-    /// pipe 是运行时实现细节，只在启动内核前写入 Runtime。
-    /// </summary>
-    public static async Task<bool> ApplyPolicyAsync(CancellationToken cancellationToken = default)
-    {
-        var appSettings = await AppSettingsService.LoadAsync(cancellationToken);
-        var configuredAddress = ResolveStoredHttpAddress(appSettings);
-        var effectiveController = ResolvePersistedExternalController(
-            appSettings.EnableExternalController,
-            configuredAddress);
-
-        var currentController = "";
-        if (File.Exists(AppPaths.RuntimeConfigPath))
-        {
-            var current = await YamlConfigService.LoadCoreSettingsAsync(AppPaths.RuntimeConfigPath, cancellationToken);
-            currentController = current.ExternalController ?? "";
-        }
-
-        var changed = !string.Equals(
-            currentController.Trim(),
-            effectiveController.Trim(),
-            StringComparison.OrdinalIgnoreCase);
-
-        await YamlConfigService.PersistBasePatchAsync(new Dictionary<string, object?>
-        {
-            ["external-controller"] = effectiveController
-        }, cancellationToken);
-
-        return changed;
-    }
-
-    /// <summary>
-    /// 生成内核实际加载的运行时配置：HTTP 按开关暴露；pipe 写入 YAML（与 -ext-ctl-pipe 一致）。
+    /// 生成内核实际加载的运行时配置：保留 Base 中的 HTTP 控制器设置，
+    /// 并注入仅供应用内部通信使用的 pipe。
     /// </summary>
     public static async Task PrepareRuntimeConfigForCoreAsync(
-        CancellationToken cancellationToken = default,
-        bool? tunEnabledOverride = null)
+        CancellationToken cancellationToken = default)
     {
         await AppPaths.BootstrapAsync(cancellationToken);
-        await ApplyPolicyAsync(cancellationToken);
 
         if (!File.Exists(AppPaths.RuntimeConfigPath))
         {
@@ -68,50 +32,28 @@ public static class MihomoControllerEndpoint
 
         await PrepareConfigFileForCoreAsync(
             AppPaths.RuntimeConfigPath,
-            cancellationToken,
-            tunEnabledOverride);
+            cancellationToken);
     }
 
     public static async Task PrepareConfigFileForCoreAsync(
         string configPath,
-        CancellationToken cancellationToken = default,
-        bool? tunEnabledOverride = null)
+        CancellationToken cancellationToken = default)
     {
         if (!File.Exists(configPath))
         {
             throw new FileNotFoundException("找不到待处理的 mihomo 配置文件。", configPath);
         }
 
-        var appSettings = await AppSettingsService.LoadAsync(cancellationToken);
-        var httpController = ResolvePersistedExternalController(
-            appSettings.EnableExternalController,
-            ResolveStoredHttpAddress(appSettings));
-
         var patch = new Dictionary<string, object?>
         {
             ["external-controller-pipe"] = PipePath,
         };
-        if (File.Exists(AppPaths.BaseConfigPath))
-        {
-            var baseSettings = await YamlConfigService.LoadCoreSettingsAsync(
-                AppPaths.BaseConfigPath,
-                cancellationToken);
-            patch["secret"] = baseSettings.Secret;
-        }
-
-        if (tunEnabledOverride.HasValue)
-        {
-            patch["tun"] = new Dictionary<string, object?>
-            {
-                ["enable"] = tunEnabledOverride.Value
-            };
-        }
-
-        if (string.IsNullOrWhiteSpace(httpController))
-        {
-            patch["external-controller"] = "";
-        }
-        else
+        var baseSettings = await YamlConfigService.LoadCoreSettingsAsync(
+            AppPaths.BaseConfigPath,
+            cancellationToken);
+        var httpController = baseSettings.ExternalController.Trim();
+        patch["secret"] = baseSettings.Secret;
+        if (!string.IsNullOrWhiteSpace(httpController))
         {
             patch["external-controller"] = httpController;
         }
@@ -126,15 +68,5 @@ public static class MihomoControllerEndpoint
         runtimeYaml = YamlConfigService.RemoveRootKeys(runtimeYaml, removeKeys);
 
         await File.WriteAllTextAsync(configPath, runtimeYaml, cancellationToken);
-    }
-
-    private static string ResolveStoredHttpAddress(AppSettings appSettings)
-    {
-        if (!string.IsNullOrWhiteSpace(appSettings.ExternalControllerAddress))
-        {
-            return appSettings.ExternalControllerAddress;
-        }
-
-        return DefaultHttpAddress;
     }
 }

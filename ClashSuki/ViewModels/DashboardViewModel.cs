@@ -184,6 +184,11 @@ public sealed partial class DashboardViewModel : ObservableObject
             var mode = SystemProxyModeIndex == 1 ? "auto" : "manual";
             var host = string.IsNullOrWhiteSpace(SystemProxyHost) ? "127.0.0.1" : SystemProxyHost.Trim();
             var pac = WindowsSystemProxyService.NormalizePacScript(PacScript);
+            if (mode == "auto")
+            {
+                WindowsSystemProxyService.ValidatePacScript(pac);
+            }
+
             await AppSettingsService.PatchAsync(settings =>
             {
                 settings.SystemProxyBypass = normalized;

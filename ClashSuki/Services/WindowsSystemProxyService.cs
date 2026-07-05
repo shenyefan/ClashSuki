@@ -1,6 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using Jint;
 using Microsoft.Win32;
 
 namespace ClashSuki.Services;
@@ -29,12 +32,6 @@ public sealed class WindowsSystemProxyService
           return "PROXY %proxy-host%:%mixed-port%; SOCKS5 %proxy-host%:%mixed-port%; DIRECT;";
         }
         """;
-
-    public bool IsEnabled()
-    {
-        using var key = Registry.CurrentUser.OpenSubKey(InternetSettingsKey, writable: false);
-        return Convert.ToInt32(key?.GetValue("ProxyEnable") ?? 0) == 1;
-    }
 
     public bool IsEnabledFor(int mixedPort) => IsEnabledFor(mixedPort, "127.0.0.1", "manual");
 
@@ -180,7 +177,8 @@ public sealed class WindowsSystemProxyService
         key.SetValue("AutoConfigURL", pacUrl, RegistryValueKind.String);
         ApplyPerConnectionProxy(null, null, pacUrl);
         NotifySettingsChanged();
-        VerifyAutoEnabled();
+        VerifyAutoEnabled(pacUrl);
+        CleanupOldPacFiles(pacUrl);
     }
 
     public void Disable()
@@ -230,6 +228,23 @@ public sealed class WindowsSystemProxyService
 
     private static void ApplyPerConnectionProxy(string? proxyServer, string? proxyBypass, string? autoConfigUrl)
     {
+        ApplyPerConnectionProxyCore(proxyServer, proxyBypass, autoConfigUrl, null);
+        foreach (var connectionName in GetConnectionNames())
+        {
+            ApplyPerConnectionProxyCore(
+                proxyServer,
+                proxyBypass,
+                autoConfigUrl,
+                connectionName);
+        }
+    }
+
+    private static void ApplyPerConnectionProxyCore(
+        string? proxyServer,
+        string? proxyBypass,
+        string? autoConfigUrl,
+        string? connectionName)
+    {
         var enabled = !string.IsNullOrWhiteSpace(proxyServer);
         var autoEnabled = !string.IsNullOrWhiteSpace(autoConfigUrl);
         var allocatedStrings = new List<IntPtr>();
@@ -276,7 +291,9 @@ public sealed class WindowsSystemProxyService
             var optionList = new InternetPerConnOptionList
             {
                 Size = Marshal.SizeOf<InternetPerConnOptionList>(),
-                Connection = IntPtr.Zero,
+                Connection = string.IsNullOrWhiteSpace(connectionName)
+                    ? IntPtr.Zero
+                    : AllocateString(connectionName),
                 OptionCount = options.Length,
                 OptionError = 0,
                 Options = optionsPtr
@@ -307,6 +324,23 @@ public sealed class WindowsSystemProxyService
         }
     }
 
+    private static IReadOnlyList<string> GetConnectionNames()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(InternetConnectionsKey, writable: false);
+        if (key is null)
+        {
+            return [];
+        }
+
+        return key.GetValueNames()
+            .Where(name =>
+                !name.Equals("DefaultConnectionSettings", StringComparison.OrdinalIgnoreCase) &&
+                !name.Equals("SavedLegacySettings", StringComparison.OrdinalIgnoreCase) &&
+                key.GetValue(name) is byte[])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static string BuildManualProxyServer(string host, int port)
     {
         return $"{host}:{port}";
@@ -324,9 +358,30 @@ public sealed class WindowsSystemProxyService
     public static string NormalizePacScript(string? script) =>
         string.IsNullOrWhiteSpace(script) ? DefaultPacScript : script.Trim();
 
-    public static string PacFilePath => Path.Combine(AppPaths.DataRoot, "sysproxy.pac");
-
-    public static string PacFileUrl => new Uri(PacFilePath).AbsoluteUri;
+    public static void ValidatePacScript(string script)
+    {
+        var normalized = NormalizePacScript(script);
+        try
+        {
+            var engine = new Engine(options =>
+            {
+                options.TimeoutInterval(TimeSpan.FromSeconds(1));
+                options.LimitRecursion(64);
+                options.MaxStatements(20_000);
+            });
+            engine.Execute(normalized);
+            engine.Execute(
+                """
+                if (typeof FindProxyForURL !== 'function') {
+                    throw new Error('PAC 脚本必须定义 FindProxyForURL 函数');
+                }
+                """);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("PAC 脚本语法无效", ex);
+        }
+    }
 
     private static string WritePacFile(int mixedPort, string proxyHost, string? script)
     {
@@ -334,21 +389,61 @@ public sealed class WindowsSystemProxyService
         var content = NormalizePacScript(script)
             .Replace("%mixed-port%", mixedPort.ToString(), StringComparison.Ordinal)
             .Replace("%proxy-host%", proxyHost, StringComparison.Ordinal);
-        File.WriteAllText(PacFilePath, content);
-        return PacFileUrl;
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)))[..16]
+            .ToLowerInvariant();
+        var path = Path.Combine(AppPaths.DataRoot, $"sysproxy-{hash}.pac");
+        File.WriteAllText(path, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return new Uri(path).AbsoluteUri;
     }
 
-    private static bool IsOwnPacUrl(string? actual) =>
-        string.Equals(actual?.Trim(), PacFileUrl, StringComparison.OrdinalIgnoreCase);
+    private static bool IsOwnPacUrl(string? actual)
+    {
+        if (!Uri.TryCreate(actual?.Trim(), UriKind.Absolute, out var uri) || !uri.IsFile)
+        {
+            return false;
+        }
 
-    private static void VerifyAutoEnabled()
+        var path = Path.GetFullPath(uri.LocalPath);
+        var directory = Path.GetDirectoryName(path);
+        var fileName = Path.GetFileName(path);
+        return string.Equals(directory, AppPaths.DataRoot, StringComparison.OrdinalIgnoreCase) &&
+               (fileName.Equals("sysproxy.pac", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith("sysproxy-", StringComparison.OrdinalIgnoreCase) &&
+                fileName.EndsWith(".pac", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void VerifyAutoEnabled(string expectedPacUrl)
     {
         using var key = Registry.CurrentUser.OpenSubKey(InternetSettingsKey, writable: false)
                         ?? throw new InvalidOperationException("无法打开 Windows Internet Settings 注册表项。");
         var autoConfigUrl = Convert.ToString(key.GetValue("AutoConfigURL") ?? "");
-        if (!IsOwnPacUrl(autoConfigUrl))
+        if (!string.Equals(autoConfigUrl, expectedPacUrl, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"系统代理写入后校验失败，PAC 地址不是 {PacFileUrl}，当前状态: {GetStaticSnapshot()}");
+            throw new InvalidOperationException(
+                $"系统代理写入后校验失败，PAC 地址不是 {expectedPacUrl}，当前状态: {GetStaticSnapshot()}");
+        }
+    }
+
+    private static void CleanupOldPacFiles(string currentPacUrl)
+    {
+        try
+        {
+            var currentPath = new Uri(currentPacUrl).LocalPath;
+            foreach (var path in Directory.EnumerateFiles(AppPaths.DataRoot, "sysproxy*.pac"))
+            {
+                if (!string.Equals(path, currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.WriteAppException(
+                LogSources.SystemProxy,
+                ex,
+                "清理旧 PAC 文件失败",
+                "WARN");
         }
     }
 

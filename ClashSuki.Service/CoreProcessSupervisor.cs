@@ -71,6 +71,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
 
                 _process = process;
                 _exitedHandler = exitedHandler;
+                ApplyPriority(process, options.Priority);
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
                 logger.LogInformation("内核进程已启动，进程标识: {Pid}", process.Id);
@@ -94,6 +95,24 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         try
         {
             await StopLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    public async Task SetPriorityAsync(string priority, CancellationToken cancellationToken)
+    {
+        await _lifecycleGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_process is not { HasExited: false } process)
+            {
+                throw new InvalidOperationException("mihomo 内核尚未运行");
+            }
+
+            ApplyPriority(process, priority);
         }
         finally
         {
@@ -150,6 +169,19 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         {
             DetachOutputAndDispose(process);
         }
+    }
+
+    private static void ApplyPriority(Process process, string priority)
+    {
+        process.PriorityClass = priority switch
+        {
+            "idle" => ProcessPriorityClass.Idle,
+            "below_normal" => ProcessPriorityClass.BelowNormal,
+            "above_normal" => ProcessPriorityClass.AboveNormal,
+            "high" => ProcessPriorityClass.High,
+            "real_time" => ProcessPriorityClass.RealTime,
+            _ => ProcessPriorityClass.Normal
+        };
     }
 
     private async Task HandleCoreExitedAsync(Process process)

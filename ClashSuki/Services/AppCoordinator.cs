@@ -27,6 +27,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     private readonly SemaphoreSlim _tunLock = new(1, 1);
     private readonly SemaphoreSlim _allowLanLock = new(1, 1);
     private readonly SemaphoreSlim _modeLock = new(1, 1);
+    private readonly SemaphoreSlim _configMutationLock = new(1, 1);
     private readonly TargetTransitionState<bool> _systemProxyTargets = new();
     private readonly TargetTransitionState<bool> _tunTargets = new();
     private readonly TargetTransitionState<bool> _allowLanTargets = new();
@@ -182,10 +183,10 @@ public sealed class AppCoordinator : IAsyncDisposable
         await PrepareForWindowAsync();
 
         _ws.Start(_cts.Token);
+        var desiredTunEnabled = Runtime.IsTunEnabled;
 
         try
         {
-            var desiredTunEnabled = Runtime.IsTunEnabled;
             var serviceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
             await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(serviceStatus));
             await _core.EnsureStartedAsync(desiredTunEnabled, _cts.Token);
@@ -204,6 +205,17 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 if (_core.RunMode == CoreRunMode.NotRunning && !_core.IsRunning)
                 {
+                    if (desiredTunEnabled)
+                    {
+                        await ApplyConfigPatchTransactionAsync(
+                            new Dictionary<string, object?>
+                            {
+                                ["tun"] = new Dictionary<string, object?> { ["enable"] = false }
+                            },
+                            reloadAfterPatch: false);
+                        await _dispatcher.RunAsync(() => Runtime.SyncTunEnabled(false));
+                    }
+
                     await _core.EnsureStartedAsync(requireTun: false, _cts.Token);
                 }
 
@@ -261,7 +273,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         await RebuildRuntimeFromSourcesAsync(_cts.Token);
         await SyncSwitchStatesFromConfigAsync(_cts.Token);
         await ReconcileStaleSystemProxyAsync(settings, _cts.Token);
-        await EnsureExternalControllerPolicyInYamlAsync(_cts.Token);
         await ApplyApiEndpointFromConfigAsync(_cts.Token);
         await _dispatcher.RunAsync(() =>
         {
@@ -342,25 +353,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
     }
 
-    public async Task PatchConfigAsync(Dictionary<string, object?> patch)
-    {
-        try
-        {
-            await PatchConfigOrThrowAsync(patch);
-        }
-        catch (Exception ex) when (!IsAppCancellation(ex))
-        {
-            await _dispatcher.RunAsync(() =>
-            {
-                Runtime.Notifications.Error(
-                    "配置更新失败",
-                    source: LogSources.Core,
-                    exception: ex);
-            });
-        }
-    }
-
-    public async Task PatchConfigOrThrowAsync(
+    private async Task PatchConfigOrThrowAsync(
         Dictionary<string, object?> patch,
         IReadOnlySet<string>? replaceRootMappings = null)
     {
@@ -647,7 +640,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                 settings.UseHotReloadProfile && !settings.DiffWorkDir,
                 settings.HotReloadProfileAutoCloseConnection);
             await ApplyApiEndpointFromConfigAsync(_cts.Token);
-            await SyncExternalControllerPolicyAsync(_cts.Token);
             await RefreshRuntimeAsync(_cts.Token);
             await RefreshProxiesAsync(_cts.Token);
             await RefreshRulesAsync(_cts.Token);
@@ -729,7 +721,6 @@ public sealed class AppCoordinator : IAsyncDisposable
             settings.UseHotReloadProfile && !settings.DiffWorkDir,
             settings.HotReloadProfileAutoCloseConnection);
         await ApplyApiEndpointFromConfigAsync(_cts.Token);
-        await SyncExternalControllerPolicyAsync(_cts.Token);
         await RefreshRuntimeAsync(_cts.Token);
         await RefreshProxiesAsync(_cts.Token);
         await RefreshRulesAsync(_cts.Token);
@@ -1113,7 +1104,10 @@ public sealed class AppCoordinator : IAsyncDisposable
                 }
                 else
                 {
-                    _systemProxy.Disable();
+                    if (_systemProxy.IsEnabledFor(mixedPort, settings))
+                    {
+                        _systemProxy.Disable();
+                    }
                     _activeSystemProxyPort = null;
                 }
             }, _cts.Token);
@@ -1359,13 +1353,16 @@ public sealed class AppCoordinator : IAsyncDisposable
             await RefreshRuntimeAsync(cancellationToken);
         }
 
-        await _core.ApplyPriorityToRunningSidecarAsync();
+        await _core.ApplyPriorityToRunningCoreAsync();
         _lastSsidCheck = DateTime.MinValue;
         await ApplySsidDirectIfNeededAsync(cancellationToken);
     }
 
     public async Task ReloadRestoredStateAsync(CancellationToken cancellationToken = default)
     {
+        await YamlConfigService.NormalizeBaseFileAsync(
+            AppPaths.BaseConfigPath,
+            cancellationToken);
         var settings = await AppSettingsService.LoadAsync(cancellationToken);
         _desiredSystemProxyEnabled = settings.SystemProxyEnabled;
         await Profiles.LoadAsync(cancellationToken);
@@ -1390,7 +1387,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         await RefreshRuntimeAsync(cancellationToken);
         await RefreshProxiesAsync(cancellationToken);
         await RefreshRulesAsync(cancellationToken);
-        await _core.ApplyPriorityToRunningSidecarAsync();
+        await _core.ApplyPriorityToRunningCoreAsync();
     }
 
     public async Task SetTunAsync(bool enabled)
@@ -1450,6 +1447,9 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     private async Task ApplyTunTargetAsync(bool enabled)
     {
+        await _configMutationLock.WaitAsync(_cts.Token);
+        try
+        {
         var previousTunEnabled = !enabled;
         ConfigFileSnapshot? snapshot = null;
         try
@@ -1513,6 +1513,11 @@ public sealed class AppCoordinator : IAsyncDisposable
             var currentServiceStatus = await _serviceManager.GetStatusAsync(_cts.Token);
             await _dispatcher.RunAsync(() =>
                 Runtime.ApplyTunCapability(currentServiceStatus));
+        }
+        }
+        finally
+        {
+            _configMutationLock.Release();
         }
     }
 
@@ -2164,9 +2169,9 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task SaveCoreSettingsAsync(YamlConfigService.CoreSectionSettings settings, bool enableExternalController)
     {
-        var effectiveController = MihomoControllerEndpoint.ResolvePersistedExternalController(
-            enableExternalController,
-            settings.ExternalController);
+        await _configMutationLock.WaitAsync(_cts.Token);
+        try
+        {
         var patch = new Dictionary<string, object?>
         {
             ["ipv6"] = settings.Ipv6,
@@ -2179,7 +2184,9 @@ public sealed class AppCoordinator : IAsyncDisposable
             ["port"] = settings.HttpPort,
             ["redir-port"] = settings.RedirPort,
             ["tproxy-port"] = settings.TproxyPort,
-            ["external-controller"] = effectiveController,
+            ["external-controller"] = enableExternalController
+                ? MihomoControllerEndpoint.ResolveHttpAddress(settings.ExternalController)
+                : null,
             ["secret"] = settings.Secret,
             ["allow-lan"] = settings.AllowLan,
             ["lan-allowed-ips"] = settings.LanAllowedIps,
@@ -2196,8 +2203,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         var snapshot = await ConfigFileSnapshot.CaptureAsync(
             [
                 AppPaths.BaseConfigPath,
-                AppPaths.RuntimeConfigPath,
-                AppPaths.SettingsPath
+                AppPaths.RuntimeConfigPath
             ],
             _cts.Token);
         var previousRuntime = snapshot.GetContent(AppPaths.RuntimeConfigPath);
@@ -2208,12 +2214,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         try
         {
             await YamlConfigService.PersistBasePatchAsync(patch, _cts.Token);
-            await AppSettingsService.PatchAsync(appSettings =>
-            {
-                appSettings.EnableExternalController = enableExternalController;
-                appSettings.ExternalControllerAddress =
-                    MihomoControllerEndpoint.ResolveHttpAddress(settings.ExternalController);
-            }, _cts.Token);
             await _runtimeConfig.RebuildAsync(_cts.Token);
             await ApplyApiEndpointFromConfigAsync(_cts.Token);
             await RestartCoreProcessAsync();
@@ -2222,24 +2222,26 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch
         {
             await snapshot.RestoreAsync();
-            AppSettingsService.InvalidateCache();
             await ApplyApiEndpointFromConfigAsync(CancellationToken.None);
             await RestorePreviousRuntimeAsync(coreWasRunning, previousRuntime, previousTunEnabled);
             throw;
+        }
+        }
+        finally
+        {
+            _configMutationLock.Release();
         }
     }
 
     public async Task SaveCoreAppSettingsAsync(
         int maxLogDays,
         int maxLogFileSizeMb,
-        IReadOnlyList<WebUiPanelSetting> panels,
-        bool enableExternalController)
+        IReadOnlyList<WebUiPanelSetting> panels)
     {
         await AppSettingsService.PatchAsync(settings =>
         {
             settings.MaxLogDays = Math.Max(1, maxLogDays);
             settings.MaxLogFileSizeMb = Math.Max(1, maxLogFileSizeMb);
-            settings.EnableExternalController = enableExternalController;
             settings.WebUiPanels = panels
                 .Where(panel => !string.IsNullOrWhiteSpace(panel.Name) && !string.IsNullOrWhiteSpace(panel.Url))
                 .Select(panel => new WebUiPanelSetting { Name = panel.Name.Trim(), Url = panel.Url.Trim() })
@@ -2255,8 +2257,8 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task OpenWebUiAsync(string template)
     {
-        var appSettings = await AppSettingsService.LoadAsync(_cts.Token);
-        if (!appSettings.EnableExternalController)
+        var settings = await LoadCoreSettingsAsync();
+        if (string.IsNullOrWhiteSpace(settings.ExternalController))
         {
             await _dispatcher.RunAsync(() =>
             {
@@ -2267,7 +2269,6 @@ public sealed class AppCoordinator : IAsyncDisposable
             return;
         }
 
-        var settings = await LoadCoreSettingsAsync();
         var controller = MihomoControllerEndpoint.ResolveHttpAddress(settings.ExternalController);
         var (host, port) = SplitController(controller);
         var url = template
@@ -2275,24 +2276,6 @@ public sealed class AppCoordinator : IAsyncDisposable
             .Replace("%port", port, StringComparison.OrdinalIgnoreCase)
             .Replace("%secret", Uri.EscapeDataString(settings.Secret), StringComparison.OrdinalIgnoreCase);
         await OpenExternalFileAsync(url, "WebUI");
-    }
-
-    private async Task EnsureExternalControllerPolicyInYamlAsync(CancellationToken cancellationToken) =>
-        await MihomoControllerEndpoint.ApplyPolicyAsync(cancellationToken);
-
-    private async Task SyncExternalControllerPolicyAsync(CancellationToken cancellationToken)
-    {
-        var appSettings = await AppSettingsService.LoadAsync(cancellationToken);
-        var changed = await MihomoControllerEndpoint.ApplyPolicyAsync(cancellationToken);
-        if (_core.RunMode == CoreRunMode.NotRunning)
-        {
-            return;
-        }
-
-        if (!appSettings.EnableExternalController || changed)
-        {
-            await RestartCoreAsync();
-        }
     }
 
     private async Task ApplyApiEndpointFromConfigAsync(CancellationToken cancellationToken)
@@ -2325,10 +2308,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     public Task<YamlConfigService.TunSectionSettings> LoadTunSettingsAsync() =>
         YamlConfigService.LoadTunSettingsAsync(GetSettingsConfigPath(), _cts.Token);
 
-    private static string GetSettingsConfigPath() =>
-        File.Exists(AppPaths.BaseConfigPath)
-            ? AppPaths.BaseConfigPath
-            : AppPaths.RuntimeConfigPath;
+    private static string GetSettingsConfigPath() => AppPaths.BaseConfigPath;
 
     public async Task SaveSnifferSettingsAsync(YamlConfigService.SnifferSectionSettings settings)
     {
@@ -2366,7 +2346,8 @@ public sealed class AppCoordinator : IAsyncDisposable
                 ["auto-detect-interface"] = settings.AutoDetectInterface,
                 ["strict-route"] = settings.StrictRoute,
                 ["mtu"] = settings.Mtu,
-                ["device-name"] = settings.DeviceName,
+                ["device"] = settings.DeviceName,
+                ["device-name"] = null,
                 ["dns-hijack"] = settings.DnsHijack,
                 ["route-exclude-address"] = settings.RouteExcludeAddress
             }
@@ -2398,6 +2379,9 @@ public sealed class AppCoordinator : IAsyncDisposable
         bool reloadAfterPatch,
         IReadOnlySet<string>? replaceRootMappings = null)
     {
+        await _configMutationLock.WaitAsync(_cts.Token);
+        try
+        {
         var snapshot = await ConfigFileSnapshot.CaptureAsync(
             [AppPaths.BaseConfigPath, AppPaths.RuntimeConfigPath],
             _cts.Token);
@@ -2413,9 +2397,16 @@ public sealed class AppCoordinator : IAsyncDisposable
                 _cts.Token,
                 replaceRootMappings);
             await _runtimeConfig.RebuildAsync(_cts.Token);
-            if (reloadAfterPatch && coreWasRunning)
+            if (coreWasRunning)
             {
-                await ReloadCurrentConfigAsync();
+                if (reloadAfterPatch)
+                {
+                    await ReloadCurrentConfigAsync();
+                }
+                else
+                {
+                    await _api.PatchConfigAsync(patch, _cts.Token);
+                }
             }
 
             if (coreWasRunning)
@@ -2431,6 +2422,11 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
 
         await SyncRuntimeConfigToGistIfEnabledAsync();
+        }
+        finally
+        {
+            _configMutationLock.Release();
+        }
     }
 
     private async Task RestorePreviousRuntimeAsync(
@@ -2572,7 +2568,10 @@ public sealed class AppCoordinator : IAsyncDisposable
                         "INFO",
                         $"SSID {currentSsid} 命中直连规则，切换到 DIRECT",
                         LogSources.Network));
-                await SwitchModeAsync("direct");
+                await PatchConfigOrThrowAsync(new Dictionary<string, object?>
+                {
+                    ["mode"] = "direct"
+                });
                 if (!Runtime.CurrentMode.Equals("direct", StringComparison.OrdinalIgnoreCase))
                 {
                     return;
@@ -2582,7 +2581,11 @@ public sealed class AppCoordinator : IAsyncDisposable
             }
             else if (!Runtime.CurrentMode.Equals("direct", StringComparison.OrdinalIgnoreCase))
             {
-                await SwitchModeAsync("direct");
+                _ssidModeBeforeDirect = NormalizeRestorableMode(Runtime.CurrentMode);
+                await PatchConfigOrThrowAsync(new Dictionary<string, object?>
+                {
+                    ["mode"] = "direct"
+                });
                 if (!Runtime.CurrentMode.Equals("direct", StringComparison.OrdinalIgnoreCase))
                 {
                     return;
@@ -2592,7 +2595,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             if (settings.DisableDnsOnPauseSsid && !_ssidDnsDisabled)
             {
                 _ssidDnsEnabledBeforeDirect = (await YamlConfigService.LoadDnsSettingsAsync(
-                    AppPaths.RuntimeConfigPath,
+                    AppPaths.BaseConfigPath,
                     cancellationToken)).Enable;
                 if (_ssidDnsEnabledBeforeDirect)
                 {
@@ -2602,6 +2605,15 @@ public sealed class AppCoordinator : IAsyncDisposable
                     });
                     _ssidDnsDisabled = true;
                 }
+            }
+            else if (settings.DisableDnsOnPauseSsid &&
+                     _ssidDnsDisabled &&
+                     (await _api.GetConfigsAsync(cancellationToken)).Dns?.Enable != false)
+            {
+                await PatchConfigOrThrowAsync(new Dictionary<string, object?>
+                {
+                    ["dns"] = new Dictionary<string, object?> { ["enable"] = false }
+                });
             }
             else if (!settings.DisableDnsOnPauseSsid && _ssidDnsDisabled)
             {
@@ -2616,7 +2628,10 @@ public sealed class AppCoordinator : IAsyncDisposable
                     "INFO",
                     $"SSID 直连规则已离开，恢复 {restoreMode.ToUpperInvariant()} 模式",
                     LogSources.Network));
-            await SwitchModeAsync(restoreMode);
+            await PatchConfigOrThrowAsync(new Dictionary<string, object?>
+            {
+                ["mode"] = restoreMode
+            });
             if (!Runtime.CurrentMode.Equals(restoreMode, StringComparison.OrdinalIgnoreCase))
             {
                 return;
@@ -2919,28 +2934,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         throw new TimeoutException($"等待 mihomo API 就绪超时：{reason}", lastError);
     }
 
-    private async Task PatchTunAndVerifyAsync(bool enabled, CancellationToken cancellationToken)
-    {
-        Exception? patchError = null;
-        try
-        {
-            await _api.PatchTunAsync(enabled, cancellationToken);
-        }
-        catch (Exception ex) when (!IsAppCancellation(ex))
-        {
-            patchError = ex;
-        }
-
-        if (await WaitForTunStateAsync(enabled, TimeSpan.FromSeconds(12), cancellationToken))
-        {
-            return;
-        }
-
-        throw patchError is null
-            ? new TimeoutException($"TUN 状态验证超时：tun.enable 未变为 {enabled}")
-            : new InvalidOperationException($"TUN PATCH 失败且状态未变为 {enabled}", patchError);
-    }
-
     private async Task ApplyTunConfigAndVerifyAsync(bool enabled, CancellationToken cancellationToken)
     {
         const int verifySeconds = 3;
@@ -2956,7 +2949,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
 
         await YamlConfigService.PersistBasePatchAsync(patch, cancellationToken);
-        await _runtimeConfig.RebuildAsync(cancellationToken, enabled);
+        await _runtimeConfig.RebuildAsync(cancellationToken);
 
         if (!enabled)
         {
@@ -3351,6 +3344,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         _tunLock.Dispose();
         _allowLanLock.Dispose();
         _modeLock.Dispose();
+        _configMutationLock.Dispose();
         _cts.Dispose();
         await Task.CompletedTask;
     }
@@ -3411,7 +3405,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             var settings = await AppSettingsService.LoadAsync(CancellationToken.None);
             var ownsCurrentProxy = await Task.Run(() => IsSystemProxyEnabledForApp(settings));
-            if (!_desiredSystemProxyEnabled && !ownsCurrentProxy)
+            if (!ownsCurrentProxy)
             {
                 return;
             }

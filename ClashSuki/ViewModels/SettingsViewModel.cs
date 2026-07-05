@@ -50,27 +50,38 @@ public sealed partial class SettingsViewModel : ObservableObject
     private async Task SaveAsync()
     {
         var previous = await AppSettingsService.LoadAsync();
+        previous.AutoRun = await WindowsAutoRunService.IsEnabledAsync();
         var newTheme = IndexToTheme(ThemeIndex);
         var newBackdrop = IndexToBackdrop(BackdropIndex);
         var themeChanged = !string.Equals(Settings.Theme, newTheme, StringComparison.OrdinalIgnoreCase);
         var backdropChanged = !string.Equals(Settings.Backdrop, newBackdrop, StringComparison.OrdinalIgnoreCase);
 
-        Settings.Theme = newTheme;
-        Settings.Backdrop = newBackdrop;
-        Settings.MihomoCpuPriority = IndexToPriority(PriorityIndex);
-        Settings.EnvType = IndexToEnvType(EnvTypeIndex);
-        Settings.SubscriptionTimeout = NormalizeInt(SubscriptionTimeout, 1, 600, 30);
-        Settings.DelayTestConcurrency = NormalizeInt(DelayTestConcurrency, 1, 100, 10);
-        Settings.DelayTestTimeout = NormalizeInt(DelayTestTimeout, 1000, 60000, 5000);
-        Settings.PauseSsids = ConfigTextCodec.ParseLines(PauseSsidText).ToList();
-        if (string.IsNullOrWhiteSpace(Settings.DelayTestUrl))
-        {
-            Settings.DelayTestUrl = "https://www.gstatic.com/generate_204";
-        }
-
         try
         {
-            await AppSettingsService.SaveAsync(Settings);
+            Settings.Theme = newTheme;
+            Settings.Backdrop = newBackdrop;
+            Settings.MihomoCpuPriority = IndexToPriority(PriorityIndex);
+            Settings.EnvType = IndexToEnvType(EnvTypeIndex);
+            Settings.SubscriptionTimeout = NormalizeInt(SubscriptionTimeout, 1, 600, 30);
+            Settings.DelayTestConcurrency = NormalizeInt(DelayTestConcurrency, 1, 100, 10);
+            Settings.DelayTestTimeout = NormalizeInt(DelayTestTimeout, 1000, 60000, 5000);
+            Settings.PauseSsids = ConfigTextCodec.ParseLines(PauseSsidText)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            Settings.UserAgent = string.IsNullOrWhiteSpace(Settings.UserAgent)
+                ? "clash.meta"
+                : Settings.UserAgent.Trim();
+            Settings.GitHubProxy = Settings.GitHubProxy?.Trim() ?? "";
+            Settings.DelayTestUrl = string.IsNullOrWhiteSpace(Settings.DelayTestUrl)
+                ? "https://www.gstatic.com/generate_204"
+                : Settings.DelayTestUrl.Trim();
+            ValidateHttpUrl(Settings.DelayTestUrl, "延迟测试 URL");
+            if (!string.IsNullOrWhiteSpace(Settings.GitHubProxy))
+            {
+                ValidateHttpUrl(Settings.GitHubProxy, "GitHub 下载代理");
+            }
+
+            await AppSettingsService.PatchAsync(current => CopyPageSettings(Settings, current));
             await WindowsAutoRunService.SetEnabledAsync(Settings.AutoRun);
             await _coordinator.ApplySavedSettingsSideEffectsAsync();
 
@@ -90,7 +101,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             try
             {
-                await AppSettingsService.SaveAsync(previous);
+                await AppSettingsService.PatchAsync(current => CopyPageSettings(previous, current));
                 await WindowsAutoRunService.SetEnabledAsync(previous.AutoRun);
             }
             catch (Exception rollbackEx)
@@ -193,7 +204,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             var gistId = await _gistSync.SyncRuntimeConfigAsync(Settings, CancellationToken.None);
             Settings.GistId = gistId;
-            await AppSettingsService.SaveAsync(Settings);
+            await AppSettingsService.PatchAsync(settings => settings.GistId = gistId);
             Runtime.Notifications.Success(
                 "运行时配置已同步到 Gist",
                 source: LogSources.Gist);
@@ -405,6 +416,46 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
 
         return Math.Clamp((int)Math.Round(value), min, max);
+    }
+
+    private static void ValidateHttpUrl(string value, string displayName)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https"))
+        {
+            throw new InvalidOperationException($"{displayName}必须是有效的 HTTP 或 HTTPS 地址");
+        }
+    }
+
+    private static void CopyPageSettings(AppSettings source, AppSettings target)
+    {
+        target.Theme = source.Theme;
+        target.Backdrop = source.Backdrop;
+        target.CloseToTray = source.CloseToTray;
+        target.AutoRun = source.AutoRun;
+        target.SilentStart = source.SilentStart;
+        target.EnvType = source.EnvType;
+        target.GitHubProxy = source.GitHubProxy;
+        target.UserAgent = source.UserAgent;
+        target.SubscriptionTimeout = source.SubscriptionTimeout;
+        target.ProfileUseProxy = source.ProfileUseProxy;
+        target.DelayTestUrl = source.DelayTestUrl;
+        target.DelayTestConcurrency = source.DelayTestConcurrency;
+        target.DelayTestTimeout = source.DelayTestTimeout;
+        target.SyncRuntimeConfigToGist = source.SyncRuntimeConfigToGist;
+        target.GistAgeEncrypt = source.GistAgeEncrypt;
+        target.GistAgeRecipient = source.GistAgeRecipient;
+        target.GistAgeSecretKey = source.GistAgeSecretKey;
+        target.GitHubToken = source.GitHubToken;
+        target.GistId = source.GistId;
+        target.MihomoCpuPriority = source.MihomoCpuPriority;
+        target.DiffWorkDir = source.DiffWorkDir;
+        target.UseHotReloadProfile = source.UseHotReloadProfile;
+        target.HotReloadProfileAutoCloseConnection = source.HotReloadProfileAutoCloseConnection;
+        target.AutoCloseConnection = source.AutoCloseConnection;
+        target.TestProfileOnStart = source.TestProfileOnStart;
+        target.PauseSsids = [.. source.PauseSsids];
+        target.DisableDnsOnPauseSsid = source.DisableDnsOnPauseSsid;
     }
 
     private void SyncEditorState(AppSettings value)

@@ -68,14 +68,33 @@ public sealed class MihomoCoreDownloadService
                 return _cachedTags;
             }
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, MihomoTagsUrl);
-            request.Headers.Accept.ParseAdd("application/vnd.github+json");
-            request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-            using var response = await Http.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var tags = await JsonSerializer.DeserializeAsync<List<GitHubTag>>(stream, cancellationToken: cancellationToken)
-                       ?? [];
+            var settings = await AppSettingsService.LoadAsync(cancellationToken);
+            List<GitHubTag>? tags = null;
+            Exception? lastError = null;
+            foreach (var candidate in GitHubProxyUrlService.BuildCandidates(MihomoTagsUrl, settings))
+            {
+                try
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Get, candidate);
+                    request.Headers.Accept.ParseAdd("application/vnd.github+json");
+                    request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+                    using var response = await Http.SendAsync(request, cancellationToken);
+                    response.EnsureSuccessStatusCode();
+                    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    tags = await JsonSerializer.DeserializeAsync<List<GitHubTag>>(
+                        stream,
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    lastError = ex;
+                }
+            }
+
+            tags ??= lastError is null
+                ? []
+                : throw new InvalidOperationException("获取内核版本列表失败", lastError);
             _cachedTags = tags
                 .Select(tag => tag.Name?.Trim())
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
@@ -121,21 +140,36 @@ public sealed class MihomoCoreDownloadService
 
     private static async Task<string> ReadVersionAsync(string url, CancellationToken cancellationToken)
     {
-        using var response = await Http.GetAsync(url, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        var version = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
-        if (string.IsNullOrWhiteSpace(version))
+        var settings = await AppSettingsService.LoadAsync(cancellationToken);
+        Exception? lastError = null;
+        foreach (var candidate in GitHubProxyUrlService.BuildCandidates(url, settings))
         {
-            throw new InvalidOperationException("远端版本号为空。");
+            try
+            {
+                using var response = await Http.GetAsync(candidate, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                var version = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+                if (!string.IsNullOrWhiteSpace(version))
+                {
+                    return version;
+                }
+
+                lastError = new InvalidOperationException("远端版本号为空");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                lastError = ex;
+            }
         }
 
-        return version;
+        throw new InvalidOperationException("获取内核版本号失败", lastError);
     }
 
     private static async Task DownloadFileAsync(string url, string targetPath, CancellationToken cancellationToken)
     {
         Exception? lastError = null;
-        foreach (var candidate in await BuildDownloadUrlsAsync(url, cancellationToken))
+        var settings = await AppSettingsService.LoadAsync(cancellationToken);
+        foreach (var candidate in GitHubProxyUrlService.BuildCandidates(url, settings))
         {
             try
             {
@@ -158,23 +192,6 @@ public sealed class MihomoCoreDownloadService
         }
 
         throw lastError ?? new InvalidOperationException("下载失败。");
-    }
-
-    private static async Task<IReadOnlyList<string>> BuildDownloadUrlsAsync(string url, CancellationToken cancellationToken)
-    {
-        var settings = await AppSettingsService.LoadAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(settings.GitHubProxy))
-        {
-            return [url];
-        }
-
-        var proxy = settings.GitHubProxy.Trim();
-        if (!proxy.EndsWith('/'))
-        {
-            proxy += "/";
-        }
-
-        return [$"{proxy}{url}", url];
     }
 
     private static void ExtractExecutable(string archivePath, string executableName, string targetPath)

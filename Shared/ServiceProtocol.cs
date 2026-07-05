@@ -8,7 +8,7 @@ public static class ServiceProtocol
     public const string ServiceName = "ClashSukiService";
     public const string PipeName = "ClashSukiService";
     public const string CoreControlPipePath = @"\\.\pipe\clashsuki-mihomo";
-    public const int Version = 4;
+    public const int Version = 5;
     public const int MaxRequestCharacters = 32 * 1024;
 
     public static JsonSerializerOptions CreateJsonOptions()
@@ -26,6 +26,7 @@ public static class ServiceCommands
     public const string Ping = "ping";
     public const string GetStatus = "get_status";
     public const string StartCore = "start_core";
+    public const string SetCorePriority = "set_core_priority";
     public const string StopCore = "stop_core";
     public const string StopService = "stop_service";
 }
@@ -37,6 +38,7 @@ public sealed class ServiceRequest
     public string? ConfigPath { get; init; }
     public string? ConfigDir { get; init; }
     public string? CoreIpcPath { get; init; }
+    public string? CorePriority { get; init; }
 }
 
 public sealed class ServiceResponse

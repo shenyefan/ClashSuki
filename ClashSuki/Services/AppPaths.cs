@@ -4,6 +4,9 @@ namespace ClashSuki.Services;
 
 public static class AppPaths
 {
+    private static readonly SemaphoreSlim BootstrapLock = new(1, 1);
+    private static int _bootstrapped;
+
     public static string DataRoot { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ClashSuki");
@@ -19,12 +22,31 @@ public static class AppPaths
 
     public static async Task BootstrapAsync(CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(CoreDirectory);
-        Directory.CreateDirectory(ConfigDirectory);
-        Directory.CreateDirectory(LogDirectory);
+        if (Volatile.Read(ref _bootstrapped) != 0)
+        {
+            return;
+        }
 
-        await EnsureTemplateConfigAsync(cancellationToken);
-        EnsureManagedCore();
+        await BootstrapLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_bootstrapped != 0)
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(CoreDirectory);
+            Directory.CreateDirectory(ConfigDirectory);
+            Directory.CreateDirectory(LogDirectory);
+
+            await EnsureTemplateConfigAsync(cancellationToken);
+            EnsureManagedCore();
+            Volatile.Write(ref _bootstrapped, 1);
+        }
+        finally
+        {
+            BootstrapLock.Release();
+        }
     }
 
     private static async Task EnsureTemplateConfigAsync(CancellationToken cancellationToken)
@@ -33,6 +55,8 @@ public static class AppPaths
         {
             await File.WriteAllTextAsync(BaseConfigPath, DefaultBaseConfig, cancellationToken);
         }
+
+        await YamlConfigService.NormalizeBaseFileAsync(BaseConfigPath, cancellationToken);
 
         if (File.Exists(RuntimeConfigPath))
         {
@@ -73,7 +97,6 @@ public static class AppPaths
         log-level: info
         ipv6: false
         secret: ""
-        external-controller: ""
         external-ui: ""
         unified-delay: true
         tcp-concurrent: true

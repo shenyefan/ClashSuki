@@ -8,6 +8,8 @@ namespace ClashSuki.Services;
 
 public static class YamlConfigService
 {
+    private static readonly SemaphoreSlim BaseWriteLock = new(1, 1);
+
     public sealed record TunSectionSettings(
         string Stack,
         bool AutoRoute,
@@ -173,13 +175,107 @@ public static class YamlConfigService
         }
 
         await AppPaths.BootstrapAsync(cancellationToken);
-        var yaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
-        var doc = LoadDocument(yaml);
-        MergePatch(EnsureRoot(doc), patch, replaceRootMappings);
-        await File.WriteAllTextAsync(
-            AppPaths.BaseConfigPath,
-            SaveAndVerifyDocument(doc),
-            cancellationToken);
+        await BaseWriteLock.WaitAsync(cancellationToken);
+        try
+        {
+            var yaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
+            var doc = LoadDocument(yaml);
+            MergePatch(EnsureRoot(doc), patch, replaceRootMappings);
+            await WriteTextAtomicAsync(
+                AppPaths.BaseConfigPath,
+                SaveAndVerifyDocument(doc),
+                cancellationToken);
+        }
+        finally
+        {
+            BaseWriteLock.Release();
+        }
+    }
+
+    public static async Task NormalizeBaseFileAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        await BaseWriteLock.WaitAsync(cancellationToken);
+        try
+        {
+            var yaml = await File.ReadAllTextAsync(path, cancellationToken);
+            var doc = LoadDocument(yaml);
+            var root = EnsureRoot(doc);
+            var changed = false;
+            var tun = TryGetMap(root, "tun");
+            if (tun is not null)
+            {
+                var legacyDeviceKey = new YamlScalarNode("device-name");
+                if (tun.Children.TryGetValue(legacyDeviceKey, out var legacyDevice))
+                {
+                    var deviceKey = new YamlScalarNode("device");
+                    if (!tun.Children.ContainsKey(deviceKey))
+                    {
+                        tun.Children[deviceKey] = CloneNode(legacyDevice);
+                    }
+
+                    tun.Children.Remove(legacyDeviceKey);
+                    changed = true;
+                }
+            }
+
+            foreach (var key in new[] { "external-controller-unix", "external-controller-tls" })
+            {
+                changed |= root.Children.Remove(new YamlScalarNode(key));
+            }
+
+            var externalControllerKey = new YamlScalarNode("external-controller");
+            if (root.Children.TryGetValue(externalControllerKey, out var controllerNode) &&
+                controllerNode is YamlScalarNode controller &&
+                string.IsNullOrWhiteSpace(controller.Value))
+            {
+                root.Children.Remove(externalControllerKey);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await WriteTextAtomicAsync(
+                    path,
+                    SaveAndVerifyDocument(doc),
+                    cancellationToken);
+            }
+        }
+        finally
+        {
+            BaseWriteLock.Release();
+        }
+    }
+
+    private static async Task WriteTextAtomicAsync(
+        string path,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.GetDirectoryName(path)
+                        ?? throw new InvalidOperationException("无法确定配置文件目录");
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(
+            directory,
+            $"{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, content, cancellationToken);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 
     public static async Task<string> BuildPatchedConfigAsync(
@@ -250,7 +346,7 @@ public static class YamlConfigService
             TryGetBool(tun, "auto-detect-interface") ?? true,
             TryGetBool(tun, "strict-route") ?? false,
             TryGetInt(tun, "mtu") ?? 9000,
-            TryGetString(tun, "device-name") ?? TryGetString(tun, "device") ?? "",
+            TryGetString(tun, "device") ?? TryGetString(tun, "device-name") ?? "",
             ReadList(tun, "dns-hijack", ["any:53"]),
             ReadList(tun, "route-exclude-address", []));
     }
@@ -411,8 +507,18 @@ public static class YamlConfigService
             return;
         }
 
+        if (string.Equals(
+                Path.GetFullPath(configPath),
+                Path.GetFullPath(AppPaths.RuntimeConfigPath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            await PersistBasePatchAsync(
+                new Dictionary<string, object?> { ["mixed-port"] = replacement },
+                cancellationToken);
+        }
+
         SetScalar(root, "mixed-port", replacement.ToString(CultureInfo.InvariantCulture), overwrite: true);
-        await File.WriteAllTextAsync(configPath, SaveDocument(doc), cancellationToken);
+        await WriteTextAtomicAsync(configPath, SaveAndVerifyDocument(doc), cancellationToken);
         log($"[port conflict] mixed-port {current} 被其他程序占用，已自动改用 {replacement}");
     }
 
@@ -665,6 +771,12 @@ public static class YamlConfigService
         foreach (var (key, value) in patch)
         {
             var keyNode = new YamlScalarNode(key);
+            if (value is null)
+            {
+                target.Children.Remove(keyNode);
+                continue;
+            }
+
             if (replaceMappings?.Contains(key) == true)
             {
                 target.Children[keyNode] = ToYamlNode(value);
@@ -703,6 +815,11 @@ public static class YamlConfigService
         var node = new YamlMappingNode();
         foreach (var (key, value) in map)
         {
+            if (value is null)
+            {
+                continue;
+            }
+
             node.Children[new YamlScalarNode(key)] = ToYamlNode(value);
         }
 

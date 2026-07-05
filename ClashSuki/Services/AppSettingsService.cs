@@ -130,11 +130,6 @@ public sealed class AppSettings
     [JsonPropertyName("core_specific_version")]
     public string CoreSpecificVersion { get; set; } = "";
 
-    [JsonPropertyName("enable_external_controller")]
-    public bool EnableExternalController { get; set; }
-
-    [JsonPropertyName("external_controller_address")]
-    public string ExternalControllerAddress { get; set; } = MihomoControllerEndpoint.DefaultHttpAddress;
 }
 
 public sealed class StringListJsonConverter : JsonConverter<List<string>>
@@ -291,56 +286,141 @@ public static class AppSettingsService
             return _cached;
         }
 
-        await using var stream = File.OpenRead(AppPaths.SettingsPath);
-        _cached = await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken)
-                  ?? new AppSettings();
-        await stream.DisposeAsync();
-
-        if (TryMigrate(_cached))
+        try
         {
+            AppSettings loaded;
+            await using (var stream = File.OpenRead(AppPaths.SettingsPath))
+            {
+                loaded = await JsonSerializer.DeserializeAsync<AppSettings>(
+                             stream,
+                             JsonOptions,
+                             cancellationToken)
+                         ?? new AppSettings();
+            }
+
+            _cached = loaded;
+            Normalize(_cached);
             await SaveCoreAsync(_cached, cancellationToken);
+            return _cached;
         }
-
-        return _cached;
-    }
-
-    /// <summary>
-    /// 一次性设置迁移。返回 true 表示有改动、需要回写。
-    /// </summary>
-    private static bool TryMigrate(AppSettings settings)
-    {
-        var changed = false;
-
-        // PAC（auto）兼容性差，很多程序 / WinHTTP 不认 file:// PAC，会出现「开了代理但没走代理」。
-        // party / verge 默认都用固定代理服务器（manual）。仅当用户未自定义 PAC 时迁移为 manual。
-        if (string.Equals(settings.SystemProxyMode, "auto", StringComparison.OrdinalIgnoreCase) &&
-            IsDefaultPacScript(settings.SystemProxyPacScript))
+        catch (JsonException ex)
         {
-            settings.SystemProxyMode = "manual";
-            changed = true;
+            var corruptPath = Path.Combine(
+                AppPaths.DataRoot,
+                $"app-settings.corrupt-{DateTime.Now:yyyyMMddHHmmss}.json");
+            File.Copy(AppPaths.SettingsPath, corruptPath, overwrite: true);
+            DiagnosticLog.WriteAppException(
+                LogSources.Settings,
+                ex,
+                $"应用设置文件损坏，已备份为 {Path.GetFileName(corruptPath)}");
+            _cached = new AppSettings();
+            await SaveCoreAsync(_cached, cancellationToken);
+            return _cached;
         }
-
-        return changed;
     }
-
-    private static bool IsDefaultPacScript(string? pacScript) =>
-        string.IsNullOrWhiteSpace(pacScript) ||
-        string.Equals(
-            NormalizeScript(pacScript),
-            NormalizeScript(WindowsSystemProxyService.DefaultPacScript),
-            StringComparison.Ordinal);
-
-    private static string NormalizeScript(string value) =>
-        value.Replace("\r\n", "\n").Replace("\r", "\n").Trim();
 
     private static async Task SaveCoreAsync(AppSettings settings, CancellationToken cancellationToken)
     {
         await AppPaths.BootstrapAsync(cancellationToken);
+        Normalize(settings);
         var json = JsonSerializer.Serialize(settings, JsonOptions);
         var tempPath = AppPaths.SettingsPath + ".tmp";
         await File.WriteAllTextAsync(tempPath, json, cancellationToken);
         File.Move(tempPath, AppPaths.SettingsPath, overwrite: true);
         _cached = Clone(settings);
+    }
+
+    private static void Normalize(AppSettings settings)
+    {
+        settings.SystemProxyBypass =
+            WindowsSystemProxyService.NormalizeBypassList(settings.SystemProxyBypass);
+        settings.SystemProxyHost = string.IsNullOrWhiteSpace(settings.SystemProxyHost)
+            ? "127.0.0.1"
+            : settings.SystemProxyHost.Trim();
+        settings.SystemProxyMode =
+            WindowsSystemProxyService.NormalizeMode(settings.SystemProxyMode);
+        settings.SystemProxyPacScript =
+            WindowsSystemProxyService.NormalizePacScript(settings.SystemProxyPacScript);
+        settings.Theme = settings.Theme?.Trim().ToLowerInvariant() switch
+        {
+            "light" => "light",
+            "dark" => "dark",
+            _ => "system"
+        };
+        settings.Backdrop = settings.Backdrop?.Trim().ToLowerInvariant() switch
+        {
+            "acrylic" => "acrylic",
+            "none" => "none",
+            _ => "mica"
+        };
+        settings.EnvType = settings.EnvType?.Trim().ToLowerInvariant() switch
+        {
+            "cmd" => "cmd",
+            "bash" => "bash",
+            "fish" => "fish",
+            "nushell" => "nushell",
+            _ => "powershell"
+        };
+        settings.ProxyDisplayMode = string.IsNullOrWhiteSpace(settings.ProxyDisplayMode)
+            ? "simple"
+            : settings.ProxyDisplayMode.Trim();
+        settings.ProxyDisplayOrder = string.IsNullOrWhiteSpace(settings.ProxyDisplayOrder)
+            ? "default"
+            : settings.ProxyDisplayOrder.Trim();
+        settings.GitHubProxy = settings.GitHubProxy?.Trim() ?? "";
+        settings.UserAgent = string.IsNullOrWhiteSpace(settings.UserAgent)
+            ? "clash.meta"
+            : settings.UserAgent.Trim();
+        settings.DelayTestUrl = string.IsNullOrWhiteSpace(settings.DelayTestUrl)
+            ? "https://www.gstatic.com/generate_204"
+            : settings.DelayTestUrl.Trim();
+        settings.GistAgeRecipient = settings.GistAgeRecipient?.Trim() ?? "";
+        settings.GistAgeSecretKey = settings.GistAgeSecretKey?.Trim() ?? "";
+        settings.GitHubToken = settings.GitHubToken?.Trim() ?? "";
+        settings.GistId = settings.GistId?.Trim() ?? "";
+        settings.MihomoCpuPriority = settings.MihomoCpuPriority?.Trim().ToLowerInvariant() switch
+        {
+            "idle" => "idle",
+            "below_normal" => "below_normal",
+            "above_normal" => "above_normal",
+            "high" => "high",
+            "real_time" => "real_time",
+            _ => "normal"
+        };
+        settings.CoreReleaseChannel = settings.CoreReleaseChannel?.Trim().ToLowerInvariant() switch
+        {
+            "preview" => "preview",
+            "smart" => "smart",
+            "specific" => "specific",
+            _ => "latest"
+        };
+        settings.CoreSpecificVersion = settings.CoreSpecificVersion?.Trim() ?? "";
+        settings.SubscriptionTimeout = Math.Clamp(settings.SubscriptionTimeout, 1, 600);
+        settings.DelayTestConcurrency = Math.Clamp(settings.DelayTestConcurrency, 1, 100);
+        settings.DelayTestTimeout = Math.Clamp(settings.DelayTestTimeout, 1000, 60000);
+        settings.MaxLogDays = Math.Max(1, settings.MaxLogDays);
+        settings.MaxLogFileSizeMb = Math.Max(1, settings.MaxLogFileSizeMb);
+        settings.GroupExpandState = settings.GroupExpandState is null
+            ? new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, bool>(
+                settings.GroupExpandState,
+                StringComparer.OrdinalIgnoreCase);
+        settings.PauseSsids = settings.PauseSsids?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+        settings.WebUiPanels = settings.WebUiPanels?
+            .Where(panel =>
+                panel is not null &&
+                !string.IsNullOrWhiteSpace(panel.Name) &&
+                !string.IsNullOrWhiteSpace(panel.Url))
+            .Select(panel => new WebUiPanelSetting
+            {
+                Name = panel.Name.Trim(),
+                Url = panel.Url.Trim()
+            })
+            .ToList() ?? WebUiPanelSetting.CreateDefaults();
     }
 
     private static AppSettings Clone(AppSettings settings) =>

@@ -20,14 +20,11 @@ public sealed class RuntimeConfigService
     }
 
     public async Task<OverrideApplyResult> RebuildAsync(
-        CancellationToken cancellationToken = default,
-        bool? tunEnabledOverride = null)
+        CancellationToken cancellationToken = default)
     {
         await _composeLock.WaitAsync(cancellationToken);
         try
         {
-            await MihomoControllerEndpoint.ApplyPolicyAsync(cancellationToken);
-
             var sourceYaml = await _profiles.BuildActiveRuntimeYamlAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(sourceYaml))
             {
@@ -45,8 +42,7 @@ public sealed class RuntimeConfigService
                 await File.WriteAllTextAsync(tempPath, runtimeYaml, cancellationToken);
                 await MihomoControllerEndpoint.PrepareConfigFileForCoreAsync(
                     tempPath,
-                    cancellationToken,
-                    tunEnabledOverride);
+                    cancellationToken);
                 await _core.ValidateConfigAsync(tempPath, cancellationToken);
                 File.Move(tempPath, AppPaths.RuntimeConfigPath, overwrite: true);
                 return result;

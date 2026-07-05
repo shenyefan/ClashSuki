@@ -15,7 +15,7 @@ public sealed class RemoteResourceFetchService : IDisposable
         new HttpClientHandler { UseProxy = false },
         disposeHandler: true)
     {
-        Timeout = TimeSpan.FromSeconds(30)
+        Timeout = Timeout.InfiniteTimeSpan
     };
 
     public void Dispose() => _directClient.Dispose();
@@ -33,7 +33,7 @@ public sealed class RemoteResourceFetchService : IDisposable
         }
 
         var settings = await AppSettingsService.LoadAsync(cancellationToken);
-        var urls = BuildDownloadUrls(url, settings);
+        var urls = GitHubProxyUrlService.BuildCandidates(url, settings);
         Exception? lastError = null;
 
         foreach (var attemptUrl in urls)
@@ -83,7 +83,9 @@ public sealed class RemoteResourceFetchService : IDisposable
                     cancellationToken);
                 return content;
             }
-            catch (Exception) when (mixedPort.HasValue)
+            catch (Exception ex) when (
+                ex is not OperationCanceledException &&
+                mixedPort.HasValue)
             {
             }
         }
@@ -110,23 +112,6 @@ public sealed class RemoteResourceFetchService : IDisposable
             timeout,
             cancellationToken);
         return proxyContent;
-    }
-
-    private static string[] BuildDownloadUrls(string url, AppSettings settings)
-    {
-        if (string.IsNullOrWhiteSpace(settings.GitHubProxy) ||
-            !url.Contains("github.com", StringComparison.OrdinalIgnoreCase))
-        {
-            return [url];
-        }
-
-        var proxy = settings.GitHubProxy.Trim();
-        if (!proxy.EndsWith('/'))
-        {
-            proxy += "/";
-        }
-
-        return [$"{proxy}{url}", url];
     }
 
     private static string EffectiveUserAgent(string? userAgent, AppSettings settings) =>

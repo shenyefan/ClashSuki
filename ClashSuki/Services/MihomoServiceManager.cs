@@ -197,6 +197,7 @@ public sealed class MihomoServiceManager
             ? AppPaths.DataRoot
             : Path.GetFullPath(configDirectory);
         Directory.CreateDirectory(effectiveConfigDirectory);
+        var settings = await AppSettingsService.LoadAsync(cancellationToken);
 
         var payload = new ServiceRequest
         {
@@ -204,11 +205,25 @@ public sealed class MihomoServiceManager
             CorePath = AppPaths.ManagedCorePath,
             ConfigPath = AppPaths.RuntimeConfigPath,
             ConfigDir = effectiveConfigDirectory,
-            CoreIpcPath = MihomoControllerEndpoint.PipePath
+            CoreIpcPath = MihomoControllerEndpoint.PipePath,
+            CorePriority = settings.MihomoCpuPriority
         };
 
         await _ipcClient.SendAsync(payload, cancellationToken);
         await WaitForCoreStateAsync(expectedRunning: true, TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
+    public async Task SetCorePriorityAsync(
+        string priority,
+        CancellationToken cancellationToken = default)
+    {
+        await _ipcClient.SendAsync(
+            new ServiceRequest
+            {
+                Command = ServiceCommands.SetCorePriority,
+                CorePriority = priority
+            },
+            cancellationToken);
     }
 
     public async Task StopCoreAsync(CancellationToken cancellationToken = default)

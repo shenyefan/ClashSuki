@@ -50,6 +50,15 @@ public sealed record ConfigSnapshot
 
     [JsonPropertyName("tun")]
     public TunConfig? Tun { get; init; }
+
+    [JsonPropertyName("dns")]
+    public DnsConfig? Dns { get; init; }
+}
+
+public sealed record DnsConfig
+{
+    [JsonPropertyName("enable")]
+    public bool? Enable { get; init; }
 }
 
 public sealed record TunConfig
