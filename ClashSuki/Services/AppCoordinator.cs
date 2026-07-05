@@ -744,6 +744,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         try
         {
             var result = await _runtimeConfig.RebuildAsync(_cts.Token);
+            _cachedGroupOrder = null;
             var requireTun = await YamlConfigService.IsTunEnabledAsync(
                 AppPaths.RuntimeConfigPath,
                 _cts.Token);
@@ -778,6 +779,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch
         {
             await snapshot.RestoreAsync();
+            _cachedGroupOrder = null;
             if (coreWasRunning && previousRuntime is not null)
             {
                 try

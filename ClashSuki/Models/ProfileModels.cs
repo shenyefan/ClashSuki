@@ -15,6 +15,11 @@ public sealed class ProfileItem
     [JsonPropertyName("name")]
     public string Name { get; set; } = "未命名";
 
+    /// <summary>null 表示旧数据，true 表示名称由用户明确指定。</summary>
+    [JsonPropertyName("name_customized")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? NameCustomized { get; set; }
+
     [JsonPropertyName("url")]
     public string? Url { get; set; }
 

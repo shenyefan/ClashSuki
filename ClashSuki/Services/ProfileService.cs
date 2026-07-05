@@ -113,6 +113,12 @@ public sealed class ProfileService : IDisposable
             ? TryParseContentDispositionFileName(headers) ?? $"{profile.Uid}.yaml"
             : profile.File.Trim();
         profile.File = NormalizeProfileFileName(filename, profile.Uid);
+        if (ShouldUpdateAutomaticName(profile))
+        {
+            profile.Name = InferRemoteName(headers, profile.Url, profile.File, profile.Uid);
+            profile.NameCustomized = false;
+        }
+
         var filePath = Path.Combine(ProfilesDir, profile.File);
         await File.WriteAllTextAsync(filePath, content, cancellationToken);
 
@@ -392,7 +398,7 @@ public sealed class ProfileService : IDisposable
             .ToList();
     }
 
-    private static string? TryParseContentDispositionFileName(Dictionary<string, string> headers)
+    private static string? TryParseContentDispositionFileName(IReadOnlyDictionary<string, string> headers)
     {
         if (!headers.TryGetValue("content-disposition", out var value))
         {
@@ -407,6 +413,118 @@ public sealed class ProfileService : IDisposable
 
         var match = Regex.Match(value, "filename=(?<name>[^;]+)", RegexOptions.IgnoreCase);
         return match.Success ? match.Groups["name"].Value.Trim('"', '\'') : null;
+    }
+
+    private static bool ShouldUpdateAutomaticName(ProfileItem profile)
+    {
+        if (profile.NameCustomized.HasValue)
+        {
+            return !profile.NameCustomized.Value;
+        }
+
+        var name = profile.Name.Trim();
+        if (string.IsNullOrWhiteSpace(name) ||
+            name is "未命名" or "远程订阅" ||
+            string.Equals(name, profile.Uid, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (Uri.TryCreate(profile.Url, UriKind.Absolute, out var uri) &&
+            string.Equals(name, uri.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(profile.File) &&
+               string.Equals(
+                   name,
+                   Path.GetFileNameWithoutExtension(profile.File),
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string InferRemoteName(
+        IReadOnlyDictionary<string, string> headers,
+        string? url,
+        string? fileName,
+        string uid)
+    {
+        if (headers.TryGetValue("profile-title", out var title) &&
+            TryDecodeProfileTitle(title) is { Length: > 0 } decodedTitle)
+        {
+            return decodedTitle;
+        }
+
+        var dispositionFile = TryParseContentDispositionFileName(headers);
+        var dispositionName = Path.GetFileNameWithoutExtension(dispositionFile);
+        if (!string.IsNullOrWhiteSpace(dispositionName))
+        {
+            return dispositionName.Trim();
+        }
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            !string.IsNullOrWhiteSpace(uri.Host))
+        {
+            return uri.Host;
+        }
+
+        var localName = Path.GetFileNameWithoutExtension(fileName);
+        return string.IsNullOrWhiteSpace(localName) ||
+               string.Equals(localName, uid, StringComparison.OrdinalIgnoreCase)
+            ? "远程订阅"
+            : localName.Trim();
+    }
+
+    private static string? TryDecodeProfileTitle(string value)
+    {
+        var title = value.Trim().Trim('"', '\'');
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return null;
+        }
+
+        var encodedWord = Regex.Match(
+            title,
+            @"^=\?utf-8\?b\?(?<value>[^?]+)\?=$",
+            RegexOptions.IgnoreCase);
+        if (encodedWord.Success &&
+            TryDecodeBase64Text(encodedWord.Groups["value"].Value) is { } mimeDecoded)
+        {
+            return mimeDecoded;
+        }
+
+        if (title.StartsWith("base64:", StringComparison.OrdinalIgnoreCase) &&
+            TryDecodeBase64Text(title[7..]) is { } prefixedDecoded)
+        {
+            return prefixedDecoded;
+        }
+
+        var uriDecoded = Uri.UnescapeDataString(title.Replace("+", " ", StringComparison.Ordinal));
+        return TryDecodeBase64Text(uriDecoded) ?? uriDecoded.Trim();
+    }
+
+    private static string? TryDecodeBase64Text(string value)
+    {
+        var normalized = value.Trim().Replace('-', '+').Replace('_', '/');
+        if (normalized.Length < 8 || normalized.Any(char.IsWhiteSpace))
+        {
+            return null;
+        }
+
+        normalized = normalized.PadRight((normalized.Length + 3) / 4 * 4, '=');
+        try
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(normalized)).Trim();
+            return string.IsNullOrWhiteSpace(decoded) ||
+                   decoded.Contains('\uFFFD') ||
+                   decoded.Any(char.IsControl)
+                ? null
+                : decoded;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     private static string NormalizeProfileFileName(string? fileName, string uid)

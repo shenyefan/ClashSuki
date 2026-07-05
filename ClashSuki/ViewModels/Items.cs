@@ -38,6 +38,10 @@ public sealed partial class ProxyGroupItemViewModel : ObservableObject
         IconUri is null &&
         string.IsNullOrWhiteSpace(Icon) &&
         !string.IsNullOrEmpty(LeadingEmoji);
+    public bool ShowDefaultGroupIcon =>
+        IconUri is null &&
+        string.IsNullOrWhiteSpace(Icon) &&
+        string.IsNullOrEmpty(LeadingEmoji);
     public string DisplayName => ShowLeadingEmoji ? EmojiText.RemoveLeadingEmoji(Name) : Name;
 
     public ObservableCollection<NodeItemViewModel> FilteredNodes { get; } = [];
@@ -46,12 +50,14 @@ public sealed partial class ProxyGroupItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(LeadingEmoji));
         OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(ShowDefaultGroupIcon));
         OnPropertyChanged(nameof(DisplayName));
     }
 
     partial void OnIconChanged(string value)
     {
         OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(ShowDefaultGroupIcon));
         OnPropertyChanged(nameof(DisplayName));
     }
 
@@ -59,6 +65,7 @@ public sealed partial class ProxyGroupItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasGroupIcon));
         OnPropertyChanged(nameof(ShowLeadingEmoji));
+        OnPropertyChanged(nameof(ShowDefaultGroupIcon));
         OnPropertyChanged(nameof(DisplayName));
     }
 
@@ -276,31 +283,50 @@ public sealed partial class ProfileItemViewModel : ObservableObject
     [ObservableProperty] private int? intervalMinutes;
     [ObservableProperty] private bool autoUpdate;
 
-    public string StatusText => IsBusy ? "处理中" : TypeLabel;
     public string TypeLabel => string.Equals(Type, "remote", StringComparison.OrdinalIgnoreCase) ? "远程" : "本地";
+    public string StatusAndUpdatedText =>
+        $"{(IsBusy ? "处理中" : TypeLabel)} · {UpdatedText}";
     public bool IsRemote => string.Equals(Type, "remote", StringComparison.OrdinalIgnoreCase);
     public bool IsLocal => !IsRemote;
-    public string SourceText => string.IsNullOrWhiteSpace(Url) ? File : Url;
-    public string DetailText => string.Join("  ", new[] { UpdatedText, UsedText, ExpireText }.Where(s => !string.IsNullOrWhiteSpace(s)));
+    public string SourceText => !string.IsNullOrWhiteSpace(UsedText)
+        ? string.Join("  ", new[] { UsedText, ExpireText }.Where(s => !string.IsNullOrWhiteSpace(s)))
+        : string.IsNullOrWhiteSpace(Url) ? File : Url;
     public string UpdatePolicyText => AutoUpdate
         ? $"自动更新 · {((IntervalMinutes is > 0 ? IntervalMinutes.Value : 1440) / 60.0):0.#} 小时"
         : "手动更新";
     public Windows.UI.Color StatusColor => IsBusy ? Windows.UI.Color.FromArgb(255, 255, 165, 0) : IsActive ? Windows.UI.Color.FromArgb(255, 16, 137, 62) : Windows.UI.Color.FromArgb(255, 128, 128, 128);
+    public FontWeight NameFontWeight => new((ushort)(IsActive ? 600 : 400));
+    public Brush CardBorderBrush => IsActive ? DelayBrushes.Primary : DelayBrushes.Transparent;
+    public Thickness CardBorderThickness => IsActive ? new(2, 0, 2, 0) : new(0);
+    public Brush CardBackgroundBrush => IsActive
+        ? DelayBrushes.SelectedBackground
+        : DelayBrushes.NeutralBackground;
 
-    partial void OnIsActiveChanged(bool value) { OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(StatusColor)); }
-    partial void OnIsBusyChanged(bool value) { OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(StatusColor)); }
+    partial void OnIsActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusColor));
+        OnPropertyChanged(nameof(NameFontWeight));
+        OnPropertyChanged(nameof(CardBorderBrush));
+        OnPropertyChanged(nameof(CardBorderThickness));
+        OnPropertyChanged(nameof(CardBackgroundBrush));
+    }
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusAndUpdatedText));
+        OnPropertyChanged(nameof(StatusColor));
+    }
     partial void OnTypeChanged(string value)
     {
-        OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(TypeLabel));
+        OnPropertyChanged(nameof(StatusAndUpdatedText));
         OnPropertyChanged(nameof(IsRemote));
         OnPropertyChanged(nameof(IsLocal));
     }
     partial void OnUrlChanged(string value) => OnPropertyChanged(nameof(SourceText));
     partial void OnFileChanged(string value) => OnPropertyChanged(nameof(SourceText));
-    partial void OnUpdatedTextChanged(string value) => OnPropertyChanged(nameof(DetailText));
-    partial void OnUsedTextChanged(string value) => OnPropertyChanged(nameof(DetailText));
-    partial void OnExpireTextChanged(string value) => OnPropertyChanged(nameof(DetailText));
+    partial void OnUpdatedTextChanged(string value) => OnPropertyChanged(nameof(StatusAndUpdatedText));
+    partial void OnUsedTextChanged(string value) => OnPropertyChanged(nameof(SourceText));
+    partial void OnExpireTextChanged(string value) => OnPropertyChanged(nameof(SourceText));
     partial void OnIntervalMinutesChanged(int? value) => OnPropertyChanged(nameof(UpdatePolicyText));
     partial void OnAutoUpdateChanged(bool value) => OnPropertyChanged(nameof(UpdatePolicyText));
 }

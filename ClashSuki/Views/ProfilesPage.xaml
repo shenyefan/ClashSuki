@@ -96,6 +96,15 @@
                         <DataTemplate>
                             <controls:SettingsCard Header="{Binding Name}"
                                                    Description="{Binding SourceText}"
+                                                   IsClickEnabled="True"
+                                                   IsActionIconVisible="False"
+                                                   Click="ProfileCard_Click"
+                                                   Tag="{Binding}"
+                                                   IsEnabled="{Binding DataContext.IsSwitchingProfile, ElementName=PageRoot, Converter={StaticResource InverseBool}}"
+                                                   Background="{Binding CardBackgroundBrush}"
+                                                   BorderBrush="{Binding CardBorderBrush}"
+                                                   BorderThickness="{Binding CardBorderThickness}"
+                                                   FontWeight="{Binding NameFontWeight}"
                                                    Margin="0,0,0,4">
                                 <controls:SettingsCard.HeaderIcon>
                                     <FontIcon Glyph="&#xE8F1;">
@@ -109,16 +118,14 @@
                                       VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="228" />
-                                        <ColumnDefinition Width="56" />
+                                        <ColumnDefinition Width="32" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0"
                                                 Spacing="2"
                                                 Width="228"
                                                 VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding StatusText}"
-                                                   Style="{StaticResource MutedCaptionTextStyle}" />
-                                        <TextBlock Text="{Binding DetailText}"
+                                        <TextBlock Text="{Binding StatusAndUpdatedText}"
                                                    Style="{StaticResource MutedCaptionTextStyle}"
                                                    TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding UpdatePolicyText}"
@@ -127,21 +134,13 @@
                                                    Visibility="{Binding IsRemote, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     <Grid Grid.Column="1"
-                                          Width="56"
+                                          Width="32"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center">
                                         <ProgressRing Width="20"
                                                       Height="20"
                                                       IsActive="{Binding IsBusy}"
                                                       Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
-                                        <ToggleSwitch Loaded="ActiveSwitch_Loaded"
-                                                      Toggled="ActiveSwitch_Toggled"
-                                                      MinWidth="0"
-                                                      Width="48"
-                                                      OnContent=""
-                                                      OffContent=""
-                                                      IsOn="{Binding IsActive, Mode=OneWay}"
-                                                      Visibility="{Binding IsBusy, Converter={StaticResource InverseBoolToVis}}" />
                                     </Grid>
                                     <ui:IconActionButton Grid.Column="2"
                                             IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"

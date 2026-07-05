@@ -99,46 +99,17 @@ public sealed partial class ProfilesPage : Page
                 ? profile
                 : null;
 
-    private void ActiveSwitch_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is ToggleSwitch toggle &&
-            toggle.DataContext is ProfileItemViewModel profile &&
-            toggle.IsOn != profile.IsActive)
-        {
-            toggle.IsOn = profile.IsActive;
-        }
-    }
-
-    private async void ActiveSwitch_Toggled(object sender, RoutedEventArgs e)
+    private async void ProfileCard_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is not ProfilesViewModel viewModel ||
-            sender is not ToggleSwitch toggle ||
-            toggle.DataContext is not ProfileItemViewModel profile)
+            GetProfileFromSender(sender) is not { } profile ||
+            profile.IsActive ||
+            viewModel.IsSwitchingProfile)
         {
             return;
         }
 
-        if (toggle.IsOn == profile.IsActive)
-        {
-            return;
-        }
-
-        if (!toggle.IsOn)
-        {
-            toggle.IsOn = profile.IsActive;
-            return;
-        }
-
-        toggle.IsEnabled = false;
-        try
-        {
-            var activated = await viewModel.ActivateProfileWithRollbackAsync(profile);
-            toggle.IsOn = activated && profile.IsActive;
-        }
-        finally
-        {
-            toggle.IsEnabled = !profile.IsBusy;
-        }
+        await viewModel.ActivateProfileWithRollbackAsync(profile);
     }
 
     private async void ImportLocalFile_Click(object sender, RoutedEventArgs e)

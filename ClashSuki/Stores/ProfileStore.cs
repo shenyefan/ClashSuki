@@ -56,9 +56,11 @@ public sealed class ProfileStore : IDisposable
                 ? DateTimeOffset.FromUnixTimeSeconds(ts).LocalDateTime.ToString("MM/dd HH:mm")
                 : "未更新";
             item.UsedText = profile.Extra is { } e
-                ? $"{Formatters.FormatBytes(e.Used)} / {Formatters.FormatBytes(e.Total)}"
+                ? e.Total > 0
+                    ? $"已用 {Formatters.FormatBytes(e.Used)} / 总量 {Formatters.FormatBytes(e.Total)}"
+                    : $"已用 {Formatters.FormatBytes(e.Used)} / 不限流量"
                 : "";
-            item.ExpireText = profile.Extra?.Expire is { } exp
+            item.ExpireText = profile.Extra?.Expire is > 0 and var exp
                 ? DateTimeOffset.FromUnixTimeSeconds(exp).LocalDateTime.ToString("yyyy/MM/dd 到期")
                 : "";
             item.UserAgent = profile.UserAgent ?? "";
@@ -85,6 +87,7 @@ public sealed class ProfileStore : IDisposable
         var profile = new ProfileItem
         {
             Name = string.IsNullOrWhiteSpace(name) ? InferName(url) : name.Trim(),
+            NameCustomized = !string.IsNullOrWhiteSpace(name),
             Type = "remote",
             Url = url.Trim(),
             UserAgent = string.IsNullOrWhiteSpace(userAgent) ? null : userAgent.Trim(),
@@ -114,7 +117,12 @@ public sealed class ProfileStore : IDisposable
         CancellationToken cancellationToken)
     {
         var profile = Require(uid);
-        profile.Name = string.IsNullOrWhiteSpace(name) ? profile.Name : name.Trim();
+        if (!string.IsNullOrWhiteSpace(name) &&
+            !string.Equals(profile.Name, name.Trim(), StringComparison.Ordinal))
+        {
+            profile.Name = name.Trim();
+            profile.NameCustomized = true;
+        }
         profile.UserAgent = string.IsNullOrWhiteSpace(userAgent) ? null : userAgent.Trim();
         profile.AuthToken = string.IsNullOrWhiteSpace(authToken) ? null : authToken.Trim();
         profile.AgeSecretKey = NormalizeAgeSecretKey(ageSecretKey);
@@ -361,6 +369,7 @@ public sealed class ProfileStore : IDisposable
         Uid = source.Uid,
         Type = source.Type,
         Name = source.Name,
+        NameCustomized = source.NameCustomized,
         Url = source.Url,
         File = source.File,
         Desc = source.Desc,

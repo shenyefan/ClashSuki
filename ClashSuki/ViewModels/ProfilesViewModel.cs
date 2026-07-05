@@ -8,6 +8,7 @@ namespace ClashSuki.ViewModels;
 public sealed partial class ProfilesViewModel : ObservableObject
 {
     private readonly AppCoordinator _coordinator;
+    private readonly SemaphoreSlim _activationGate = new(1, 1);
 
     [ObservableProperty] private string newProfileName = "";
     [ObservableProperty] private string newProfileUrl = "";
@@ -24,6 +25,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
     [ObservableProperty] private string editAgeSecretKey = "";
     [ObservableProperty] private string editUpdateIntervalMinutes = "";
     [ObservableProperty] private bool editAutoUpdate;
+    [ObservableProperty] private bool isSwitchingProfile;
 
     public ProfilesViewModel(AppCoordinator coordinator)
     {
@@ -152,16 +154,23 @@ public sealed partial class ProfilesViewModel : ObservableObject
             return true;
         }
 
-        var previousUid = Profiles.ActiveUid;
-        ApplyActiveVisualState(profile.Uid);
-
-        var activated = await _coordinator.ActivateProfileAsync(profile.Uid);
-        if (!activated)
+        if (!await _activationGate.WaitAsync(0))
         {
-            ApplyActiveVisualState(previousUid);
+            return false;
         }
 
-        return activated;
+        IsSwitchingProfile = true;
+        try
+        {
+            ApplyActiveVisualState(profile.Uid);
+            return await _coordinator.ActivateProfileAsync(profile.Uid);
+        }
+        finally
+        {
+            ApplyActiveVisualState(Profiles.ActiveUid);
+            IsSwitchingProfile = false;
+            _activationGate.Release();
+        }
     }
 
     [RelayCommand]

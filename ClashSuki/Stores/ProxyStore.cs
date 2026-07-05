@@ -16,6 +16,7 @@ public sealed partial class ProxyStore : ObservableObject
 
     private readonly Dictionary<string, ProxyGroupItemViewModel> _groups = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProviderItemViewModel> _providers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ProxyGroupItemViewModel> _orderedGroups = [];
     private bool _globalOnly;
     private string _sortMode = "default";
     private bool _sortDescending;
@@ -39,32 +40,39 @@ public sealed partial class ProxyStore : ObservableObject
             group.SearchText = _filterText;
         }
 
-        ApplyVisibleGroups(_groups.Values.ToList());
+        ApplyVisibleGroups(_orderedGroups);
     }
 
     public void SetGlobalOnly(bool value)
     {
         if (_globalOnly == value) return;
         _globalOnly = value;
-        ApplyVisibleGroups(_groups.Values.ToList());
+        ApplyVisibleGroups(_orderedGroups);
     }
 
     public void SetSortMode(string value)
     {
-        _sortMode = value;
-        foreach (var g in _groups.Values)
+        var normalized = value is "delay" or "name" ? value : "default";
+        if (string.Equals(_sortMode, normalized, StringComparison.Ordinal))
         {
-            g.SortMode = value;
+            return;
         }
+
+        _sortMode = normalized;
+        ResetNodeSorting();
+        ApplyVisibleGroups(_orderedGroups);
     }
 
     public void SetSortDescending(bool value)
     {
-        _sortDescending = value;
-        foreach (var g in _groups.Values)
+        if (_sortDescending == value)
         {
-            g.SortDescending = value;
+            return;
         }
+
+        _sortDescending = value;
+        ResetNodeSorting();
+        ApplyVisibleGroups(_orderedGroups);
     }
 
     public void ApplyProxyGroups(ProxyGroupsResponse response, IReadOnlyList<string>? order = null)
@@ -90,16 +98,15 @@ public sealed partial class ProxyStore : ObservableObject
                 {
                     Name = name,
                     Type = dto.Type ?? "",
-                    Hidden = dto.Hidden ?? false,
-                    SortMode = _sortMode,
-                    SortDescending = _sortDescending
+                    Hidden = dto.Hidden ?? false
                 };
                 _groups[name] = group;
             }
 
             group.CurrentNode = current;
             group.NodeCount = all.Length;
-            group.Delay = dto.LatestDelay;
+            delayMap.TryGetValue(current, out var currentNodeDelay);
+            group.Delay = dto.LatestDelay ?? currentNodeDelay;
             group.FixedNode = dto.Fixed ?? "";
             UpdateGroupIconKey(group, dto.Icon);
             group.TimeoutMs = dto.Timeout ?? 0;
@@ -173,7 +180,9 @@ public sealed partial class ProxyStore : ObservableObject
             }
         }
 
-        ApplyVisibleGroups(desired);
+        _orderedGroups.Clear();
+        _orderedGroups.AddRange(desired);
+        ApplyVisibleGroups(_orderedGroups);
         ProxyIconLoader.ScheduleAfterListUpdated(desired);
     }
 
@@ -233,7 +242,43 @@ public sealed partial class ProxyStore : ObservableObject
                 || g.FilteredNodes.Count > 0);
         }
 
-        CollectionSync.Sync(Groups, visible.ToList());
+        var sorted = _sortMode switch
+        {
+            "delay" => SortGroupsByDelay(visible),
+            "name" => visible
+                .OrderBy(group => group.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToList(),
+            _ => visible.ToList()
+        };
+
+        if (_sortDescending && _sortMode != "delay")
+        {
+            sorted.Reverse();
+        }
+
+        CollectionSync.Sync(Groups, sorted);
+    }
+
+    private void ResetNodeSorting()
+    {
+        foreach (var group in _groups.Values)
+        {
+            group.SortMode = "default";
+            group.SortDescending = false;
+        }
+    }
+
+    private List<ProxyGroupItemViewModel> SortGroupsByDelay(
+        IEnumerable<ProxyGroupItemViewModel> groups)
+    {
+        var list = groups.ToList();
+        var available = _sortDescending
+            ? list.Where(group => group.Delay is > 0).OrderByDescending(group => group.Delay)
+            : list.Where(group => group.Delay is > 0).OrderBy(group => group.Delay);
+
+        return available
+            .Concat(list.Where(group => group.Delay is not > 0))
+            .ToList();
     }
 
     private static void ApplyNodeMetadata(
