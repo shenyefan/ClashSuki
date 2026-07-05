@@ -27,6 +27,8 @@
   <ItemGroup>
     <Content Include="Assets\Img\*.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Img\*.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\TwemojiMozilla.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\TwemojiMozilla.LICENSE.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

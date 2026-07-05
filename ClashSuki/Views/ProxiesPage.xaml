@@ -6,6 +6,7 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:vm="using:ClashSuki.ViewModels"
     xmlns:ui="using:ClashSuki.Controls"
+    xmlns:utilities="using:ClashSuki.Utilities"
     Loaded="Page_Loaded"
     NavigationCacheMode="Enabled">
     <Page.Resources>
@@ -109,7 +110,8 @@
                                                Stretch="Uniform"
                                                Visibility="{x:Bind HasGroupIcon, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
                                         <TextBlock Text="{x:Bind LeadingEmoji, Mode=OneWay}"
-                                                   FontFamily="Segoe UI Emoji"
+                                                   FontFamily="{StaticResource EmojiFontFamily}"
+                                                   IsColorFontEnabled="True"
                                                    FontSize="24"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
@@ -124,10 +126,12 @@
                                     <StackPanel Grid.Column="1"
                                                 Spacing="2"
                                                 VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}"
+                                        <TextBlock utilities:FlagEmojiText.Text="{x:Bind DisplayName, Mode=OneWay}"
+                                                   IsColorFontEnabled="True"
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{x:Bind SubtitleText, Mode=OneWay}"
+                                        <TextBlock utilities:FlagEmojiText.Text="{x:Bind SubtitleText, Mode=OneWay}"
+                                                   IsColorFontEnabled="True"
                                                    Style="{StaticResource MutedCaptionTextStyle}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
@@ -168,7 +172,8 @@
                                                     Background="Transparent"
                                                     Tapped="NodeCard_Tapped">
                                                 <StackPanel Spacing="4" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Name}"
+                                                    <TextBlock utilities:FlagEmojiText.Text="{Binding Name}"
+                                                               IsColorFontEnabled="True"
                                                                TextTrimming="CharacterEllipsis"
                                                                FontWeight="{Binding NameFontWeight}" />
                                                     <StackPanel Orientation="Horizontal"

@@ -25,6 +25,7 @@
             <viewModels:ProcessIconElementConverter x:Key="ProcessIconElement" />
             <viewModels:DelayBrushConverter x:Key="DelayBrush" />
             <viewModels:LogLevelBrushConverter x:Key="LogLevelBrush" />
+            <FontFamily x:Key="EmojiFontFamily">ms-appx:///Assets/Fonts/TwemojiMozilla.ttf#Twemoji Mozilla</FontFamily>
             <Thickness x:Key="PagePadding">32,24,32,32</Thickness>
             <Thickness x:Key="CardPadding">16</Thickness>
             <Thickness x:Key="DenseCardPadding">12,10</Thickness>
