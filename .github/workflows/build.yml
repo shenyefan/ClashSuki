@@ -75,5 +75,6 @@ jobs:
           name: ClashSuki-msix-x64-${{ github.sha }}
           path: |
             ClashSuki.Package/AppPackages/**/*.msix
+            ClashSuki.Package/AppPackages/**/*_Test/**/*.cer
           if-no-files-found: error
           retention-days: 14
