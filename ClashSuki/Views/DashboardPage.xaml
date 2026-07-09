@@ -6,6 +6,7 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:lvc="using:LiveChartsCore.SkiaSharpView.WinUI"
     xmlns:ui="using:ClashSuki.Controls"
+    xmlns:utilities="using:ClashSuki.Utilities"
     NavigationCacheMode="Enabled">
     <ScrollViewer>
         <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
@@ -184,7 +185,7 @@
                                                        HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" />
                                             <StackPanel Grid.Column="1" Spacing="2">
-                                                <TextBlock Text="{Binding Label}"
+                                                <TextBlock utilities:FlagEmojiText.Text="{Binding Label}"
                                                            Style="{StaticResource ListItemTitleTextStyle}" />
                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                     <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
