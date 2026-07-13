@@ -267,6 +267,17 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
 
         var settings = await AppSettingsService.LoadAsync(_cts.Token);
+        if (!settings.OfflineDnsDefaultMigrated)
+        {
+            await YamlConfigService.DisableGeoIpForLegacyFactoryDnsAsync(
+                AppPaths.BaseConfigPath,
+                _cts.Token);
+            await AppSettingsService.PatchAsync(
+                value => value.OfflineDnsDefaultMigrated = true,
+                _cts.Token);
+            settings.OfflineDnsDefaultMigrated = true;
+        }
+
         _desiredSystemProxyEnabled = settings.SystemProxyEnabled;
         await Profiles.LoadAsync(_cts.Token);
         ApplyCoreWorkDirectory(Profiles.ActiveUid, settings);

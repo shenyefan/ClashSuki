@@ -261,6 +261,53 @@ public static class YamlConfigService
         }
     }
 
+    public static async Task<bool> DisableGeoIpForLegacyFactoryDnsAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        await BaseWriteLock.WaitAsync(cancellationToken);
+        try
+        {
+            var yaml = await File.ReadAllTextAsync(path, cancellationToken);
+            var doc = LoadDocument(yaml);
+            var root = EnsureRoot(doc);
+            var dns = TryGetMap(root, "dns");
+            var fallbackFilter = TryGetMap(dns, "fallback-filter");
+            if (dns is null ||
+                fallbackFilter is null ||
+                TryGetBool(fallbackFilter, "geoip") != true ||
+                !ReadList(dns, "nameserver", []).SequenceEqual(
+                    ["114.114.114.114", "8.8.8.8"],
+                    StringComparer.OrdinalIgnoreCase) ||
+                !ReadList(dns, "fallback", []).SequenceEqual(
+                    ["tls://1.1.1.1", "tls://8.8.4.4"],
+                    StringComparer.OrdinalIgnoreCase) ||
+                !string.Equals(
+                    TryGetString(fallbackFilter, "geoip-code"),
+                    "CN",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            SetScalar(fallbackFilter, "geoip", "false", overwrite: true);
+            await WriteTextAtomicAsync(
+                path,
+                SaveAndVerifyDocument(doc),
+                cancellationToken);
+            return true;
+        }
+        finally
+        {
+            BaseWriteLock.Release();
+        }
+    }
+
     private static async Task WriteTextAtomicAsync(
         string path,
         string content,
@@ -390,7 +437,7 @@ public static class YamlConfigService
             ReadList(dns, "default-nameserver", ["114.114.114.114", "8.8.8.8"]),
             ReadList(dns, "direct-nameserver", []),
             ReadList(dns, "proxy-server-nameserver", []),
-            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip") ?? true,
+            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip") ?? false,
             TryGetString(TryGetMap(dns, "fallback-filter"), "geoip-code") ?? "CN",
             ReadList(TryGetMap(dns, "fallback-filter"), "ipcidr", []),
             ReadList(TryGetMap(dns, "fallback-filter"), "domain", []),

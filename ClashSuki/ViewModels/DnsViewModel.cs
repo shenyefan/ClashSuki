@@ -24,7 +24,7 @@ public sealed partial class DnsViewModel : ObservableObject
     [ObservableProperty] private string defaultNameserver = "114.114.114.114\n8.8.8.8";
     [ObservableProperty] private string directNameserver = "";
     [ObservableProperty] private string proxyServerNameserver = "";
-    [ObservableProperty] private bool fallbackGeoIp = true;
+    [ObservableProperty] private bool fallbackGeoIp;
     [ObservableProperty] private string fallbackGeoIpCode = "CN";
     [ObservableProperty] private string fallbackIpCidr = "";
     [ObservableProperty] private string fallbackDomain = "";
@@ -126,7 +126,7 @@ public sealed partial class DnsViewModel : ObservableObject
         DefaultNameserver = "114.114.114.114\n8.8.8.8";
         DirectNameserver = "";
         ProxyServerNameserver = "";
-        FallbackGeoIp = true;
+        FallbackGeoIp = false;
         FallbackGeoIpCode = "CN";
         FallbackIpCidr = "";
         FallbackDomain = "";

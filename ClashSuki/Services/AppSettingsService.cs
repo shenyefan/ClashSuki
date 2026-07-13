@@ -121,6 +121,9 @@ public sealed class AppSettings
     [JsonPropertyName("sniffer_override_enabled")]
     public bool SnifferOverrideEnabled { get; set; } = true;
 
+    [JsonPropertyName("offline_dns_default_migrated")]
+    public bool OfflineDnsDefaultMigrated { get; set; }
+
     [JsonPropertyName("max_log_days")]
     public int MaxLogDays { get; set; } = 7;
 
