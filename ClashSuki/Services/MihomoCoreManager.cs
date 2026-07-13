@@ -60,6 +60,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
     private async Task EnsureStartedCoreAsync(bool requireTun, CancellationToken cancellationToken)
     {
         await AppPaths.BootstrapAsync(cancellationToken);
+        AppPaths.EnsureGeoDataFiles(WorkDirectory);
         var serviceStatus = await _serviceManager.GetStatusAsync(cancellationToken);
         if (requireTun &&
             serviceStatus != MihomoServiceStatus.Ready &&
@@ -400,6 +401,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
     public async Task ValidateConfigAsync(string configPath, CancellationToken cancellationToken = default)
     {
         await AppPaths.BootstrapAsync(cancellationToken);
+        AppPaths.EnsureGeoDataFiles(WorkDirectory);
         configPath = Path.GetFullPath(configPath);
         var configDirectory = Path.GetDirectoryName(configPath)
                               ?? throw new InvalidOperationException("无法确定待校验配置的目录");

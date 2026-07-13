@@ -382,7 +382,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             ["dns"] = new Dictionary<string, object?>
             {
-                ["enable"] = true,
+                ["enable"] = settings.Enabled,
                 ["enhanced-mode"] = settings.EnhancedMode,
                 ["ipv6"] = settings.Ipv6,
                 ["respect-rules"] = settings.RespectRules,
@@ -476,7 +476,6 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         try
         {
-            var hadActiveProfile = !string.IsNullOrWhiteSpace(Profiles.ActiveUid);
             var profile = await Profiles.AddRemoteAsync(
                 name,
                 url,
@@ -486,12 +485,6 @@ public sealed class AppCoordinator : IAsyncDisposable
                 fileName,
                 Runtime.MixedPortNumber > 0 ? Runtime.MixedPortNumber : null,
                 _cts.Token);
-
-            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
-            {
-                await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
-                throw new InvalidOperationException("订阅配置未能通过校验并激活");
-            }
 
             await _dispatcher.RunAsync(() =>
                 Logs.AddApp("INFO", $"订阅已添加：{profile.Name}", LogSources.Subscription));
@@ -577,14 +570,7 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         try
         {
-            var hadActiveProfile = !string.IsNullOrWhiteSpace(Profiles.ActiveUid);
             var profile = await Profiles.ImportLocalAsync(name, fileName, content, _cts.Token);
-
-            if (!hadActiveProfile && !await ActivateProfileAsync(profile.Uid, reportResult: false))
-            {
-                await Profiles.DeleteAsync(profile.Uid, CancellationToken.None);
-                throw new InvalidOperationException("本地配置未能通过校验并激活");
-            }
 
             await _dispatcher.RunAsync(() =>
                 Logs.AddApp("INFO", $"本地配置已导入：{profile.Name}", LogSources.Subscription));
@@ -615,10 +601,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                 _cts.Token);
             if (profile.Uid == Profiles.ActiveUid)
             {
-                if (!await ActivateProfileAsync(uid, reportResult: false))
-                {
-                    throw new InvalidOperationException("新订阅配置未能激活");
-                }
+                await ActivateProfileOrThrowAsync(uid);
             }
 
             await _dispatcher.RunAsync(() =>
@@ -654,6 +637,36 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task<bool> ActivateProfileAsync(string uid, bool reportResult = true)
     {
+        try
+        {
+            await ActivateProfileOrThrowAsync(uid);
+            if (reportResult)
+            {
+                await _dispatcher.RunAsync(() =>
+                    Logs.AddApp("INFO", "订阅已启用", LogSources.Subscription));
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (!IsAppCancellation(ex))
+        {
+            if (reportResult)
+            {
+                await _dispatcher.RunAsync(() =>
+                {
+                    Runtime.Notifications.Error(
+                        "订阅启用失败",
+                        source: LogSources.Subscription,
+                        exception: ex);
+                });
+            }
+
+            return false;
+        }
+    }
+
+    private async Task ActivateProfileOrThrowAsync(string uid)
+    {
         var previousUid = Profiles.ActiveUid;
         try
         {
@@ -669,15 +682,8 @@ public sealed class AppCoordinator : IAsyncDisposable
             await RefreshProxiesAsync(_cts.Token);
             await RefreshRulesAsync(_cts.Token);
             await SyncRuntimeConfigToGistIfEnabledAsync();
-            if (reportResult)
-            {
-                await _dispatcher.RunAsync(() =>
-                    Logs.AddApp("INFO", "订阅已启用", LogSources.Subscription));
-            }
-
-            return true;
         }
-        catch (Exception ex) when (!IsAppCancellation(ex))
+        catch
         {
             if (!string.Equals(previousUid, Profiles.ActiveUid, StringComparison.Ordinal))
             {
@@ -707,18 +713,7 @@ public sealed class AppCoordinator : IAsyncDisposable
                     "恢复内核工作目录失败");
             }
 
-            if (reportResult)
-            {
-                await _dispatcher.RunAsync(() =>
-                {
-                    Runtime.Notifications.Error(
-                        "订阅启用失败",
-                        source: LogSources.Subscription,
-                        exception: ex);
-                });
-            }
-
-            return false;
+            throw;
         }
     }
 
@@ -2352,7 +2347,7 @@ public sealed class AppCoordinator : IAsyncDisposable
         {
             ["sniffer"] = new Dictionary<string, object?>
             {
-                ["enable"] = true,
+                ["enable"] = settings.Enabled,
                 ["override-destination"] = settings.OverrideDestination,
                 ["force-dns-mapping"] = settings.ForceDnsMapping,
                 ["parse-pure-ip"] = settings.ParsePureIp,
@@ -2378,33 +2373,6 @@ public sealed class AppCoordinator : IAsyncDisposable
         catch
         {
             await AppSettingsService.PatchAsync(value => value.SnifferOverrideEnabled = previous, CancellationToken.None);
-            throw;
-        }
-    }
-
-    public Task SetDnsOverrideEnabledAsync(bool enabled) =>
-        SetBuiltInOverrideEnabledAsync(
-            enabled,
-            static (settings, value) => settings.DnsOverrideEnabled = value);
-
-    public Task SetSnifferOverrideEnabledAsync(bool enabled) =>
-        SetBuiltInOverrideEnabledAsync(
-            enabled,
-            static (settings, value) => settings.SnifferOverrideEnabled = value);
-
-    private async Task SetBuiltInOverrideEnabledAsync(
-        bool enabled,
-        Action<AppSettings, bool> update)
-    {
-        var previousSettings = await AppSettingsService.LoadAsync(_cts.Token);
-        await AppSettingsService.PatchAsync(value => update(value, enabled), _cts.Token);
-        try
-        {
-            await ApplyConfigPatchTransactionAsync([], reloadAfterPatch: true);
-        }
-        catch
-        {
-            await AppSettingsService.SaveAsync(previousSettings, CancellationToken.None);
             throw;
         }
     }

@@ -24,6 +24,9 @@
                 <controls:SettingsCard Header="覆写 DNS 配置" Description="关闭后完整使用当前订阅的 DNS 与 Hosts 配置">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding DnsOverrideEnabled, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>
+                <controls:SettingsCard Header="启用 DNS" Description="dns.enable；仅在覆写 DNS 配置开启时写入运行配置">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding DnsEnabled, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
                 <controls:SettingsCard Header="增强模式" Description="fake-ip 性能更好，redir-host 更兼容">
                     <ComboBox SelectedIndex="{Binding EnhancedModeIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
                         <ComboBoxItem Content="fake-ip" />

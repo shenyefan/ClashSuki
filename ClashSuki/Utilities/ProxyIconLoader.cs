@@ -42,6 +42,47 @@ public static class ProxyIconLoader
         });
     }
 
+    public static async Task RefreshAsync(
+        IEnumerable<ProxyGroupItemViewModel> groups,
+        CancellationToken cancellationToken = default)
+    {
+        var targets = groups
+            .Where(group => !string.IsNullOrWhiteSpace(group.Icon))
+            .GroupBy(group => group.Icon.Trim(), StringComparer.Ordinal)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var group in targets.SelectMany(group => group))
+        {
+            group.IconUri = null;
+        }
+
+        var refreshed = await Task.WhenAll(targets.Select(async group =>
+        {
+            var iconKey = group.Key;
+            var uri = await ProxyIconProvider.RefreshIconUriAsync(iconKey, cancellationToken)
+                .ConfigureAwait(false);
+            return (IconKey: iconKey, Uri: uri, Groups: group.ToArray());
+        })).ConfigureAwait(false);
+
+        EnqueueUi(DispatcherQueuePriority.Normal, () =>
+        {
+            foreach (var result in refreshed)
+            {
+                foreach (var group in result.Groups)
+                {
+                    if (string.Equals(group.Icon, result.IconKey, StringComparison.Ordinal))
+                    {
+                        group.IconUri = result.Uri;
+                    }
+                }
+            }
+        });
+    }
+
     private static void ScheduleDownload(ProxyGroupItemViewModel group)
     {
         var iconKey = group.Icon.Trim();

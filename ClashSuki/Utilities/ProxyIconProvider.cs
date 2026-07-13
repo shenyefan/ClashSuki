@@ -116,6 +116,41 @@ public static class ProxyIconProvider
         }
     }
 
+    public static async Task<Uri?> RefreshIconUriAsync(
+        string? icon,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(icon))
+        {
+            return null;
+        }
+
+        var key = icon.Trim();
+        Cache.TryRemove(key, out _);
+        Failed.TryRemove(key, out _);
+
+        var hash = HashKey(key);
+        foreach (var extension in new[] { ".png", ".jpg", ".webp", ".gif", ".svg" })
+        {
+            var path = Path.Combine(GetCacheDirectory(), hash + extension);
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.WriteAppExceptionThrottled(
+                    $"proxy-icon-cache-delete:{hash}",
+                    LogSources.Proxy,
+                    ex,
+                    $"清理代理图标缓存失败，图标: {DescribeIcon(key)}",
+                    level: "WARN");
+            }
+        }
+
+        return await GetIconUriAsync(key, cancellationToken).ConfigureAwait(false);
+    }
+
     public static Uri? TryGetCachedUri(string? icon)
     {
         if (string.IsNullOrWhiteSpace(icon))
@@ -212,10 +247,7 @@ public static class ProxyIconProvider
     private static string GetCachePath(string iconKey, string? extension = null)
     {
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(iconKey)));
-        var directory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ClashSuki",
-            "proxy-icon-cache");
+        var directory = GetCacheDirectory();
 
         if (string.IsNullOrWhiteSpace(extension))
         {
@@ -235,4 +267,10 @@ public static class ProxyIconProvider
 
         return Path.Combine(directory, hash + extension);
     }
+
+    private static string GetCacheDirectory() =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClashSuki",
+            "proxy-icon-cache");
 }

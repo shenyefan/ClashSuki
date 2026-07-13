@@ -11,6 +11,7 @@ public sealed partial class SnifferViewModel : ObservableObject
     private readonly AppCoordinator _coordinator;
 
     [ObservableProperty] private bool snifferOverrideEnabled = true;
+    [ObservableProperty] private bool snifferEnabled = true;
     [ObservableProperty] private bool overrideDestination;
     [ObservableProperty] private bool forceDnsMapping = true;
     [ObservableProperty] private bool parsePureIp;
@@ -34,6 +35,7 @@ public sealed partial class SnifferViewModel : ObservableObject
     {
         var settings = await _coordinator.LoadSnifferSettingsAsync();
         SnifferOverrideEnabled = settings.OverrideEnabled;
+        SnifferEnabled = settings.Enabled;
         OverrideDestination = settings.OverrideDestination;
         ForceDnsMapping = settings.ForceDnsMapping;
         ParsePureIp = settings.ParsePureIp;
@@ -53,6 +55,7 @@ public sealed partial class SnifferViewModel : ObservableObject
         {
             await _coordinator.SaveSnifferSettingsAsync(new YamlConfigService.SnifferSectionSettings(
                 SnifferOverrideEnabled,
+                SnifferEnabled,
                 OverrideDestination,
                 ForceDnsMapping,
                 ParsePureIp,
@@ -81,6 +84,7 @@ public sealed partial class SnifferViewModel : ObservableObject
     public void ApplyDefaults()
     {
         SnifferOverrideEnabled = true;
+        SnifferEnabled = true;
         OverrideDestination = false;
         ForceDnsMapping = true;
         ParsePureIp = false;

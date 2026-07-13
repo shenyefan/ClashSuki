@@ -22,6 +22,7 @@ public static class YamlConfigService
 
     public sealed record DnsSectionSettings(
         bool OverrideEnabled,
+        bool Enabled,
         string EnhancedMode,
         bool Ipv6,
         bool RespectRules,
@@ -43,6 +44,7 @@ public static class YamlConfigService
 
     public sealed record SnifferSectionSettings(
         bool OverrideEnabled,
+        bool Enabled,
         bool OverrideDestination,
         bool ForceDnsMapping,
         bool ParsePureIp,
@@ -423,6 +425,7 @@ public static class YamlConfigService
         var root = await LoadRootFromFileAsync(path, cancellationToken);
         var dns = TryGetMap(root, "dns");
         return new DnsSectionSettings(
+            true,
             TryGetBool(dns, "enable") ?? true,
             TryGetString(dns, "enhanced-mode") ?? "fake-ip",
             TryGetBool(dns, "ipv6") ?? false,
@@ -450,6 +453,7 @@ public static class YamlConfigService
         var sniffer = TryGetMap(root, "sniffer");
         var sniff = TryGetMap(sniffer, "sniff");
         return new SnifferSectionSettings(
+            true,
             TryGetBool(sniffer, "enable") ?? true,
             TryGetBool(sniffer, "override-destination") ?? false,
             TryGetBool(sniffer, "force-dns-mapping") ?? true,

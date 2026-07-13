@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Stores;
+using ClashSuki.Utilities;
 
 namespace ClashSuki.ViewModels;
 
@@ -169,7 +170,11 @@ public sealed partial class ProxiesViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RefreshAsync() => await _coordinator.RefreshProxiesNowAsync();
+    private async Task RefreshAsync()
+    {
+        await _coordinator.RefreshProxiesNowAsync();
+        await ProxyIconLoader.RefreshAsync(Proxies.SnapshotGroups());
+    }
 
     [RelayCommand]
     private void ToggleSortDirection() => SortDescending = !SortDescending;

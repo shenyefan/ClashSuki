@@ -26,6 +26,8 @@ public sealed partial class ProxyStore : ObservableObject
     public ObservableCollection<ProviderItemViewModel> Providers { get; } = [];
     public int TotalGroupCount => _groups.Count;
 
+    public IReadOnlyList<ProxyGroupItemViewModel> SnapshotGroups() => _orderedGroups.ToArray();
+
     public void SetFilterText(string value)
     {
         var normalized = value.Trim();

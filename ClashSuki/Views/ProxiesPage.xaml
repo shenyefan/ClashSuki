@@ -47,7 +47,7 @@
                         ToolTipService.ToolTip="{Binding DisplayModeLabel}" />
                 <ui:IconActionButton Command="{Binding RefreshCommand}"
                         Glyph="&#xE72C;"
-                        ToolTipService.ToolTip="刷新代理组" />
+                        ToolTipService.ToolTip="刷新代理组及图标" />
             </StackPanel>
         </Grid>
 

@@ -11,28 +11,6 @@
             <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
                 <TextBlock Text="覆写" Style="{StaticResource PageTitleStyle}" />
 
-                <TextBlock Text="内置覆写" Style="{StaticResource SectionTitleStyle}" />
-                <StackPanel Spacing="4">
-                    <controls:SettingsCard Header="DNS 与 Hosts" Description="关闭后完整使用当前订阅的 DNS 与 Hosts 配置">
-                        <ToggleSwitch MinWidth="0"
-                                      Width="48"
-                                      OnContent=""
-                                      OffContent=""
-                                      IsOn="{Binding DnsOverrideEnabled, Mode=OneWay}"
-                                      Toggled="DnsOverrideSwitch_Toggled"
-                                      HorizontalAlignment="Right" />
-                    </controls:SettingsCard>
-                    <controls:SettingsCard Header="嗅探" Description="关闭后完整使用当前订阅的嗅探配置">
-                        <ToggleSwitch MinWidth="0"
-                                      Width="48"
-                                      OnContent=""
-                                      OffContent=""
-                                      IsOn="{Binding SnifferOverrideEnabled, Mode=OneWay}"
-                                      Toggled="SnifferOverrideSwitch_Toggled"
-                                      HorizontalAlignment="Right" />
-                    </controls:SettingsCard>
-                </StackPanel>
-
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

@@ -24,6 +24,9 @@
                 <controls:SettingsCard Header="覆写嗅探配置" Description="关闭后完整使用当前订阅的嗅探配置">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding SnifferOverrideEnabled, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>
+                <controls:SettingsCard Header="启用嗅探" Description="sniffer.enable；仅在覆写嗅探配置开启时写入运行配置">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding SnifferEnabled, Mode=TwoWay}" HorizontalAlignment="Right" />
+                </controls:SettingsCard>
                 <controls:SettingsCard Header="覆盖目标地址" Description="使用嗅探结果覆盖连接目标">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding OverrideDestination, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>

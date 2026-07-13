@@ -4,6 +4,13 @@ namespace ClashSuki.Services;
 
 public static class AppPaths
 {
+    private static readonly string[] GeoDataFileNames =
+    [
+        "Country.mmdb",
+        "geoip.dat",
+        "geosite.dat"
+    ];
+
     private static readonly SemaphoreSlim BootstrapLock = new(1, 1);
     private static int _bootstrapped;
 
@@ -43,6 +50,7 @@ public static class AppPaths
 
             await EnsureTemplateConfigAsync(cancellationToken);
             EnsureManagedCore();
+            EnsureGeoDataFiles(DataRoot);
             Volatile.Write(ref _bootstrapped, 1);
         }
         finally
@@ -97,6 +105,55 @@ public static class AppPaths
         if (bundledCore is not null)
         {
             File.Copy(bundledCore, ManagedCorePath, overwrite: true);
+        }
+    }
+
+    public static void EnsureGeoDataFiles(string targetDirectory)
+    {
+        targetDirectory = Path.GetFullPath(targetDirectory);
+        Directory.CreateDirectory(targetDirectory);
+
+        foreach (var fileName in GeoDataFileNames)
+        {
+            var candidates = new[]
+            {
+                Path.Combine(DataRoot, fileName),
+                Path.Combine(AppContext.BaseDirectory, "Assets", "GeoData", fileName),
+                Path.Combine(AppContext.BaseDirectory, fileName)
+            };
+
+            var destination = Path.Combine(targetDirectory, fileName);
+            var source = candidates.FirstOrDefault(candidate =>
+                File.Exists(candidate) &&
+                !string.Equals(
+                    Path.GetFullPath(candidate),
+                    Path.GetFullPath(destination),
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (source is null)
+            {
+                continue;
+            }
+
+            if (File.Exists(destination) &&
+                File.GetLastWriteTimeUtc(destination) >= File.GetLastWriteTimeUtc(source))
+            {
+                continue;
+            }
+
+            var temporaryPath = $"{destination}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                File.Copy(source, temporaryPath, overwrite: true);
+                File.Move(temporaryPath, destination, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
         }
     }
 

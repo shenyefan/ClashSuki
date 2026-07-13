@@ -98,7 +98,6 @@ public sealed class ProfileStore : IDisposable
 
         profile = await _service.DownloadAsync(profile, mixedPort, cancellationToken);
         _config.Items.Add(profile);
-        _config.Current ??= profile.Uid;
         await _service.SaveAsync(_config, cancellationToken);
         await LoadAsync(cancellationToken);
         return profile;
@@ -163,7 +162,6 @@ public sealed class ProfileStore : IDisposable
 
         profile = await _service.ImportLocalAsync(profile, content, cancellationToken);
         _config.Items.Add(profile);
-        _config.Current ??= profile.Uid;
         await _service.SaveAsync(_config, cancellationToken);
         await LoadAsync(cancellationToken);
         return profile;

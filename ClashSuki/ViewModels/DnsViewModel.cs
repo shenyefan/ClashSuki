@@ -11,6 +11,7 @@ public sealed partial class DnsViewModel : ObservableObject
     private readonly AppCoordinator _coordinator;
 
     [ObservableProperty] private bool dnsOverrideEnabled = true;
+    [ObservableProperty] private bool dnsEnabled = true;
     [ObservableProperty] private int enhancedModeIndex;
     [ObservableProperty] private bool dnsIpv6;
     [ObservableProperty] private bool respectRules;
@@ -42,6 +43,7 @@ public sealed partial class DnsViewModel : ObservableObject
     {
         var settings = await _coordinator.LoadDnsSettingsAsync();
         DnsOverrideEnabled = settings.OverrideEnabled;
+        DnsEnabled = settings.Enabled;
         EnhancedModeIndex = settings.EnhancedMode.ToLowerInvariant() switch
         {
             "redir-host" => 1,
@@ -79,6 +81,7 @@ public sealed partial class DnsViewModel : ObservableObject
         {
             await _coordinator.SaveDnsSettingsAsync(new YamlConfigService.DnsSectionSettings(
                 DnsOverrideEnabled,
+                DnsEnabled,
                 EnhancedModeIndex switch { 1 => "redir-host", 2 => "normal", _ => "fake-ip" },
                 DnsIpv6,
                 RespectRules,
@@ -113,6 +116,7 @@ public sealed partial class DnsViewModel : ObservableObject
     public void ApplyDefaults()
     {
         DnsOverrideEnabled = true;
+        DnsEnabled = true;
         EnhancedModeIndex = 0;
         DnsIpv6 = false;
         RespectRules = false;

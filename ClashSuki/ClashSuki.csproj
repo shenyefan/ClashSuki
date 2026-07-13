@@ -57,6 +57,9 @@
     <Content Include="Assets\Age\age.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age.exe')" />
     <Content Include="Assets\Age\age-keygen.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age-keygen.exe')" />
     <Content Include="Assets\UWP\*.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\UWP\enableLoopback.exe')" />
+    <Content Include="Assets\GeoData\Country.mmdb" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\GeoData\geoip.dat" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\GeoData\geosite.dat" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The 2.2 meta-package is required to override WinAppSDK 1.7 references from UI libraries. -->
