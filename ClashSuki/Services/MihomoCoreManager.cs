@@ -399,7 +399,16 @@ public sealed class MihomoCoreManager : IAsyncDisposable
 
     public async Task ValidateConfigAsync(string configPath, CancellationToken cancellationToken = default)
     {
+        await AppPaths.BootstrapAsync(cancellationToken);
+        configPath = Path.GetFullPath(configPath);
+        var configDirectory = Path.GetDirectoryName(configPath)
+                              ?? throw new InvalidOperationException("无法确定待校验配置的目录");
+        Directory.CreateDirectory(configDirectory);
         Directory.CreateDirectory(WorkDirectory);
+        if (!File.Exists(configPath))
+        {
+            throw new FileNotFoundException("找不到待校验的 mihomo 配置文件", configPath);
+        }
         var startInfo = new ProcessStartInfo
         {
             FileName = AppPaths.ManagedCorePath,

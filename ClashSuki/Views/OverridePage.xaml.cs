@@ -21,8 +21,27 @@ public sealed partial class OverridePage : Page
     {
         if (DataContext is OverrideViewModel viewModel)
         {
-            Loaded -= OverridePage_Loaded;
             await viewModel.LoadAsync();
+        }
+    }
+
+    private async void DnsOverrideSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is OverrideViewModel viewModel &&
+            sender is ToggleSwitch { IsLoaded: true } toggle &&
+            toggle.IsOn != viewModel.DnsOverrideEnabled)
+        {
+            await viewModel.SetDnsOverrideEnabledAsync(toggle.IsOn);
+        }
+    }
+
+    private async void SnifferOverrideSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is OverrideViewModel viewModel &&
+            sender is ToggleSwitch { IsLoaded: true } toggle &&
+            toggle.IsOn != viewModel.SnifferOverrideEnabled)
+        {
+            await viewModel.SetSnifferOverrideEnabledAsync(toggle.IsOn);
         }
     }
 

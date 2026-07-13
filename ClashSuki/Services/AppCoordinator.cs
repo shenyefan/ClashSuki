@@ -366,11 +366,12 @@ public sealed class AppCoordinator : IAsyncDisposable
             pair => pair.Key,
             pair => pair.Value.Count == 1 ? (object?)pair.Value[0] : pair.Value,
             StringComparer.OrdinalIgnoreCase);
-        var patch = new Dictionary<string, object?>
+        var patch = settings.OverrideEnabled
+            ? new Dictionary<string, object?>
         {
             ["dns"] = new Dictionary<string, object?>
             {
-                ["enable"] = settings.Enable,
+                ["enable"] = true,
                 ["enhanced-mode"] = settings.EnhancedMode,
                 ["ipv6"] = settings.Ipv6,
                 ["respect-rules"] = settings.RespectRules,
@@ -393,11 +394,24 @@ public sealed class AppCoordinator : IAsyncDisposable
                 }
             },
             ["hosts"] = hosts
-        };
-        await ApplyConfigPatchTransactionAsync(
-            patch,
-            reloadAfterPatch: true,
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hosts" });
+        }
+            : [];
+        var previous = (await AppSettingsService.LoadAsync(_cts.Token)).DnsOverrideEnabled;
+        await AppSettingsService.PatchAsync(value => value.DnsOverrideEnabled = settings.OverrideEnabled, _cts.Token);
+        try
+        {
+            await ApplyConfigPatchTransactionAsync(
+                patch,
+                reloadAfterPatch: true,
+                settings.OverrideEnabled
+                    ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hosts" }
+                    : null);
+        }
+        catch
+        {
+            await AppSettingsService.PatchAsync(value => value.DnsOverrideEnabled = previous, CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task SelectNodeAsync(string group, string node)
@@ -2301,11 +2315,19 @@ public sealed class AppCoordinator : IAsyncDisposable
         return YamlConfigService.LoadCoreSettingsAsync(GetSettingsConfigPath(), cancellationToken);
     }
 
-    public Task<YamlConfigService.DnsSectionSettings> LoadDnsSettingsAsync() =>
-        YamlConfigService.LoadDnsSettingsAsync(GetSettingsConfigPath(), _cts.Token);
+    public async Task<YamlConfigService.DnsSectionSettings> LoadDnsSettingsAsync()
+    {
+        var result = await YamlConfigService.LoadDnsSettingsAsync(GetSettingsConfigPath(), _cts.Token);
+        var settings = await AppSettingsService.LoadAsync(_cts.Token);
+        return result with { OverrideEnabled = settings.DnsOverrideEnabled };
+    }
 
-    public Task<YamlConfigService.SnifferSectionSettings> LoadSnifferSettingsAsync() =>
-        YamlConfigService.LoadSnifferSettingsAsync(GetSettingsConfigPath(), _cts.Token);
+    public async Task<YamlConfigService.SnifferSectionSettings> LoadSnifferSettingsAsync()
+    {
+        var result = await YamlConfigService.LoadSnifferSettingsAsync(GetSettingsConfigPath(), _cts.Token);
+        var settings = await AppSettingsService.LoadAsync(_cts.Token);
+        return result with { OverrideEnabled = settings.SnifferOverrideEnabled };
+    }
 
     public Task<YamlConfigService.TunSectionSettings> LoadTunSettingsAsync() =>
         YamlConfigService.LoadTunSettingsAsync(GetSettingsConfigPath(), _cts.Token);
@@ -2314,11 +2336,12 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task SaveSnifferSettingsAsync(YamlConfigService.SnifferSectionSettings settings)
     {
-        var patch = new Dictionary<string, object?>
+        var patch = settings.OverrideEnabled
+            ? new Dictionary<string, object?>
         {
             ["sniffer"] = new Dictionary<string, object?>
             {
-                ["enable"] = settings.Enable,
+                ["enable"] = true,
                 ["override-destination"] = settings.OverrideDestination,
                 ["force-dns-mapping"] = settings.ForceDnsMapping,
                 ["parse-pure-ip"] = settings.ParsePureIp,
@@ -2333,8 +2356,46 @@ public sealed class AppCoordinator : IAsyncDisposable
                 ["skip-dst-address"] = settings.SkipDstAddress,
                 ["skip-src-address"] = settings.SkipSrcAddress
             }
-        };
-        await ApplyConfigPatchTransactionAsync(patch, reloadAfterPatch: true);
+        }
+            : [];
+        var previous = (await AppSettingsService.LoadAsync(_cts.Token)).SnifferOverrideEnabled;
+        await AppSettingsService.PatchAsync(value => value.SnifferOverrideEnabled = settings.OverrideEnabled, _cts.Token);
+        try
+        {
+            await ApplyConfigPatchTransactionAsync(patch, reloadAfterPatch: true);
+        }
+        catch
+        {
+            await AppSettingsService.PatchAsync(value => value.SnifferOverrideEnabled = previous, CancellationToken.None);
+            throw;
+        }
+    }
+
+    public Task SetDnsOverrideEnabledAsync(bool enabled) =>
+        SetBuiltInOverrideEnabledAsync(
+            enabled,
+            static (settings, value) => settings.DnsOverrideEnabled = value);
+
+    public Task SetSnifferOverrideEnabledAsync(bool enabled) =>
+        SetBuiltInOverrideEnabledAsync(
+            enabled,
+            static (settings, value) => settings.SnifferOverrideEnabled = value);
+
+    private async Task SetBuiltInOverrideEnabledAsync(
+        bool enabled,
+        Action<AppSettings, bool> update)
+    {
+        var previousSettings = await AppSettingsService.LoadAsync(_cts.Token);
+        await AppSettingsService.PatchAsync(value => update(value, enabled), _cts.Token);
+        try
+        {
+            await ApplyConfigPatchTransactionAsync([], reloadAfterPatch: true);
+        }
+        catch
+        {
+            await AppSettingsService.SaveAsync(previousSettings, CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task SaveTunSettingsAsync(YamlConfigService.TunSectionSettings settings)
@@ -2596,9 +2657,9 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             if (settings.DisableDnsOnPauseSsid && !_ssidDnsDisabled)
             {
-                _ssidDnsEnabledBeforeDirect = (await YamlConfigService.LoadDnsSettingsAsync(
-                    AppPaths.BaseConfigPath,
-                    cancellationToken)).Enable;
+                _ssidDnsEnabledBeforeDirect = await YamlConfigService.IsDnsEnabledAsync(
+                    AppPaths.RuntimeConfigPath,
+                    cancellationToken);
                 if (_ssidDnsEnabledBeforeDirect)
                 {
                     await PatchConfigOrThrowAsync(new Dictionary<string, object?>

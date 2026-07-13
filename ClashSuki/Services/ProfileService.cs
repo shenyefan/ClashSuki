@@ -152,7 +152,20 @@ public sealed class ProfileService : IDisposable
         }
 
         var baseYaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
-        return YamlConfigService.MergeWithBase(profileYaml, baseYaml);
+        var settings = await AppSettingsService.LoadAsync(cancellationToken);
+        var excludedRootKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!settings.DnsOverrideEnabled)
+        {
+            excludedRootKeys.Add("dns");
+            excludedRootKeys.Add("hosts");
+        }
+
+        if (!settings.SnifferOverrideEnabled)
+        {
+            excludedRootKeys.Add("sniffer");
+        }
+
+        return YamlConfigService.MergeWithBase(profileYaml, baseYaml, excludedRootKeys);
     }
 
     public async Task<ProfileItem> ImportLocalAsync(

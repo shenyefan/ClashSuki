@@ -22,6 +22,10 @@ public static class AppPaths
 
     public static async Task BootstrapAsync(CancellationToken cancellationToken = default)
     {
+        // Always heal the directory layout. The process may outlive a cleanup or an
+        // incomplete first-run initialization even after the one-time bootstrap ran.
+        EnsureDirectories();
+
         if (Volatile.Read(ref _bootstrapped) != 0)
         {
             return;
@@ -35,9 +39,7 @@ public static class AppPaths
                 return;
             }
 
-            Directory.CreateDirectory(CoreDirectory);
-            Directory.CreateDirectory(ConfigDirectory);
-            Directory.CreateDirectory(LogDirectory);
+            EnsureDirectories();
 
             await EnsureTemplateConfigAsync(cancellationToken);
             EnsureManagedCore();
@@ -47,6 +49,14 @@ public static class AppPaths
         {
             BootstrapLock.Release();
         }
+    }
+
+    public static void EnsureDirectories()
+    {
+        Directory.CreateDirectory(DataRoot);
+        Directory.CreateDirectory(CoreDirectory);
+        Directory.CreateDirectory(ConfigDirectory);
+        Directory.CreateDirectory(LogDirectory);
     }
 
     private static async Task EnsureTemplateConfigAsync(CancellationToken cancellationToken)

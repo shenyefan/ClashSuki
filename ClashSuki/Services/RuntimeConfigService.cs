@@ -25,13 +25,14 @@ public sealed class RuntimeConfigService
         await _composeLock.WaitAsync(cancellationToken);
         try
         {
+            await AppPaths.BootstrapAsync(cancellationToken);
             var sourceYaml = await _profiles.BuildActiveRuntimeYamlAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(sourceYaml))
             {
                 sourceYaml = await File.ReadAllTextAsync(AppPaths.BaseConfigPath, cancellationToken);
             }
 
-            Directory.CreateDirectory(AppPaths.ConfigDirectory);
+            AppPaths.EnsureDirectories();
             var tempPath = Path.Combine(
                 AppPaths.ConfigDirectory,
                 $"mihomo.compose.{Guid.NewGuid():N}.tmp.yaml");

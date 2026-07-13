@@ -21,7 +21,7 @@ public static class YamlConfigService
         IReadOnlyList<string> RouteExcludeAddress);
 
     public sealed record DnsSectionSettings(
-        bool Enable,
+        bool OverrideEnabled,
         string EnhancedMode,
         bool Ipv6,
         bool RespectRules,
@@ -42,7 +42,7 @@ public static class YamlConfigService
         IReadOnlyDictionary<string, IReadOnlyList<string>> Hosts);
 
     public sealed record SnifferSectionSettings(
-        bool Enable,
+        bool OverrideEnabled,
         bool OverrideDestination,
         bool ForceDnsMapping,
         bool ParsePureIp,
@@ -94,7 +94,10 @@ public static class YamlConfigService
         bool AutoUpdate,
         int UpdateInterval);
 
-    public static string MergeWithBase(string subscriptionYaml, string baseYaml)
+    public static string MergeWithBase(
+        string subscriptionYaml,
+        string baseYaml,
+        IReadOnlySet<string>? excludedRootKeys = null)
     {
         var subscriptionDoc = LoadDocument(subscriptionYaml);
         var subscriptionRoot = EnsureRoot(subscriptionDoc);
@@ -103,6 +106,11 @@ public static class YamlConfigService
         foreach (var (keyNode, valueNode) in baseRoot.Children)
         {
             if (keyNode is not YamlScalarNode scalarKey || string.IsNullOrWhiteSpace(scalarKey.Value))
+            {
+                continue;
+            }
+
+            if (excludedRootKeys?.Contains(scalarKey.Value) == true)
             {
                 continue;
             }
@@ -322,6 +330,18 @@ public static class YamlConfigService
 
         var yaml = await File.ReadAllTextAsync(path, cancellationToken);
         return IsTunEnabled(yaml);
+    }
+
+    public static async Task<bool> IsDnsEnabledAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        var yaml = await File.ReadAllTextAsync(path, cancellationToken);
+        var root = EnsureRoot(LoadDocument(yaml));
+        return TryGetNestedBool(root, "dns", "enable") ?? false;
     }
 
     public static async Task<bool> IsAllowLanEnabledAsync(string path, CancellationToken cancellationToken)

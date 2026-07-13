@@ -21,8 +21,8 @@
 
             <TextBlock Text="基础设置" Style="{StaticResource SectionTitleStyle}" />
             <StackPanel Spacing="4">
-                <controls:SettingsCard Header="启用嗅探" Description="识别连接域名用于提升规则匹配准确性">
-                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding SnifferEnable, Mode=TwoWay}" HorizontalAlignment="Right" />
+                <controls:SettingsCard Header="覆写嗅探配置" Description="关闭后完整使用当前订阅的嗅探配置">
+                    <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding SnifferOverrideEnabled, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>
                 <controls:SettingsCard Header="覆盖目标地址" Description="使用嗅探结果覆盖连接目标">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding OverrideDestination, Mode=TwoWay}" HorizontalAlignment="Right" />

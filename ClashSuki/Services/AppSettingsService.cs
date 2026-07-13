@@ -115,6 +115,12 @@ public sealed class AppSettings
     [JsonPropertyName("disable_dns_on_pause_ssid")]
     public bool DisableDnsOnPauseSsid { get; set; }
 
+    [JsonPropertyName("dns_override_enabled")]
+    public bool DnsOverrideEnabled { get; set; } = true;
+
+    [JsonPropertyName("sniffer_override_enabled")]
+    public bool SnifferOverrideEnabled { get; set; } = true;
+
     [JsonPropertyName("max_log_days")]
     public int MaxLogDays { get; set; } = 7;
 

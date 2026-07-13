@@ -98,6 +98,8 @@ public sealed partial class OverrideViewModel : ObservableObject
     [ObservableProperty] private string logTitle = "执行日志";
     [ObservableProperty] private string logContent = "";
     [ObservableProperty] private string logPath = "";
+    [ObservableProperty] private bool dnsOverrideEnabled = true;
+    [ObservableProperty] private bool snifferOverrideEnabled = true;
     private OverrideItemViewModel? _infoEditingItem;
     private OverrideItemViewModel? _editingItem;
 
@@ -113,6 +115,9 @@ public sealed partial class OverrideViewModel : ObservableObject
 
     public async Task LoadAsync()
     {
+        var settings = await AppSettingsService.LoadAsync();
+        DnsOverrideEnabled = settings.DnsOverrideEnabled;
+        SnifferOverrideEnabled = settings.SnifferOverrideEnabled;
         _config = await _service.LoadAsync();
         var existing = Items.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
         var desired = new List<OverrideItemViewModel>(_config.Items.Count);
@@ -132,6 +137,42 @@ public sealed partial class OverrideViewModel : ObservableObject
 
         ClashSuki.Utilities.CollectionSync.Sync(Items, desired);
         OnPropertyChanged(nameof(ItemCount));
+    }
+
+    public async Task SetDnsOverrideEnabledAsync(bool enabled)
+    {
+        var previous = DnsOverrideEnabled;
+        DnsOverrideEnabled = enabled;
+        try
+        {
+            await _coordinator.SetDnsOverrideEnabledAsync(enabled);
+            Runtime.Notifications.Success(
+                enabled ? "已启用 DNS 与 Hosts 覆写" : "已改用订阅的 DNS 与 Hosts 配置",
+                source: LogSources.Override);
+        }
+        catch (Exception ex)
+        {
+            DnsOverrideEnabled = previous;
+            Runtime.Notifications.Error("切换 DNS 覆写失败", source: LogSources.Override, exception: ex);
+        }
+    }
+
+    public async Task SetSnifferOverrideEnabledAsync(bool enabled)
+    {
+        var previous = SnifferOverrideEnabled;
+        SnifferOverrideEnabled = enabled;
+        try
+        {
+            await _coordinator.SetSnifferOverrideEnabledAsync(enabled);
+            Runtime.Notifications.Success(
+                enabled ? "已启用嗅探覆写" : "已改用订阅的嗅探配置",
+                source: LogSources.Override);
+        }
+        catch (Exception ex)
+        {
+            SnifferOverrideEnabled = previous;
+            Runtime.Notifications.Error("切换嗅探覆写失败", source: LogSources.Override, exception: ex);
+        }
     }
 
     [RelayCommand]
