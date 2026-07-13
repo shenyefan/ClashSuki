@@ -191,7 +191,7 @@ public static class AppPaths
             - tls://1.1.1.1
             - tls://8.8.4.4
           fallback-filter:
-            geoip: false
+            geoip: true
             geoip-code: CN
         """;
 }

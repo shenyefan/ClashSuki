@@ -263,7 +263,7 @@ public static class YamlConfigService
         }
     }
 
-    public static async Task<bool> DisableGeoIpForLegacyFactoryDnsAsync(
+    public static async Task<bool> EnableGeoIpForBundledFactoryDnsAsync(
         string path,
         CancellationToken cancellationToken)
     {
@@ -282,7 +282,7 @@ public static class YamlConfigService
             var fallbackFilter = TryGetMap(dns, "fallback-filter");
             if (dns is null ||
                 fallbackFilter is null ||
-                TryGetBool(fallbackFilter, "geoip") != true ||
+                TryGetBool(fallbackFilter, "geoip") != false ||
                 !ReadList(dns, "nameserver", []).SequenceEqual(
                     ["114.114.114.114", "8.8.8.8"],
                     StringComparer.OrdinalIgnoreCase) ||
@@ -297,7 +297,7 @@ public static class YamlConfigService
                 return false;
             }
 
-            SetScalar(fallbackFilter, "geoip", "false", overwrite: true);
+            SetScalar(fallbackFilter, "geoip", "true", overwrite: true);
             await WriteTextAtomicAsync(
                 path,
                 SaveAndVerifyDocument(doc),
@@ -440,7 +440,7 @@ public static class YamlConfigService
             ReadList(dns, "default-nameserver", ["114.114.114.114", "8.8.8.8"]),
             ReadList(dns, "direct-nameserver", []),
             ReadList(dns, "proxy-server-nameserver", []),
-            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip") ?? false,
+            TryGetBool(TryGetMap(dns, "fallback-filter"), "geoip") ?? true,
             TryGetString(TryGetMap(dns, "fallback-filter"), "geoip-code") ?? "CN",
             ReadList(TryGetMap(dns, "fallback-filter"), "ipcidr", []),
             ReadList(TryGetMap(dns, "fallback-filter"), "domain", []),

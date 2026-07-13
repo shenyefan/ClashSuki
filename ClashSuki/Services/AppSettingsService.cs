@@ -124,6 +124,9 @@ public sealed class AppSettings
     [JsonPropertyName("offline_dns_default_migrated")]
     public bool OfflineDnsDefaultMigrated { get; set; }
 
+    [JsonPropertyName("bundled_geodata_default_migrated")]
+    public bool BundledGeoDataDefaultMigrated { get; set; }
+
     [JsonPropertyName("max_log_days")]
     public int MaxLogDays { get; set; } = 7;
 

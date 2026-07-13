@@ -267,15 +267,15 @@ public sealed class AppCoordinator : IAsyncDisposable
         }
 
         var settings = await AppSettingsService.LoadAsync(_cts.Token);
-        if (!settings.OfflineDnsDefaultMigrated)
+        if (!settings.BundledGeoDataDefaultMigrated)
         {
-            await YamlConfigService.DisableGeoIpForLegacyFactoryDnsAsync(
+            await YamlConfigService.EnableGeoIpForBundledFactoryDnsAsync(
                 AppPaths.BaseConfigPath,
                 _cts.Token);
             await AppSettingsService.PatchAsync(
-                value => value.OfflineDnsDefaultMigrated = true,
+                value => value.BundledGeoDataDefaultMigrated = true,
                 _cts.Token);
-            settings.OfflineDnsDefaultMigrated = true;
+            settings.BundledGeoDataDefaultMigrated = true;
         }
 
         _desiredSystemProxyEnabled = settings.SystemProxyEnabled;
