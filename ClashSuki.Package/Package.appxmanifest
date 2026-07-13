@@ -11,7 +11,7 @@
   <Identity
     Name="ClashSuki"
     Publisher="CN=shenyefan"
-    Version="1.4.1.0" />
+    Version="1.4.2.0" />
 
   <mp:PhoneIdentity PhoneProductId="7b1b3221-30d4-46df-aa3d-96c4f42d2bca" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
@@ -19,6 +19,8 @@
     <DisplayName>ClashSuki</DisplayName>
     <PublisherDisplayName>ClashSuki</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
 
   <Dependencies>
@@ -69,5 +71,6 @@
     <rescap:Capability Name="runFullTrust" />
     <rescap:Capability Name="packagedServices" />
     <rescap:Capability Name="localSystemServices" />
+    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>
