@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using ClashSuki.Services;
 using ClashSuki.Utilities;
 using Microsoft.UI.Xaml;
-using System.Diagnostics;
 
 namespace ClashSuki.ViewModels;
 
@@ -160,15 +159,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         }, "恢复备份", LogSources.Settings);
 
     [RelayCommand]
-    private void OpenBackupDirectory() =>
-        Execute(() =>
+    private Task OpenBackupDirectory() =>
+        ExecuteAsync(async () =>
         {
             Directory.CreateDirectory(BackupService.BackupDirectory);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = BackupService.BackupDirectory,
-                UseShellExecute = true
-            });
+            await WindowsShellLauncher.LaunchFolderPathAsync(
+                BackupService.BackupDirectory,
+                "备份目录");
             Runtime.Notifications.Info(
                 "备份目录已打开",
                 source: LogSources.Settings,
@@ -389,18 +386,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             await operation();
-        }
-        catch (Exception ex)
-        {
-            Runtime.Notifications.Error(ex.Message, $"{action}失败", source, ex);
-        }
-    }
-
-    private void Execute(Action operation, string action, string source)
-    {
-        try
-        {
-            operation();
         }
         catch (Exception ex)
         {

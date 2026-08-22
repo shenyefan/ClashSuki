@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Net;
 using System.Net.Sockets;
@@ -23,6 +24,10 @@ public sealed class WindowsSystemProxyService
     private const int ProxyTypeDirect = 0x00000001;
     private const int ProxyTypeProxy = 0x00000002;
     private const int ProxyTypeAutoProxyUrl = 0x00000004;
+    private const int WinHttpAccessTypeDefaultProxy = 0;
+    private const int WinHttpAccessTypeNoProxy = 1;
+    private const int WinHttpAccessTypeNamedProxy = 3;
+    private const int WinHttpAccessTypeAutomaticProxy = 4;
     private const int HwndBroadcast = 0xffff;
     private const int WmSettingChange = 0x001A;
     private const int SmtoAbortIfHung = 0x0002;
@@ -107,17 +112,133 @@ public sealed class WindowsSystemProxyService
             $"连接设置: {GetConnectionSettingsSnapshot()}",
             $"端口探测，地址: 127.0.0.1:{mixedPort}，可连接: {CanConnect(mixedPort)}",
             $"代理探测: {ProbeHttpProxy(mixedPort)}",
-            DiagnosticLog.RunProcess("netsh.exe", "winhttp", "show", "proxy"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Google\Chrome", "/v", "ProxyMode"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Google\Chrome", "/v", "ProxyServer"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKLM\Software\Policies\Google\Chrome", "/v", "ProxyMode"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKLM\Software\Policies\Google\Chrome", "/v", "ProxyServer"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Microsoft\Edge", "/v", "ProxyMode"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKCU\Software\Policies\Microsoft\Edge", "/v", "ProxyServer"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKLM\Software\Policies\Microsoft\Edge", "/v", "ProxyMode"),
-            DiagnosticLog.RunProcess("reg.exe", "query", @"HKLM\Software\Policies\Microsoft\Edge", "/v", "ProxyServer")
+            GetWinHttpDefaultProxySnapshot(),
+            GetBrowserProxyPolicySnapshot(
+                Registry.CurrentUser,
+                "HKCU",
+                @"Software\Policies\Google\Chrome",
+                "ProxyMode"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.CurrentUser,
+                "HKCU",
+                @"Software\Policies\Google\Chrome",
+                "ProxyServer"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.LocalMachine,
+                "HKLM",
+                @"Software\Policies\Google\Chrome",
+                "ProxyMode"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.LocalMachine,
+                "HKLM",
+                @"Software\Policies\Google\Chrome",
+                "ProxyServer"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.CurrentUser,
+                "HKCU",
+                @"Software\Policies\Microsoft\Edge",
+                "ProxyMode"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.CurrentUser,
+                "HKCU",
+                @"Software\Policies\Microsoft\Edge",
+                "ProxyServer"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.LocalMachine,
+                "HKLM",
+                @"Software\Policies\Microsoft\Edge",
+                "ProxyMode"),
+            GetBrowserProxyPolicySnapshot(
+                Registry.LocalMachine,
+                "HKLM",
+                @"Software\Policies\Microsoft\Edge",
+                "ProxyServer")
         };
         return string.Join(Environment.NewLine, parts);
+    }
+
+    private static string GetWinHttpDefaultProxySnapshot()
+    {
+        var proxyInfo = default(WinHttpProxyInfo);
+        try
+        {
+            if (!WinHttpGetDefaultProxyConfiguration(out proxyInfo))
+            {
+                var errorCode = Marshal.GetLastWin32Error();
+                var errorMessage = new Win32Exception(errorCode).Message;
+                return $"WinHTTP 状态: 读取失败，Win32 错误码: {errorCode}，错误: {errorMessage}";
+            }
+
+            var accessType = proxyInfo.AccessType switch
+            {
+                WinHttpAccessTypeDefaultProxy => "系统默认代理",
+                WinHttpAccessTypeNoProxy => "直接连接",
+                WinHttpAccessTypeNamedProxy => "指定代理",
+                WinHttpAccessTypeAutomaticProxy => "自动代理",
+                _ => $"未知类型 ({proxyInfo.AccessType})"
+            };
+            var proxy = FormatDiagnosticValue(Marshal.PtrToStringUni(proxyInfo.Proxy));
+            var bypass = FormatDiagnosticValue(Marshal.PtrToStringUni(proxyInfo.ProxyBypass));
+            return $"WinHTTP 状态: 访问类型: {accessType}，代理服务器: {proxy}，绕过列表: {bypass}";
+        }
+        catch (Exception ex)
+        {
+            return $"WinHTTP 状态: 读取失败，错误: {ex.Message}";
+        }
+        finally
+        {
+            FreeWinHttpString(proxyInfo.Proxy);
+            FreeWinHttpString(proxyInfo.ProxyBypass);
+        }
+    }
+
+    private static string GetBrowserProxyPolicySnapshot(
+        RegistryKey root,
+        string rootName,
+        string subKeyPath,
+        string valueName)
+    {
+        var displayPath = $@"{rootName}\{subKeyPath}\{valueName}";
+        try
+        {
+            using var key = root.OpenSubKey(subKeyPath, writable: false);
+            if (key is null)
+            {
+                return $"浏览器代理策略: {displayPath}: <未设置>";
+            }
+
+            var value = key.GetValue(
+                valueName,
+                defaultValue: null,
+                RegistryValueOptions.DoNotExpandEnvironmentNames);
+            return $"浏览器代理策略: {displayPath}: {FormatRegistryValue(value)}";
+        }
+        catch (Exception ex)
+        {
+            return $"浏览器代理策略: {displayPath}: <读取失败: {ex.Message}>";
+        }
+    }
+
+    private static string FormatRegistryValue(object? value)
+    {
+        return value switch
+        {
+            null => "<未设置>",
+            string[] values => values.Length == 0 ? "<空>" : string.Join("; ", values),
+            byte[] bytes => bytes.Length == 0 ? "<空>" : Convert.ToHexString(bytes),
+            _ => FormatDiagnosticValue(value.ToString())
+        };
+    }
+
+    private static string FormatDiagnosticValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "<未设置>" : value.Trim();
+
+    private static void FreeWinHttpString(IntPtr value)
+    {
+        if (value != IntPtr.Zero)
+        {
+            _ = GlobalFree(value);
+        }
     }
 
     public void Enable(int mixedPort, string? bypassList = null)
@@ -573,6 +694,13 @@ public sealed class WindowsSystemProxyService
             out _);
     }
 
+    [DllImport("winhttp.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WinHttpGetDefaultProxyConfiguration(out WinHttpProxyInfo proxyInfo);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr memory);
+
     [DllImport("wininet.dll", SetLastError = true)]
     private static extern bool InternetSetOption(IntPtr hInternet, int dwOption, IntPtr lpBuffer, int dwBufferLength);
 
@@ -592,6 +720,14 @@ public sealed class WindowsSystemProxyService
         int flags,
         int timeout,
         out IntPtr result);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WinHttpProxyInfo
+    {
+        public int AccessType;
+        public IntPtr Proxy;
+        public IntPtr ProxyBypass;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct InternetPerConnOptionList

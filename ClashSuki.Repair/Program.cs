@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Windows.Management.Deployment;
 
 namespace ClashSuki.Repair;
@@ -74,15 +75,64 @@ internal static class Program
 
     private static void StartApplication(string appUserModelId)
     {
-        var startInfo = new ProcessStartInfo
+        if (string.IsNullOrWhiteSpace(appUserModelId))
         {
-            FileName = "explorer.exe",
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add($@"shell:AppsFolder\{appUserModelId}");
-        _ = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("应用包已修复，但无法重新启动 ClashSuki。");
+            throw new ArgumentException("应用用户模型 ID 为空。", nameof(appUserModelId));
+        }
+
+        object? activationManagerObject = null;
+        try
+        {
+            activationManagerObject = new ApplicationActivationManager();
+            var activationManager = (IApplicationActivationManager)activationManagerObject;
+            var result = activationManager.ActivateApplication(
+                appUserModelId,
+                arguments: null,
+                ActivateOptions.NoErrorUi,
+                out _);
+            Marshal.ThrowExceptionForHR(result);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"应用包已修复，但 Windows 无法激活应用“{appUserModelId}”。",
+                ex);
+        }
+        finally
+        {
+            if (activationManagerObject is not null && Marshal.IsComObject(activationManagerObject))
+            {
+                _ = Marshal.FinalReleaseComObject(activationManagerObject);
+            }
+        }
+    }
+
+    [Flags]
+    private enum ActivateOptions : uint
+    {
+        None = 0,
+        DesignMode = 0x1,
+        NoErrorUi = 0x2,
+        NoSplashScreen = 0x4
+    }
+
+    [ComImport]
+    [Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IApplicationActivationManager
+    {
+        [PreserveSig]
+        int ActivateApplication(
+            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+            [MarshalAs(UnmanagedType.LPWStr)] string? arguments,
+            ActivateOptions options,
+            out uint processId);
+    }
+
+    [ComImport]
+    [Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
+    private sealed class ApplicationActivationManager
+    {
     }
 
     private static void WriteLog(string level, string message, string? details = null)

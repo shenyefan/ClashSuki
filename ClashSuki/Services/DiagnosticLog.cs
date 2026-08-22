@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -211,60 +210,6 @@ public static class DiagnosticLog
         catch
         {
             return new AppSettings();
-        }
-    }
-
-    public static string RunProcess(string fileName, params string[] args)
-    {
-        var commandLine = CommandLineFormatter.Format(fileName, args);
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = fileName,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            foreach (var arg in args)
-            {
-                startInfo.ArgumentList.Add(arg);
-            }
-
-            using var process = Process.Start(startInfo);
-            if (process is null)
-            {
-                return $"无法启动进程 {fileName}。";
-            }
-
-            var stdoutTask = process.StandardOutput.ReadToEndAsync();
-            var stderrTask = process.StandardError.ReadToEndAsync();
-            if (!process.WaitForExit(1500))
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (Exception ex)
-                {
-                    return $"命令执行超时且无法终止：{commandLine}；{ex.Message}";
-                }
-
-                return $"命令执行超时：{commandLine}";
-            }
-
-            var streams = Task.WhenAll(stdoutTask, stderrTask)
-                .WaitAsync(TimeSpan.FromMilliseconds(500))
-                .GetAwaiter()
-                .GetResult();
-            var output = streams[0] + streams[1];
-            return $"命令执行完成: {commandLine}，退出代码: {process.ExitCode}，输出: {output.Trim()}";
-        }
-        catch (Exception ex)
-        {
-            return $"命令执行失败：{commandLine}；{ex.Message}";
         }
     }
 

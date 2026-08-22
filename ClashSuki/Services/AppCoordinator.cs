@@ -895,12 +895,17 @@ public sealed class AppCoordinator : IAsyncDisposable
             throw new FileNotFoundException($"{label}不存在", path);
         }
 
-        Process.Start(new ProcessStartInfo
+        if (isUri)
         {
-            FileName = path,
-            UseShellExecute = true
-        });
-        return Task.CompletedTask;
+            return WindowsShellLauncher.LaunchUriAsync(uri!, label);
+        }
+
+        if (Directory.Exists(path))
+        {
+            return WindowsShellLauncher.LaunchFolderPathAsync(path, label);
+        }
+
+        return WindowsShellLauncher.LaunchFileAsync(path, label);
     }
 
     public async Task<string?> ReadProfileFileAsync(string uid)
@@ -2598,7 +2603,9 @@ public sealed class AppCoordinator : IAsyncDisposable
         _lastSsidCheck = DateTime.UtcNow;
         var settings = await AppSettingsService.LoadAsync(cancellationToken);
         var ssids = settings.PauseSsids;
-        var currentSsid = await WindowsNetworkEnvironmentService.GetCurrentWifiSsidAsync(cancellationToken);
+        var currentSsid = ssids.Count == 0
+            ? null
+            : await WindowsNetworkEnvironmentService.GetCurrentWifiSsidAsync(cancellationToken);
         var shouldDirect = ssids.Count > 0 &&
                            !string.IsNullOrWhiteSpace(currentSsid) &&
                            ssids.Contains(currentSsid, StringComparer.OrdinalIgnoreCase);
