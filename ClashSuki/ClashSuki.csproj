@@ -19,16 +19,21 @@
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <StartupObject>ClashSuki.Program</StartupObject>
-    <ApplicationIcon>Assets\Img\logo.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\Branding\logo.ico</ApplicationIcon>
     <Version>1.0.0</Version>
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Img\*.png" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\Img\*.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\Fonts\TwemojiMozilla.ttf" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\Fonts\TwemojiMozilla.LICENSE.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Branding\logo.ico;Assets\Branding\logo.png"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Tray\*.ico"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\TwemojiMozilla.ttf;Assets\Fonts\TwemojiMozilla.LICENSE.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

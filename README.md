@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="ClashSuki/Assets/Img/logo.png" width="96" alt="ClashSuki">
+  <img src="ClashSuki/Assets/Branding/logo.png" width="96" alt="ClashSuki">
   <h1>ClashSuki</h1>
   <p>面向 Windows 的现代 Mihomo 图形客户端</p>
 

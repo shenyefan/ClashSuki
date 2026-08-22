@@ -144,12 +144,20 @@ public partial class App : Application
             await _window.RevealBackdropAsync();
         }
 
-        TrayService = new TrayService(_window, viewModel.Dashboard);
-        TrayService.Initialize();
+        var trayService = new TrayService(_window, viewModel.Dashboard);
+        TrayService = trayService.Initialize() ? trayService : null;
 
         if (settings.SilentStart)
         {
-            TrayService.HideWindow();
+            if (TrayService is not null)
+            {
+                TrayService.HideWindow();
+            }
+            else
+            {
+                // A silent app without a tray entry would be unreachable.
+                await _window.PresentAsync();
+            }
         }
 
         _ = StartCoreAsync(viewModel);

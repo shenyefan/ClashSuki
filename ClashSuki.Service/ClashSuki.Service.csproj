@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <ApplicationIcon>..\ClashSuki\Assets\Img\logo.ico</ApplicationIcon>
+    <ApplicationIcon>..\ClashSuki\Assets\Branding\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

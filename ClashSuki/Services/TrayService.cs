@@ -28,6 +28,7 @@ public sealed class TrayService : IDisposable
     private ToggleMenuFlyoutItem? _globalModeItem;
     private ToggleMenuFlyoutItem? _directModeItem;
     private TrayIconState? _currentIconState;
+    private bool _dpiChangedSubscribed;
     private bool _disposed;
 
     public TrayService(Window window, DashboardViewModel dashboard)
@@ -37,23 +38,23 @@ public sealed class TrayService : IDisposable
         _themeRoot = window.Content as FrameworkElement;
     }
 
-    public void Initialize()
+    public bool Initialize()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_trayIcon is not null)
         {
-            return;
+            return _trayIcon.IsCreated;
         }
 
         try
         {
+            AppIconProvider.EnsureTrayIconsAvailable();
             var iconState = ResolveIconState();
             var menu = BuildContextMenu();
             _trayIcon = new TaskbarIcon
             {
                 ContextFlyout = menu,
                 ContextMenuMode = ContextMenuMode.PopupMenu,
-                IconSource = AppIconProvider.CreateTrayIcon(iconState),
                 LeftClickCommand = new RelayCommand(ToggleWindow),
                 MenuActivation = PopupActivationMode.RightClick,
                 NoLeftClickDelay = true,
@@ -61,7 +62,9 @@ public sealed class TrayService : IDisposable
                 ToolTipText = BuildToolTip()
             };
 
-            _currentIconState = iconState;
+            ApplyIcon(iconState);
+            _trayIcon.TrayIcon.MessageWindow.DpiChanged += TrayIcon_DpiChanged;
+            _dpiChangedSubscribed = true;
             _dashboard.Runtime.PropertyChanged += Runtime_PropertyChanged;
             if (_themeRoot is not null)
             {
@@ -71,6 +74,12 @@ public sealed class TrayService : IDisposable
 
             // ClashSuki must keep its core and controller responsive while hidden.
             _trayIcon.ForceCreate(enablesEfficiencyMode: false);
+            if (!_trayIcon.IsCreated)
+            {
+                throw new InvalidOperationException("Windows 未能创建托盘图标。");
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -79,6 +88,7 @@ public sealed class TrayService : IDisposable
                 "托盘初始化失败",
                 source: LogSources.Tray,
                 exception: ex);
+            return false;
         }
     }
 
@@ -239,6 +249,16 @@ public sealed class TrayService : IDisposable
         }
     }
 
+    private void TrayIcon_DpiChanged(object? sender, EventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RunOnUiThread(() => UpdateIcon(force: true));
+    }
+
     private void SynchronizeMenuState()
     {
         if (_systemProxyItem is null || _tunItem is null)
@@ -264,7 +284,7 @@ public sealed class TrayService : IDisposable
         }
     }
 
-    private void UpdateIcon()
+    private void UpdateIcon(bool force = false)
     {
         if (_trayIcon is null)
         {
@@ -272,13 +292,44 @@ public sealed class TrayService : IDisposable
         }
 
         var iconState = ResolveIconState();
-        if (_currentIconState == iconState)
+        if (!force && _currentIconState == iconState)
         {
             return;
         }
 
-        _trayIcon.IconSource = AppIconProvider.CreateTrayIcon(iconState);
-        _currentIconState = iconState;
+        try
+        {
+            ApplyIcon(iconState);
+        }
+        catch (Exception ex)
+        {
+            _dashboard.Runtime.Notifications.Error(
+                "托盘图标更新失败",
+                source: LogSources.Tray,
+                exception: ex);
+        }
+    }
+
+    private void ApplyIcon(TrayIconState state)
+    {
+        if (_trayIcon is null)
+        {
+            return;
+        }
+
+        var icon = AppIconProvider.CreateTrayIconSource(state).ToIcon();
+        try
+        {
+            // TaskbarIcon owns and disposes the assigned System.Drawing.Icon.
+            _trayIcon.Icon = icon;
+        }
+        catch
+        {
+            icon.Dispose();
+            throw;
+        }
+
+        _currentIconState = state;
     }
 
     private TrayIconState ResolveIconState()
@@ -385,6 +436,11 @@ public sealed class TrayService : IDisposable
         if (_themeRoot is not null)
         {
             _themeRoot.ActualThemeChanged -= ThemeRoot_ActualThemeChanged;
+        }
+        if (_dpiChangedSubscribed && _trayIcon is not null)
+        {
+            _trayIcon.TrayIcon.MessageWindow.DpiChanged -= TrayIcon_DpiChanged;
+            _dpiChangedSubscribed = false;
         }
         _trayIcon?.Dispose();
         _trayIcon = null;
