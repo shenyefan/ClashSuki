@@ -9,6 +9,8 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
+    <EnableDefaultAssets>false</EnableDefaultAssets>
+    <EnableDefaultWindowsAppSdkContentItems>false</EnableDefaultWindowsAppSdkContentItems>
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>false</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
@@ -50,21 +52,20 @@
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
     <PackageReference Include="Jint" Version="4.10.1" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
-    <PackageReference Include="Polly" Version="8.5.2" />
-    <PackageReference Include="CliWrap" Version="3.8.2" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WinUI" Version="2.0.5" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Remove="Assets\Age\age-inspect.exe;Assets\Age\age-plugin-batchpass.exe" />
-    <Content Include="Assets\Core\mihomo.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Core\mihomo.exe')" />
-    <Content Include="Assets\Age\age.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age.exe')" />
-    <Content Include="Assets\Age\age-keygen.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\Age\age-keygen.exe')" />
-    <Content Include="Assets\UWP\*.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\UWP\enableLoopback.exe')" />
-    <Content Include="Assets\GeoData\Country.mmdb" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\GeoData\geoip.dat" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\GeoData\geosite.dat" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Core\mihomo.exe;Assets\Core\LICENSE;Assets\Core\README.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Age\age.exe;Assets\Age\age-keygen.exe;Assets\Age\LICENSE"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\GeoData\Country.mmdb;Assets\GeoData\geoip.dat;Assets\GeoData\geosite.dat"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The 2.2 meta-package is required to override WinAppSDK 1.7 references from UI libraries. -->

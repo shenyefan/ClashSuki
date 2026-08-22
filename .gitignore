@@ -1,5 +1,8 @@
 /.vs/
 /.idea/
+*.user
+*.suo
+/ClashSuki.Package/*.assets.cache
 /ClashSuki/bin/
 /ClashSuki/obj/
 /ClashSuki.Service/bin/

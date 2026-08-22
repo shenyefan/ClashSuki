@@ -127,14 +127,47 @@ try
 
     $requiredEntries = @(
         "ClashSuki\ClashSuki.exe"
+        "ClashSuki\ClashSuki.deps.json"
         "ClashSuki\ClashSuki.runtimeconfig.json"
+        "ClashSuki\Assets\Branding\logo.ico"
+        "ClashSuki\Assets\Branding\logo.png"
+        "ClashSuki\Assets\Tray\default.ico"
+        "ClashSuki\Assets\Tray\system-proxy.ico"
+        "ClashSuki\Assets\Tray\tun.ico"
+        "ClashSuki\Assets\Tray\system-proxy-tun.ico"
+        "ClashSuki\Assets\Age\age.exe"
+        "ClashSuki\Assets\Age\age-keygen.exe"
+        "ClashSuki\Assets\Age\LICENSE"
+        "ClashSuki\Assets\Core\mihomo.exe"
+        "ClashSuki\Assets\Core\LICENSE"
+        "ClashSuki\Assets\Core\README.md"
+        "ClashSuki\Assets\Fonts\TwemojiMozilla.ttf"
+        "ClashSuki\Assets\Fonts\TwemojiMozilla.LICENSE.md"
+        "ClashSuki\Assets\GeoData\Country.mmdb"
+        "ClashSuki\Assets\GeoData\geoip.dat"
+        "ClashSuki\Assets\GeoData\geosite.dat"
         "ClashSuki.Service\ClashSuki.Service.exe"
+        "ClashSuki.Service\ClashSuki.Service.deps.json"
         "ClashSuki.Service\ClashSuki.Service.runtimeconfig.json"
+        "ClashSuki.Repair\ClashSuki.Repair.exe"
+        "ClashSuki.Repair\ClashSuki.Repair.deps.json"
+        "ClashSuki.Repair\ClashSuki.Repair.runtimeconfig.json"
     )
     $missingEntries = @($requiredEntries | Where-Object { -not $packageEntries.Contains($_) })
     if ($missingEntries.Count -gt 0)
     {
         throw "MSIX 缺少清单入口或运行时文件：$($missingEntries -join '、')"
+    }
+
+    $forbiddenEntries = @(
+        "ClashSuki\Assets\Age\age-inspect.exe"
+        "ClashSuki\Assets\Age\age-plugin-batchpass.exe"
+        "ClashSuki\Assets\UWP\enableLoopback.exe"
+    )
+    $unexpectedEntries = @($forbiddenEntries | Where-Object { $packageEntries.Contains($_) })
+    if ($unexpectedEntries.Count -gt 0)
+    {
+        throw "MSIX 包含已移除的运行时工具：$($unexpectedEntries -join '、')"
     }
 }
 finally

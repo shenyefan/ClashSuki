@@ -39,8 +39,6 @@
     <HoursBetweenUpdateChecks>24</HoursBetweenUpdateChecks>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
-    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-    <PackageCertificateThumbprint>B39032E3289393F18D34B10D2775ED127FA0068B</PackageCertificateThumbprint>
     <GenerateTestArtifacts>False</GenerateTestArtifacts>
   </PropertyGroup>
   <ItemGroup>
