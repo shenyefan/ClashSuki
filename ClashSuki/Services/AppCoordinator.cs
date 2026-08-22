@@ -2495,7 +2495,7 @@ public sealed class AppCoordinator : IAsyncDisposable
 
     public async Task SetupTunFirewallAsync()
     {
-        await WindowsFirewallService.SetupMihomoRulesAsync();
+        await WindowsFirewallService.SetupMihomoRulesAsync(_serviceManager, _cts.Token);
         await RestartCoreAsync();
     }
 

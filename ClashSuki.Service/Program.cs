@@ -10,12 +10,6 @@ AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         "FATAL");
 };
 
-var commandLineExitCode = ServiceCommandLine.TryExecute(args);
-if (commandLineExitCode is not null)
-{
-    return commandLineExitCode.Value;
-}
-
 try
 {
     var builder = Host.CreateDefaultBuilder(args)
@@ -34,6 +28,8 @@ try
         {
             services.AddSingleton<CoreProcessSupervisor>();
             services.AddSingleton<CoreLaunchRequestValidator>();
+            services.AddSingleton<WindowsFirewallManager>();
+            services.AddSingleton<LoopbackExemptionManager>();
             services.AddSingleton<NamedPipeClientAuthorizer>();
             services.AddSingleton<ServiceCommandDispatcher>();
             services.AddHostedService<Worker>();

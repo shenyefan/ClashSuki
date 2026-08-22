@@ -250,33 +250,6 @@ public sealed partial class DashboardViewModel : ObservableObject
         await SaveSystemProxySettingsAsync();
     }
 
-    [RelayCommand]
-    private async Task OpenUwpToolAsync()
-    {
-        try
-        {
-            await UwpLoopbackToolService.OpenAsync();
-            Runtime.Notifications.Info(
-                "UWP 工具已打开",
-                source: LogSources.Tun,
-                writeLog: false);
-        }
-        catch (OperationCanceledException)
-        {
-            Runtime.Notifications.Info(
-                "已取消打开 UWP 工具",
-                source: LogSources.Tun,
-                writeLog: false);
-        }
-        catch (Exception ex)
-        {
-            Runtime.Notifications.Error(
-                "打开 UWP 工具失败",
-                source: LogSources.Network,
-                exception: ex);
-        }
-    }
-
     private static LineSeries<double> CreateSeries(
         string name,
         ObservableCollection<double> values,

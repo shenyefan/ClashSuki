@@ -6,8 +6,9 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:ui="using:ClashSuki.Controls"
     NavigationCacheMode="Enabled">
-    <ScrollViewer>
-        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+    <Grid>
+        <ScrollViewer>
+            <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -44,8 +45,11 @@
                         <ComboBoxItem Content="PAC" />
                     </ComboBox>
                 </controls:SettingsCard>
-                <controls:SettingsCard Header="UWP 应用代理" Description="配置商店应用回环代理">
-                    <ui:IconActionButton Command="{Binding OpenUwpToolCommand}" Glyph="&#xE8A7;" ToolTipService.ToolTip="打开 UWP 代理工具" />
+                <controls:SettingsCard Header="UWP 应用代理" Description="使用 Windows 原生回环配置">
+                    <ui:IconActionButton x:Name="UwpLoopbackButton"
+                                         Click="OpenUwpLoopback_Click"
+                                         Glyph="&#xE8A7;"
+                                         ToolTipService.ToolTip="配置 UWP 应用回环" />
                 </controls:SettingsCard>
             </StackPanel>
 
@@ -67,6 +71,46 @@
                              PlaceholderText="localhost&#x0a;127.0.0.1&#x0a;192.168.0.0/16&#x0a;10.0.0.0/8" />
                 </StackPanel>
             </controls:SettingsCard>
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+
+        <ContentDialog x:Name="UwpLoopbackDialog"
+                       Title="UWP 应用回环"
+                       PrimaryButtonText="保存"
+                       CloseButtonText="取消"
+                       DefaultButton="Primary"
+                       PrimaryButtonClick="UwpLoopbackDialog_PrimaryButtonClick">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">680</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">680</x:Double>
+            </ContentDialog.Resources>
+            <StackPanel Width="600" Spacing="12">
+                <TextBlock Text="选择允许访问本机代理的商店应用。保存时会通过 ClashSuki 服务调用 Windows Firewall API，不会启动系统命令或第三方工具。"
+                           TextWrapping="Wrap"
+                           Style="{StaticResource MutedCaptionTextStyle}" />
+                <ListView x:Name="UwpLoopbackList"
+                          MaxHeight="480"
+                          SelectionMode="Multiple"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="MinHeight" Value="56" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Padding="4" Spacing="2">
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding PackageFamilyName}"
+                                           Style="{StaticResource MutedCaptionTextStyle}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+        </ContentDialog>
+    </Grid>
 </Page>

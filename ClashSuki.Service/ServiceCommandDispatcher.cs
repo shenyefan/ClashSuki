@@ -5,6 +5,8 @@ namespace ClashSuki.Service;
 internal sealed class ServiceCommandDispatcher(
     CoreProcessSupervisor coreSupervisor,
     CoreLaunchRequestValidator launchValidator,
+    WindowsFirewallManager firewallManager,
+    LoopbackExemptionManager loopbackExemptionManager,
     ILogger<ServiceCommandDispatcher> logger)
 {
     public async Task<ServiceCommandResult> DispatchAsync(
@@ -29,6 +31,9 @@ internal sealed class ServiceCommandDispatcher(
                 ServiceCommands.StartCore => await StartCoreAsync(request, cancellationToken),
                 ServiceCommands.SetCorePriority => await SetCorePriorityAsync(request, cancellationToken),
                 ServiceCommands.StopCore => await StopCoreAsync(cancellationToken),
+                ServiceCommands.ConfigureFirewall => ConfigureFirewall(request, cancellationToken),
+                ServiceCommands.SetLoopbackExemptions => SetLoopbackExemptions(request, cancellationToken),
+                ServiceCommands.ReplaceCore => await ReplaceCoreAsync(request, cancellationToken),
                 ServiceCommands.StopService => await StopServiceAsync(cancellationToken),
                 _ => ServiceCommandResult.Failure($"未知命令：{request.Command}")
             };
@@ -72,6 +77,38 @@ internal sealed class ServiceCommandDispatcher(
         await coreSupervisor.SetPriorityAsync(
             CoreLaunchRequestValidator.NormalizePriority(request.CorePriority),
             cancellationToken);
+        return ServiceCommandResult.Success(ServiceResponse.Success());
+    }
+
+    private ServiceCommandResult ConfigureFirewall(
+        ServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        firewallManager.Configure(request.FirewallRules, cancellationToken);
+        return ServiceCommandResult.Success(ServiceResponse.Success());
+    }
+
+    private ServiceCommandResult SetLoopbackExemptions(
+        ServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        loopbackExemptionManager.SetExemptions(request.LoopbackExemptSids, cancellationToken);
+        return ServiceCommandResult.Success(ServiceResponse.Success());
+    }
+
+    private async Task<ServiceCommandResult> ReplaceCoreAsync(
+        ServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.CoreSourcePath) ||
+            string.IsNullOrWhiteSpace(request.CoreDestinationPath))
+        {
+            throw new InvalidOperationException("内核替换路径不能为空。");
+        }
+
+        await coreSupervisor.StopAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        CoreReplacer.Replace(request.CoreSourcePath, request.CoreDestinationPath);
         return ServiceCommandResult.Success(ServiceResponse.Success());
     }
 

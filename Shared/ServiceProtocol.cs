@@ -8,8 +8,11 @@ public static class ServiceProtocol
     public const string ServiceName = "ClashSukiService";
     public const string PipeName = "ClashSukiService";
     public const string CoreControlPipePath = @"\\.\pipe\clashsuki-mihomo";
-    public const int Version = 5;
-    public const int MaxRequestCharacters = 32 * 1024;
+    public const int Version = 7;
+    public const int MaxRequestCharacters = 128 * 1024;
+    public const int MaxFirewallRuleCount = 3;
+    public const int MaxLoopbackExemptionCount = 512;
+    public const int MaxLoopbackSidCharacters = 184;
 
     public static JsonSerializerOptions CreateJsonOptions()
     {
@@ -28,7 +31,17 @@ public static class ServiceCommands
     public const string StartCore = "start_core";
     public const string SetCorePriority = "set_core_priority";
     public const string StopCore = "stop_core";
+    public const string ConfigureFirewall = "configure_firewall";
+    public const string SetLoopbackExemptions = "set_loopback_exemptions";
+    public const string ReplaceCore = "replace_core";
     public const string StopService = "stop_service";
+}
+
+public static class FirewallRuleNames
+{
+    public const string Mihomo = "mihomo";
+    public const string MihomoAlpha = "mihomo-alpha";
+    public const string ClashSuki = "ClashSuki";
 }
 
 public sealed class ServiceRequest
@@ -39,6 +52,16 @@ public sealed class ServiceRequest
     public string? ConfigDir { get; init; }
     public string? CoreIpcPath { get; init; }
     public string? CorePriority { get; init; }
+    public FirewallRuleRequest?[]? FirewallRules { get; init; }
+    public string?[]? LoopbackExemptSids { get; init; }
+    public string? CoreSourcePath { get; init; }
+    public string? CoreDestinationPath { get; init; }
+}
+
+public sealed class FirewallRuleRequest
+{
+    public string? Name { get; init; }
+    public string? ProgramPath { get; init; }
 }
 
 public sealed class ServiceResponse

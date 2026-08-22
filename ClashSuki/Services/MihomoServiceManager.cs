@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using ClashSuki.ServiceContract;
 
@@ -169,7 +167,16 @@ public sealed class MihomoServiceManager
             return;
         }
 
-        await RunElevatedServiceAsync(cancellationToken, "--replace-core", sourcePath, destinationPath);
+        var serviceManager = new MihomoServiceManager();
+        await serviceManager.EnsureAdministrativeServiceReadyAsync(cancellationToken);
+        await serviceManager._ipcClient.SendAsync(
+            new ServiceRequest
+            {
+                Command = ServiceCommands.ReplaceCore,
+                CoreSourcePath = Path.GetFullPath(sourcePath),
+                CoreDestinationPath = Path.GetFullPath(destinationPath)
+            },
+            cancellationToken);
     }
 
     public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
@@ -222,6 +229,54 @@ public sealed class MihomoServiceManager
             {
                 Command = ServiceCommands.SetCorePriority,
                 CorePriority = priority
+            },
+            cancellationToken);
+    }
+
+    public async Task ConfigureFirewallAsync(
+        IReadOnlyCollection<FirewallRuleRequest> rules,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        if (rules.Count == 0 || rules.Count > ServiceProtocol.MaxFirewallRuleCount)
+        {
+            throw new InvalidOperationException(
+                $"防火墙规则数量必须介于 1 和 {ServiceProtocol.MaxFirewallRuleCount} 之间。");
+        }
+
+        await EnsureAdministrativeServiceReadyAsync(cancellationToken);
+
+        await _ipcClient.SendAsync(
+            new ServiceRequest
+            {
+                Command = ServiceCommands.ConfigureFirewall,
+                FirewallRules = rules.Cast<FirewallRuleRequest?>().ToArray()
+            },
+            cancellationToken);
+    }
+
+    public async Task SetLoopbackExemptionsAsync(
+        IReadOnlyCollection<string> selectedSids,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(selectedSids);
+        var normalizedSids = selectedSids
+            .Where(static sid => !string.IsNullOrWhiteSpace(sid))
+            .Select(static sid => sid.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalizedSids.Length > ServiceProtocol.MaxLoopbackExemptionCount)
+        {
+            throw new InvalidOperationException(
+                $"回环豁免不能超过 {ServiceProtocol.MaxLoopbackExemptionCount} 项。");
+        }
+
+        await EnsureAdministrativeServiceReadyAsync(cancellationToken);
+        await _ipcClient.SendAsync(
+            new ServiceRequest
+            {
+                Command = ServiceCommands.SetLoopbackExemptions,
+                LoopbackExemptSids = normalizedSids
             },
             cancellationToken);
     }
@@ -329,97 +384,17 @@ public sealed class MihomoServiceManager
         bool IsCompatible,
         int? ProtocolVersion);
 
-    private static async Task RunElevatedServiceAsync(CancellationToken cancellationToken, params string[] arguments)
+    private async Task EnsureAdministrativeServiceReadyAsync(CancellationToken cancellationToken)
     {
-        var exePath = ResolveServiceExecutablePath();
-        Process? process;
-        try
+        var serviceStatus = await EnsureReadyAsync(cancellationToken);
+        if (serviceStatus != MihomoServiceStatus.Ready)
         {
-            var startInfo = new ProcessStartInfo
+            throw new InvalidOperationException(serviceStatus switch
             {
-                FileName = exePath,
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
-            process = Process.Start(startInfo)
-                      ?? throw new InvalidOperationException(
-                          $"无法启动命令：{CommandLineFormatter.Format(exePath, arguments)}");
+                MihomoServiceStatus.InstallRequired => "ClashSuki 服务尚未安装，请先修复应用包。",
+                MihomoServiceStatus.Stopped => "ClashSuki 服务未运行。",
+                _ => "ClashSuki 服务不可用，请先修复服务。"
+            });
         }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
-        {
-            throw new OperationCanceledException("已取消管理员权限请求", ex, cancellationToken);
-        }
-
-        using (process)
-        {
-            await process.WaitForExitAsync(cancellationToken);
-            if (process.ExitCode != 0)
-            {
-                var hint = process.ExitCode switch
-                {
-                    1 => "请以管理员身份运行，并确认 UAC 提权对话框已允许。",
-                    5 => "访问被拒绝，请确认已授予管理员权限。",
-                    _ => null
-                };
-                var command = CommandLineFormatter.Format(Path.GetFileName(exePath), arguments);
-                var detail = ReadServiceInstallLogTail();
-                var baseMessage = hint is null
-                    ? $"{command} 执行失败，退出码为 {process.ExitCode}"
-                    : $"{command} 失败（退出码 {process.ExitCode}）：{hint}";
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
-                    ? baseMessage
-                    : $"{baseMessage}{Environment.NewLine}服务诊断日志：{Environment.NewLine}{detail}");
-            }
-        }
-    }
-
-    private static string? ReadServiceInstallLogTail()
-    {
-        try
-        {
-            var logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "ClashSuki",
-                "service-install.log");
-            if (!File.Exists(logPath))
-            {
-                return null;
-            }
-
-            var lines = File.ReadAllLines(logPath);
-            return string.Join(Environment.NewLine, lines.TakeLast(15));
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.WriteAppExceptionThrottled(
-                "service-install-log-read",
-                LogSources.Service,
-                ex,
-                "读取服务安装诊断日志失败",
-                level: "WARN");
-            return null;
-        }
-    }
-
-    private static string ResolveServiceExecutablePath()
-    {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
-        {
-            Path.Combine(baseDirectory, "ClashSuki.Service.exe"),
-            Path.GetFullPath(Path.Combine(baseDirectory, "..", "ClashSuki.Service", "ClashSuki.Service.exe"))
-        };
-
-        return candidates.FirstOrDefault(File.Exists)
-               ?? throw new FileNotFoundException(
-                   "找不到 ClashSuki.Service.exe，请重新生成 ClashSuki",
-                   candidates[0]);
     }
 }
