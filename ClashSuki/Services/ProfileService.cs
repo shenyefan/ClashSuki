@@ -330,10 +330,14 @@ public sealed class ProfileService : IDisposable
             throw new InvalidDataException("该订阅为 age 加密内容，需要填写有效的 age secret key。");
         }
 
-        var keyPath = Path.Combine(Path.GetTempPath(), $"clashsuki-age-{Guid.NewGuid():N}.txt");
+        var encryptedInputPath = Path.Combine(
+            Path.GetTempPath(),
+            $"clashsuki-age-{Guid.NewGuid():N}.age");
         try
         {
-            await File.WriteAllTextAsync(keyPath, string.Join(Environment.NewLine, identities), cancellationToken);
+            // age can read identities from stdin. Keep private keys off disk and only
+            // stage the already-encrypted subscription so stdin remains available.
+            await File.WriteAllTextAsync(encryptedInputPath, content, cancellationToken);
             using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -351,7 +355,8 @@ public sealed class ProfileService : IDisposable
 
             process.StartInfo.ArgumentList.Add("--decrypt");
             process.StartInfo.ArgumentList.Add("--identity");
-            process.StartInfo.ArgumentList.Add(keyPath);
+            process.StartInfo.ArgumentList.Add("-");
+            process.StartInfo.ArgumentList.Add(encryptedInputPath);
 
             try
             {
@@ -362,26 +367,36 @@ public sealed class ProfileService : IDisposable
                 throw new InvalidOperationException("检测到 Age 加密订阅，但未找到 Age 解密工具，无法解密。", ex);
             }
 
+            using var cancellationRegistration =
+                ProcessCancellation.TerminateOnCancellation(process, cancellationToken);
             var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.StandardInput.WriteAsync(content.AsMemory(), cancellationToken);
-            process.StandardInput.Close();
+            try
+            {
+                var identityText = string.Join(Environment.NewLine, identities) + Environment.NewLine;
+                await process.StandardInput.WriteAsync(identityText.AsMemory(), cancellationToken);
+            }
+            finally
+            {
+                process.StandardInput.Close();
+            }
+
             await process.WaitForExitAsync(cancellationToken);
 
             var output = await outputTask;
+            var error = await errorTask;
             if (process.ExitCode == 0)
             {
                 return output;
             }
 
-            var error = await errorTask;
             throw new InvalidDataException($"Age 订阅解密失败：{error.Trim()}");
         }
         finally
         {
-            if (File.Exists(keyPath))
+            if (File.Exists(encryptedInputPath))
             {
-                File.Delete(keyPath);
+                File.Delete(encryptedInputPath);
             }
         }
     }

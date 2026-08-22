@@ -1874,8 +1874,10 @@ public sealed class AppCoordinator : IAsyncDisposable
 
             using var process = Process.Start(startInfo) ??
                                 throw new InvalidOperationException("无法启动 mihomo 转换 MRS 规则集合");
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
+            using var cancellationRegistration =
+                ProcessCancellation.TerminateOnCancellation(process, _cts.Token);
+            var outputTask = process.StandardOutput.ReadToEndAsync(_cts.Token);
+            var errorTask = process.StandardError.ReadToEndAsync(_cts.Token);
             await process.WaitForExitAsync(_cts.Token);
             var output = await outputTask;
             var error = await errorTask;

@@ -429,6 +429,8 @@ public sealed class MihomoCoreManager : IAsyncDisposable
 
         using var process = Process.Start(startInfo)
                             ?? throw new InvalidOperationException("无法运行 mihomo 配置测试");
+        using var cancellationRegistration =
+            ProcessCancellation.TerminateOnCancellation(process, cancellationToken);
 
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);

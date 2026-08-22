@@ -47,8 +47,8 @@ public sealed class GistSyncService
 
     public async Task<AgeKeyPair> GenerateAgeKeyPairAsync(CancellationToken cancellationToken)
     {
-        var keygen = ResolveAgeTool("age-keygen.exe") ?? ResolveAgeTool("age.exe")
-                     ?? throw new FileNotFoundException("未找到 Age 工具。");
+        var keygen = ResolveAgeTool("age-keygen.exe")
+                     ?? throw new FileNotFoundException("未找到 age-keygen.exe，无法生成 Age 密钥。");
         var startInfo = new ProcessStartInfo
         {
             FileName = keygen,
@@ -57,16 +57,15 @@ public sealed class GistSyncService
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        if (Path.GetFileName(keygen).Equals("age.exe", StringComparison.OrdinalIgnoreCase))
-        {
-            startInfo.ArgumentList.Add("--generate-key");
-        }
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Age 密钥生成启动失败。");
+        using var cancellationRegistration = ProcessCancellation.TerminateOnCancellation(process, cancellationToken);
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-        var output = $"{await outputTask}{Environment.NewLine}{await errorTask}".Trim();
+        var standardOutput = await outputTask;
+        var standardError = await errorTask;
+        var output = $"{standardOutput}{Environment.NewLine}{standardError}".Trim();
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(output);
@@ -94,41 +93,41 @@ public sealed class GistSyncService
     private static async Task<string> EncryptWithAgeAsync(string content, string recipient, CancellationToken cancellationToken)
     {
         var age = ResolveAgeTool("age.exe") ?? throw new FileNotFoundException("未找到 age.exe。");
-        var tempIn = Path.Combine(Path.GetTempPath(), $"clashsuki-age-{Guid.NewGuid():N}.yaml");
-        var tempOut = tempIn + ".age";
-        await File.WriteAllTextAsync(tempIn, content, cancellationToken);
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = age,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        startInfo.ArgumentList.Add("-a");
+        startInfo.ArgumentList.Add("-r");
+        startInfo.ArgumentList.Add(recipient.Trim());
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Age 加密启动失败。");
+        using var cancellationRegistration = ProcessCancellation.TerminateOnCancellation(process, cancellationToken);
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
         try
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = age,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            startInfo.ArgumentList.Add("-a");
-            startInfo.ArgumentList.Add("-r");
-            startInfo.ArgumentList.Add(recipient.Trim());
-            startInfo.ArgumentList.Add("-o");
-            startInfo.ArgumentList.Add(tempOut);
-            startInfo.ArgumentList.Add(tempIn);
-
-            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Age 加密启动失败。");
-            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            if (process.ExitCode != 0)
-            {
-                throw new InvalidOperationException((await errorTask).Trim());
-            }
-
-            return await File.ReadAllTextAsync(tempOut, cancellationToken);
+            await process.StandardInput.WriteAsync(content.AsMemory(), cancellationToken);
         }
         finally
         {
-            TryDelete(tempIn);
-            TryDelete(tempOut);
+            process.StandardInput.Close();
         }
+
+        await process.WaitForExitAsync(cancellationToken);
+        var output = await outputTask;
+        var error = await errorTask;
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(error.Trim());
+        }
+
+        return output;
     }
 
     private static async Task<string> CreateGistAsync(string token, string fileName, string content, CancellationToken cancellationToken)
@@ -174,25 +173,6 @@ public sealed class GistSyncService
             Path.Combine(AppContext.BaseDirectory, fileName)
         };
         return candidates.FirstOrDefault(File.Exists);
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.WriteAppException(
-                LogSources.Gist,
-                ex,
-                $"删除 Gist 同步临时文件失败，路径: {path}",
-                "WARN");
-        }
     }
 
     private sealed record GistRequest(
