@@ -60,7 +60,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Core\mihomo.exe;Assets\Core\LICENSE;Assets\Core\README.md"
+    <Content Include="Assets\Core\mihomo.exe;Assets\Core\LICENSE"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Age\age.exe;Assets\Age\age-keygen.exe;Assets\Age\LICENSE"

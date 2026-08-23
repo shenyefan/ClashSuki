@@ -18,7 +18,7 @@
   <Properties>
     <DisplayName>ClashSuki</DisplayName>
     <PublisherDisplayName>ClashSuki</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <Logo>ClashSuki\Assets\StoreLogo.png</Logo>
     <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
@@ -38,10 +38,10 @@
         DisplayName="ClashSuki"
         Description="ClashSuki"
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile  Square71x71Logo="Assets\SmallTile.png" Wide310x150Logo="Assets\WideTile.png" Square310x310Logo="Assets\LargeTile.png"/>
-        <uap:SplashScreen Image="Assets\SplashScreen.png"/>
+        Square150x150Logo="ClashSuki\Assets\Square150x150Logo.png"
+        Square44x44Logo="ClashSuki\Assets\Square44x44Logo.png">
+        <uap:DefaultTile Square71x71Logo="ClashSuki\Assets\SmallTile.png" Wide310x150Logo="ClashSuki\Assets\WideTile.png" Square310x310Logo="ClashSuki\Assets\LargeTile.png"/>
+        <uap:SplashScreen Image="ClashSuki\Assets\SplashScreen.png"/>
       </uap:VisualElements>
       <Extensions>
         <desktop6:Extension

@@ -69,6 +69,14 @@ jobs:
             Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
           }
 
+      - name: Build and validate Portable
+        id: portable
+        shell: pwsh
+        run: |
+          .\ClashSuki.Package\Build-Portable.ps1 `
+            -Configuration Release `
+            -Platform x64
+
       - name: Upload MSIX
         uses: actions/upload-artifact@v7
         with:
@@ -76,5 +84,14 @@ jobs:
           path: |
             ClashSuki.Package/AppPackages/**/*.msix
             ClashSuki.Package/AppPackages/**/*_Test/**/*.cer
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Portable ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: ClashSuki-${{ steps.portable.outputs.version }}-win-x64-portable
+          path: ${{ steps.portable.outputs.zip_path }}
+          archive: false
           if-no-files-found: error
           retention-days: 14

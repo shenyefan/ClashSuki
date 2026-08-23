@@ -125,6 +125,13 @@ try
         [void]$packageEntries.Add($entry.FullName.Replace("/", "\"))
     }
 
+    $requiredVisualAssetEntries = @(Get-ChildItem `
+        -LiteralPath (Join-Path $projectDirectory "Assets") `
+        -Filter "*.png" `
+        -File | ForEach-Object {
+            "ClashSuki\Assets\$($_.Name)"
+        })
+
     $requiredEntries = @(
         "ClashSuki\ClashSuki.exe"
         "ClashSuki\ClashSuki.deps.json"
@@ -140,7 +147,6 @@ try
         "ClashSuki\Assets\Age\LICENSE"
         "ClashSuki\Assets\Core\mihomo.exe"
         "ClashSuki\Assets\Core\LICENSE"
-        "ClashSuki\Assets\Core\README.md"
         "ClashSuki\Assets\Fonts\TwemojiMozilla.ttf"
         "ClashSuki\Assets\Fonts\TwemojiMozilla.LICENSE.md"
         "ClashSuki\Assets\GeoData\Country.mmdb"
@@ -152,11 +158,19 @@ try
         "ClashSuki.Repair\ClashSuki.Repair.exe"
         "ClashSuki.Repair\ClashSuki.Repair.deps.json"
         "ClashSuki.Repair\ClashSuki.Repair.runtimeconfig.json"
-    )
+    ) + $requiredVisualAssetEntries
     $missingEntries = @($requiredEntries | Where-Object { -not $packageEntries.Contains($_) })
     if ($missingEntries.Count -gt 0)
     {
-        throw "MSIX 缺少清单入口或运行时文件：$($missingEntries -join '、')"
+        throw "MSIX 缺少清单资源或运行时文件：$($missingEntries -join '、')"
+    }
+
+    $rootAssetEntries = @($packageEntries | Where-Object {
+        $_.StartsWith("Assets\", [System.StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($rootAssetEntries.Count -gt 0)
+    {
+        throw "MSIX 包根仍包含重复 Assets 目录：$($rootAssetEntries -join '、')"
     }
 
     $forbiddenEntries = @(
@@ -175,4 +189,4 @@ finally
     $archive.Dispose()
 }
 
-Write-Host "MSIX 已生成并通过入口校验：$($package.FullName)" -ForegroundColor Green
+Write-Host "MSIX 已生成并通过内容校验：$($package.FullName)" -ForegroundColor Green
