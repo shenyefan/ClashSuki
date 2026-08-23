@@ -7,8 +7,12 @@ public static class ServiceProtocol
 {
     public const string ServiceName = "ClashSukiService";
     public const string PipeName = "ClashSukiService";
+    public const string PortableServiceName = "ClashSukiPortableService";
+    public const string PortablePipeName = "ClashSukiPortableService";
+    public const string PortableServiceHostArgument = "--portable-service-host";
+    public const string InstallPortableServiceArgument = "--install-portable-service";
     public const string CoreControlPipePath = @"\\.\pipe\clashsuki-mihomo";
-    public const int Version = 7;
+    public const int Version = 8;
     public const int MaxRequestCharacters = 128 * 1024;
     public const int MaxFirewallRuleCount = 3;
     public const int MaxLoopbackExemptionCount = 512;
@@ -33,7 +37,6 @@ public static class ServiceCommands
     public const string StopCore = "stop_core";
     public const string ConfigureFirewall = "configure_firewall";
     public const string SetLoopbackExemptions = "set_loopback_exemptions";
-    public const string ReplaceCore = "replace_core";
     public const string StopService = "stop_service";
 }
 
@@ -47,15 +50,12 @@ public static class FirewallRuleNames
 public sealed class ServiceRequest
 {
     public string? Command { get; init; }
-    public string? CorePath { get; init; }
     public string? ConfigPath { get; init; }
     public string? ConfigDir { get; init; }
     public string? CoreIpcPath { get; init; }
     public string? CorePriority { get; init; }
     public FirewallRuleRequest?[]? FirewallRules { get; init; }
     public string?[]? LoopbackExemptSids { get; init; }
-    public string? CoreSourcePath { get; init; }
-    public string? CoreDestinationPath { get; init; }
 }
 
 public sealed class FirewallRuleRequest

@@ -12,20 +12,27 @@ AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 
 try
 {
-    var builder = Host.CreateDefaultBuilder(args)
+    if (PortableServiceInstaller.IsInstallCommand(args))
+    {
+        return PortableServiceInstaller.Run(args);
+    }
+
+    var runtimeContext = ServiceRuntimeContext.Create(args);
+    var builder = Host.CreateDefaultBuilder(Array.Empty<string>())
         .UseWindowsService(options =>
         {
-            options.ServiceName = ServiceProtocol.ServiceName;
+            options.ServiceName = runtimeContext.ServiceName;
         })
         .ConfigureLogging(logging =>
         {
             logging.AddEventLog(settings =>
             {
-                settings.SourceName = ServiceProtocol.ServiceName;
+                settings.SourceName = runtimeContext.ServiceName;
             });
         })
         .ConfigureServices(services =>
         {
+            services.AddSingleton(runtimeContext);
             services.AddSingleton<CoreProcessSupervisor>();
             services.AddSingleton<CoreLaunchRequestValidator>();
             services.AddSingleton<WindowsFirewallManager>();

@@ -8,6 +8,7 @@ namespace ClashSuki.Service;
 internal sealed class Worker(
     ILogger<Worker> logger,
     IHostApplicationLifetime hostLifetime,
+    ServiceRuntimeContext runtimeContext,
     NamedPipeClientAuthorizer clientAuthorizer,
     ServiceCommandDispatcher commandDispatcher,
     CoreProcessSupervisor coreSupervisor) : BackgroundService
@@ -16,7 +17,7 @@ internal sealed class Worker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("ClashSuki 服务已启动，正在监听命名管道 {PipeName}", ServiceProtocol.PipeName);
+        logger.LogInformation("ClashSuki 服务已启动，正在监听命名管道 {PipeName}", runtimeContext.PipeName);
 
         try
         {
@@ -24,7 +25,7 @@ internal sealed class Worker(
             {
                 try
                 {
-                    await using var pipeServer = NamedPipeFactory.CreateServer(ServiceProtocol.PipeName);
+                    await using var pipeServer = NamedPipeFactory.CreateServer(runtimeContext);
                     await pipeServer.WaitForConnectionAsync(stoppingToken);
                     await HandleClientAsync(pipeServer, stoppingToken);
                 }

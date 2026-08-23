@@ -26,11 +26,6 @@ public sealed class MihomoServiceManager
     {
         await AppPaths.BootstrapAsync(cancellationToken);
 
-        if (!PackageIdentityService.IsPackaged)
-        {
-            return MihomoServiceStatus.InstallRequired;
-        }
-
         if (!PackagedServiceController.IsInstalled())
         {
             return MihomoServiceStatus.InstallRequired;
@@ -49,11 +44,6 @@ public sealed class MihomoServiceManager
     public async Task<MihomoServiceStatus> EnsureReadyAsync(CancellationToken cancellationToken = default)
     {
         await AppPaths.BootstrapAsync(cancellationToken);
-
-        if (!PackageIdentityService.IsPackaged)
-        {
-            return MihomoServiceStatus.InstallRequired;
-        }
 
         if (!PackagedServiceController.IsInstalled())
         {
@@ -111,7 +101,7 @@ public sealed class MihomoServiceManager
         if (!PackageIdentityService.IsPackaged)
         {
             throw new InvalidOperationException(
-                "服务仅由 MSIX 包管理，请在 Visual Studio 中启动 ClashSuki.Package 项目");
+                "便携版不使用应用包修复，请在虚拟网卡页面安装服务。");
         }
 
         if (PackagedServiceController.IsRunning())
@@ -120,6 +110,18 @@ public sealed class MihomoServiceManager
         }
 
         await PackageRepairLauncher.StartAfterCurrentProcessExitsAsync(cancellationToken);
+    }
+
+    public async Task InstallPortableServiceAsync(CancellationToken cancellationToken = default)
+    {
+        if (PackageIdentityService.IsPackaged)
+        {
+            throw new InvalidOperationException("MSIX 版本由 Windows 管理服务，无需手动安装。");
+        }
+
+        await AppPaths.BootstrapAsync(cancellationToken);
+        await PortableServiceInstallerLauncher.InstallAsync(cancellationToken);
+        await WaitUntilReadyAsync(TimeSpan.FromSeconds(20), cancellationToken);
     }
 
     public async Task StopHostAsync(CancellationToken cancellationToken = default)
@@ -150,7 +152,7 @@ public sealed class MihomoServiceManager
             catch (Exception fallbackEx)
             {
                 throw new InvalidOperationException(
-                    "无法停止 ClashSuki 服务，请修复应用包后重试",
+                    "无法停止 ClashSuki 服务，请修复服务后重试。",
                     new AggregateException(ex, fallbackEx));
             }
         }
@@ -167,16 +169,8 @@ public sealed class MihomoServiceManager
             return;
         }
 
-        var serviceManager = new MihomoServiceManager();
-        await serviceManager.EnsureAdministrativeServiceReadyAsync(cancellationToken);
-        await serviceManager._ipcClient.SendAsync(
-            new ServiceRequest
-            {
-                Command = ServiceCommands.ReplaceCore,
-                CoreSourcePath = Path.GetFullPath(sourcePath),
-                CoreDestinationPath = Path.GetFullPath(destinationPath)
-            },
-            cancellationToken);
+        throw new UnauthorizedAccessException(
+            "无法替换内核文件。请关闭占用该文件的程序后重试。");
     }
 
     public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
@@ -193,7 +187,8 @@ public sealed class MihomoServiceManager
             await Task.Delay(500, cancellationToken);
         }
 
-        throw new TimeoutException("服务已安装但 IPC 管道未就绪，请检查 Windows 服务 ClashSukiService 是否启动成功");
+        throw new TimeoutException(
+            $"服务已安装但 IPC 管道未就绪，请检查 Windows 服务 {PackagedServiceController.ServiceName}。");
     }
 
     public async Task StartCoreAsync(
@@ -209,7 +204,6 @@ public sealed class MihomoServiceManager
         var payload = new ServiceRequest
         {
             Command = ServiceCommands.StartCore,
-            CorePath = AppPaths.ManagedCorePath,
             ConfigPath = AppPaths.RuntimeConfigPath,
             ConfigDir = effectiveConfigDirectory,
             CoreIpcPath = MihomoControllerEndpoint.PipePath,
@@ -373,6 +367,10 @@ public sealed class MihomoServiceManager
                 IsCompatible: protocolVersion == ServiceProtocol.Version,
                 ProtocolVersion: protocolVersion);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return new ServiceProbe(false, false, null);
@@ -391,7 +389,9 @@ public sealed class MihomoServiceManager
         {
             throw new InvalidOperationException(serviceStatus switch
             {
-                MihomoServiceStatus.InstallRequired => "ClashSuki 服务尚未安装，请先修复应用包。",
+                MihomoServiceStatus.InstallRequired => PackageIdentityService.IsPackaged
+                    ? "ClashSuki 服务未安装，请先修复应用。"
+                    : "ClashSuki 服务未安装，请先在虚拟网卡页面安装服务。",
                 MihomoServiceStatus.Stopped => "ClashSuki 服务未运行。",
                 _ => "ClashSuki 服务不可用，请先修复服务。"
             });

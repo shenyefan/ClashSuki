@@ -2515,7 +2515,7 @@ public sealed class AppCoordinator : IAsyncDisposable
             {
                 Runtime.TunServiceStatusText = "正在退出并修复服务";
                 Runtime.IsTunToggleAvailable = false;
-                Logs.AddApp("INFO", "已启动包外修复进程，应用即将退出", LogSources.Service);
+                Logs.AddApp("INFO", "已启动服务修复程序，应用即将退出", LogSources.Service);
             });
         }
         catch (Exception ex) when (!IsAppCancellation(ex))
@@ -2526,6 +2526,26 @@ public sealed class AppCoordinator : IAsyncDisposable
                 Runtime.IsTunToggleAvailable = false;
                 Runtime.ShowTunServiceRepair = true;
             });
+            throw;
+        }
+    }
+
+    public async Task InstallPortableServiceAsync()
+    {
+        try
+        {
+            await _serviceManager.InstallPortableServiceAsync(_cts.Token);
+            var status = await _serviceManager.GetStatusAsync(_cts.Token);
+            await _dispatcher.RunAsync(() =>
+            {
+                Runtime.ApplyTunCapability(status);
+                Logs.AddApp("INFO", "便携服务安装完成", LogSources.Service);
+            });
+        }
+        catch (Exception ex) when (!IsAppCancellation(ex))
+        {
+            var status = await _serviceManager.GetStatusAsync(CancellationToken.None);
+            await _dispatcher.RunAsync(() => Runtime.ApplyTunCapability(status));
             throw;
         }
     }
@@ -2847,7 +2867,10 @@ public sealed class AppCoordinator : IAsyncDisposable
     {
         if (!Runtime.IsTunToggleAvailable)
         {
-            throw new InvalidOperationException("TUN 需要安装 ClashSuki 服务或以管理员身份运行");
+            throw new InvalidOperationException(
+                PackageIdentityService.IsPackaged
+                    ? "虚拟网卡服务不可用，请先修复服务"
+                    : "虚拟网卡服务不可用，请先在虚拟网卡页面安装服务");
         }
     }
 

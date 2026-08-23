@@ -5,7 +5,9 @@ namespace ClashSuki.Services;
 
 public static class PackagedServiceController
 {
-    public const string ServiceName = ServiceProtocol.ServiceName;
+    public static string ServiceName => PackageIdentityService.IsPackaged
+        ? ServiceProtocol.ServiceName
+        : ServiceProtocol.PortableServiceName;
 
     public static bool IsInstalled()
     {
@@ -16,17 +18,23 @@ public static class PackagedServiceController
     public static bool IsRunning()
     {
         using var controller = FindController();
-        return controller?.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending;
+        return controller?.Status == ServiceControllerStatus.Running;
     }
 
     public static void Start()
     {
         using var controller = FindController()
                                ?? throw new InvalidOperationException(
-                                   "ClashSuki 打包服务未注册，请先修复应用包。");
+                                   "ClashSuki 服务未安装，请先修复应用。");
 
-        if (controller.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending)
+        if (controller.Status == ServiceControllerStatus.Running)
         {
+            return;
+        }
+
+        if (controller.Status == ServiceControllerStatus.StartPending)
+        {
+            controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
             return;
         }
 
@@ -43,9 +51,14 @@ public static class PackagedServiceController
     public static void Stop()
     {
         using var controller = FindController();
-        if (controller?.Status is not (ServiceControllerStatus.Running or ServiceControllerStatus.StartPending))
+        if (controller is null || controller.Status == ServiceControllerStatus.Stopped)
         {
             return;
+        }
+
+        if (controller.Status == ServiceControllerStatus.StartPending)
+        {
+            controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
         }
 
         controller.Stop();

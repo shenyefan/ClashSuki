@@ -19,7 +19,9 @@ internal sealed class ServiceIpcClient
 
         await using var pipe = new NamedPipeClientStream(
             ".",
-            ServiceProtocol.PipeName,
+            PackageIdentityService.IsPackaged
+                ? ServiceProtocol.PipeName
+                : ServiceProtocol.PortablePipeName,
             PipeDirection.InOut,
             PipeOptions.Asynchronous);
         await pipe.ConnectAsync(connectTimeoutMilliseconds, timeout.Token);

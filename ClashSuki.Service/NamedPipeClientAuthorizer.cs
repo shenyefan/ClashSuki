@@ -1,13 +1,32 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Principal;
 
 namespace ClashSuki.Service;
 
-internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorizer> logger)
+internal sealed class NamedPipeClientAuthorizer(
+    ServiceRuntimeContext runtimeContext,
+    ILogger<NamedPipeClientAuthorizer> logger)
 {
     public bool IsAuthorized(NamedPipeServerStream pipe, out string reason)
     {
+        if (!TryGetClientSid(pipe, out var clientSid, out reason))
+        {
+            return false;
+        }
+
+        if (runtimeContext.IsPortable &&
+            !string.Equals(
+                clientSid,
+                runtimeContext.PortableRegistration!.OwnerSid,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            reason = $"拒绝未登记的便携服务客户端 SID：{clientSid}";
+            return false;
+        }
+
         if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle.DangerousGetHandle(), out var processId))
         {
             reason = $"无法读取管道客户端进程标识，Win32 错误码: {Marshal.GetLastWin32Error()}";
@@ -25,7 +44,18 @@ internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorize
             }
 
             var normalizedClientPath = Path.GetFullPath(clientPath);
-            if (GetAllowedClientPaths().Contains(normalizedClientPath, StringComparer.OrdinalIgnoreCase))
+            if (runtimeContext.IsPortable)
+            {
+                if (!ValidatePortableClient(normalizedClientPath, out reason))
+                {
+                    return false;
+                }
+
+                reason = string.Empty;
+                return true;
+            }
+
+            if (runtimeContext.GetTrustedMsixClientPaths().Contains(normalizedClientPath))
             {
                 reason = string.Empty;
                 return true;
@@ -42,22 +72,86 @@ internal sealed class NamedPipeClientAuthorizer(ILogger<NamedPipeClientAuthorize
         }
     }
 
-    private static IEnumerable<string> GetAllowedClientPaths()
+    private bool ValidatePortableClient(string clientPath, out string reason)
     {
-        var serviceDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        var parent = Directory.GetParent(serviceDirectory)?.FullName;
-        var grandParent = parent is null ? null : Directory.GetParent(parent)?.FullName;
-
-        var roots = new[] { serviceDirectory, parent, grandParent }
-            .Where(static path => !string.IsNullOrWhiteSpace(path))
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var root in roots)
+        var registration = runtimeContext.PortableRegistration!;
+        if (!ServiceRuntimeContext.PathsEqual(clientPath, registration.ClientPath))
         {
-            yield return Path.GetFullPath(Path.Combine(root, "ClashSuki.exe"));
-            yield return Path.GetFullPath(Path.Combine(root, "ClashSuki", "ClashSuki.exe"));
+            reason = $"便携服务客户端路径未登记：{clientPath}";
+            return false;
         }
+
+        var clientDllPath = Path.Combine(Path.GetDirectoryName(clientPath)!, "ClashSuki.dll");
+        if (!IsRegularFile(clientPath) || !IsRegularFile(clientDllPath))
+        {
+            reason = "便携服务客户端文件缺失或是重解析点。";
+            return false;
+        }
+
+        if (!string.Equals(
+                ComputeSha256(clientPath),
+                registration.ClientExeSha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                ComputeSha256(clientDllPath),
+                registration.ClientDllSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "便携服务客户端完整性校验失败，请重新安装便携服务。";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
+    private static bool TryGetClientSid(
+        NamedPipeServerStream pipe,
+        out string clientSid,
+        out string reason)
+    {
+        string? capturedSid = null;
+        try
+        {
+            pipe.RunAsClient(() =>
+            {
+                using var identity = WindowsIdentity.GetCurrent(ifImpersonating: true);
+                capturedSid = identity?.User?.Value;
+            });
+        }
+        catch (Exception ex)
+        {
+            clientSid = string.Empty;
+            reason = $"无法读取管道客户端 SID：{ex.Message}";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(capturedSid))
+        {
+            clientSid = string.Empty;
+            reason = "管道客户端 SID 为空。";
+            return false;
+        }
+
+        clientSid = capturedSid;
+        reason = string.Empty;
+        return true;
+    }
+
+    private static bool IsRegularFile(string path) =>
+        File.Exists(path) &&
+        (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
+
+    private static string ComputeSha256(string path)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read | FileShare.Delete,
+            bufferSize: 128 * 1024,
+            FileOptions.SequentialScan);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

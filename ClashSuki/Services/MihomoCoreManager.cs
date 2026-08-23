@@ -27,7 +27,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
     public CoreRunMode RunMode => _runMode;
     public string WorkDirectory { get; set; } = AppPaths.DataRoot;
 
-    /// <summary>当前进程是否以管理员身份运行（TUN sidecar 模式需要）。</summary>
+    /// <summary>当前进程是否以管理员身份运行（用于无需服务的内核文件维护）。</summary>
     public static bool IsElevated { get; } = CheckElevated();
 
     private static bool CheckElevated()
@@ -93,7 +93,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             PackagedServiceController.IsInstalled())
         {
             throw new InvalidOperationException(
-                "ClashSuki 服务已安装但当前不可用，为避免同时启动多个 mihomo 内核，已取消 sidecar 回退，请修复应用包后重试");
+                "ClashSuki 服务不可用。为避免重复启动内核，请修复服务后重试。");
         }
 
         if (requireTun &&
@@ -132,7 +132,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
             if (!CanRunTun(serviceStatus))
             {
                 EmitAppLog(
-                    "虚拟网卡需要安装 ClashSuki 服务或管理员权限，内核继续以子进程模式运行（系统代理仍可用）",
+                    "虚拟网卡服务不可用，内核继续以子进程模式运行（系统代理仍可用）",
                     "WARN");
                 return;
             }

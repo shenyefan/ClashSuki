@@ -33,7 +33,6 @@ internal sealed class ServiceCommandDispatcher(
                 ServiceCommands.StopCore => await StopCoreAsync(cancellationToken),
                 ServiceCommands.ConfigureFirewall => ConfigureFirewall(request, cancellationToken),
                 ServiceCommands.SetLoopbackExemptions => SetLoopbackExemptions(request, cancellationToken),
-                ServiceCommands.ReplaceCore => await ReplaceCoreAsync(request, cancellationToken),
                 ServiceCommands.StopService => await StopServiceAsync(cancellationToken),
                 _ => ServiceCommandResult.Failure($"未知命令：{request.Command}")
             };
@@ -93,22 +92,6 @@ internal sealed class ServiceCommandDispatcher(
         CancellationToken cancellationToken)
     {
         loopbackExemptionManager.SetExemptions(request.LoopbackExemptSids, cancellationToken);
-        return ServiceCommandResult.Success(ServiceResponse.Success());
-    }
-
-    private async Task<ServiceCommandResult> ReplaceCoreAsync(
-        ServiceRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.CoreSourcePath) ||
-            string.IsNullOrWhiteSpace(request.CoreDestinationPath))
-        {
-            throw new InvalidOperationException("内核替换路径不能为空。");
-        }
-
-        await coreSupervisor.StopAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        CoreReplacer.Replace(request.CoreSourcePath, request.CoreDestinationPath);
         return ServiceCommandResult.Success(ServiceResponse.Success());
     }
 

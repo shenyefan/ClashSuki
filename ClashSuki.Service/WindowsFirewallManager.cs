@@ -4,7 +4,9 @@ using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Service;
 
-internal sealed class WindowsFirewallManager(ILogger<WindowsFirewallManager> logger)
+internal sealed class WindowsFirewallManager(
+    ServiceRuntimeContext runtimeContext,
+    ILogger<WindowsFirewallManager> logger)
 {
     private const string FirewallPolicyProgId = "HNetCfg.FwPolicy2";
     private const string FirewallRuleProgId = "HNetCfg.FWRule";
@@ -86,7 +88,7 @@ internal sealed class WindowsFirewallManager(ILogger<WindowsFirewallManager> log
         }
     }
 
-    private static IReadOnlyList<ValidatedFirewallRule> ValidateRules(
+    private IReadOnlyList<ValidatedFirewallRule> ValidateRules(
         IReadOnlyList<FirewallRuleRequest?>? requestedRules)
     {
         if (requestedRules is null || requestedRules.Count == 0)
@@ -122,17 +124,7 @@ internal sealed class WindowsFirewallManager(ILogger<WindowsFirewallManager> log
                 throw new InvalidOperationException($"防火墙规则名称重复：{name}");
             }
 
-            if (string.IsNullOrWhiteSpace(requestedRule.ProgramPath) ||
-                !Path.IsPathFullyQualified(requestedRule.ProgramPath))
-            {
-                throw new InvalidOperationException($"防火墙程序路径必须是绝对路径：{name}");
-            }
-
-            var programPath = Path.GetFullPath(requestedRule.ProgramPath);
-            if (programPath.StartsWith(@"\\", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"防火墙程序路径必须位于本机磁盘：{name}");
-            }
+            var programPath = ResolveProgramPath(name, requestedRule.ProgramPath);
 
             if (!string.Equals(Path.GetFileName(programPath), expectedFileName, StringComparison.OrdinalIgnoreCase))
             {
@@ -145,6 +137,11 @@ internal sealed class WindowsFirewallManager(ILogger<WindowsFirewallManager> log
                 throw new FileNotFoundException($"找不到防火墙规则对应的程序：{name}", programPath);
             }
 
+            if ((File.GetAttributes(programPath) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException($"防火墙程序不能是重解析点：{name}");
+            }
+
             if (!paths.Add(programPath))
             {
                 throw new InvalidOperationException($"防火墙程序路径重复：{programPath}");
@@ -154,6 +151,39 @@ internal sealed class WindowsFirewallManager(ILogger<WindowsFirewallManager> log
         }
 
         return validated;
+    }
+
+    private string ResolveProgramPath(string ruleName, string? requestedProgramPath)
+    {
+        if (string.Equals(ruleName, FirewallRuleNames.Mihomo, StringComparison.Ordinal))
+        {
+            return runtimeContext.CorePath;
+        }
+
+        if (string.Equals(ruleName, FirewallRuleNames.MihomoAlpha, StringComparison.Ordinal))
+        {
+            return Path.Combine(Path.GetDirectoryName(runtimeContext.CorePath)!, "mihomo-alpha.exe");
+        }
+
+        if (runtimeContext.IsPortable)
+        {
+            return runtimeContext.PortableRegistration!.ClientPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(requestedProgramPath) ||
+            !Path.IsPathFullyQualified(requestedProgramPath))
+        {
+            throw new InvalidOperationException($"防火墙程序路径必须是绝对路径：{ruleName}");
+        }
+
+        var normalizedPath = Path.GetFullPath(requestedProgramPath);
+        if (normalizedPath.StartsWith(@"\\", StringComparison.Ordinal) ||
+            !runtimeContext.GetTrustedMsixClientPaths().Contains(normalizedPath))
+        {
+            throw new InvalidOperationException($"防火墙程序路径不属于受信任的 ClashSuki 安装目录：{ruleName}");
+        }
+
+        return normalizedPath;
     }
 
     private static object CreateNativeRule(Type ruleType, ValidatedFirewallRule rule)

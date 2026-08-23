@@ -2,11 +2,11 @@ using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Service;
 
-internal sealed class CoreLaunchRequestValidator
+internal sealed class CoreLaunchRequestValidator(ServiceRuntimeContext runtimeContext)
 {
     public CoreLaunchOptions Validate(ServiceRequest request)
     {
-        var corePath = NormalizeRequiredPath(request.CorePath, "内核路径");
+        var corePath = runtimeContext.CorePath;
         var configPath = NormalizeRequiredPath(request.ConfigPath, "配置文件路径");
         var configDirectory = NormalizeRequiredPath(request.ConfigDir, "工作目录");
         var controlPipePath = string.IsNullOrWhiteSpace(request.CoreIpcPath)
@@ -29,6 +29,9 @@ internal sealed class CoreLaunchRequestValidator
             throw new DirectoryNotFoundException($"找不到内核工作目录：{configDirectory}");
         }
 
+        EnsureNotReparsePoint(configPath, "运行时配置");
+        EnsureNotReparsePoint(configDirectory, "内核工作目录");
+
         if (!string.Equals(Path.GetFileName(corePath), "mihomo.exe", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("服务仅允许启动受管的 mihomo.exe。");
@@ -40,13 +43,23 @@ internal sealed class CoreLaunchRequestValidator
             throw new InvalidOperationException("运行时配置路径不符合 ClashSuki 数据目录规范。");
         }
 
-        var configRoot = Directory.GetParent(Path.GetDirectoryName(configPath)!)?.FullName
-                         ?? throw new InvalidOperationException("无法确定 ClashSuki 数据目录。");
-        var expectedCorePath = Path.GetFullPath(Path.Combine(configRoot, "core", "mihomo.exe"));
-
-        if (!string.Equals(corePath, expectedCorePath, StringComparison.OrdinalIgnoreCase))
+        var configRoot = runtimeContext.IsPortable
+            ? runtimeContext.PortableRegistration!.DataRoot
+            : Directory.GetParent(Path.GetDirectoryName(configPath)!)?.FullName
+              ?? throw new InvalidOperationException("无法确定 ClashSuki 数据目录。");
+        configRoot = Path.GetFullPath(configRoot);
+        EnsurePathHasNoReparsePoints(configPath, configRoot, "运行时配置");
+        EnsurePathHasNoReparsePoints(configDirectory, configRoot, "内核工作目录");
+        if (runtimeContext.IsPortable)
         {
-            throw new InvalidOperationException("内核路径不属于当前 ClashSuki 数据目录。");
+            var expectedConfigPath = Path.GetFullPath(Path.Combine(
+                configRoot,
+                "config",
+                "mihomo-runtime.yaml"));
+            if (!string.Equals(configPath, expectedConfigPath, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("运行时配置不属于已登记的便携版数据目录。");
+            }
         }
 
         if (!IsWithinDirectory(configDirectory, configRoot))
@@ -95,6 +108,39 @@ internal sealed class CoreLaunchRequestValidator
                (!Path.IsPathRooted(relative) &&
                 !relative.Equals("..", StringComparison.Ordinal) &&
                 !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+    }
+
+    private static void EnsureNotReparsePoint(string path, string displayName)
+    {
+        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException($"{displayName}不能是重解析点。");
+        }
+    }
+
+    private static void EnsurePathHasNoReparsePoints(
+        string path,
+        string root,
+        string displayName)
+    {
+        if (!IsWithinDirectory(path, root))
+        {
+            throw new InvalidOperationException($"{displayName}不属于 ClashSuki 数据目录。");
+        }
+
+        var current = Path.GetFullPath(path);
+        var normalizedRoot = Path.GetFullPath(root);
+        while (true)
+        {
+            EnsureNotReparsePoint(current, displayName);
+            if (string.Equals(current, normalizedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            current = Path.GetDirectoryName(current)
+                      ?? throw new InvalidOperationException($"无法验证{displayName}路径。");
+        }
     }
 }
 

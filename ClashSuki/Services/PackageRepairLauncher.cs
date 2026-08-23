@@ -13,7 +13,7 @@ internal static class PackageRepairLauncher
         if (!PackageIdentityService.IsPackaged)
         {
             throw new InvalidOperationException(
-                "服务由 MSIX 包管理。请在 Visual Studio 中启动 ClashSuki.Package 项目后重试。");
+                "便携版不使用应用包修复。");
         }
 
         var sourceDirectory = ResolveRepairHostDirectory();
