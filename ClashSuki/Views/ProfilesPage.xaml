@@ -31,9 +31,9 @@
                                 <StackPanel Width="380" Spacing="12">
                                     <TextBlock Text="下载高级选项" Style="{StaticResource SectionTitleStyle}" Margin="0" />
                                     <TextBox Header="名称" PlaceholderText="留空自动推断" Text="{Binding NewProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <PasswordBox Header="Token" PlaceholderText="Authorization 请求头" Password="{Binding NewAuthToken, Mode=TwoWay}" />
+                                    <PasswordBox Header="访问令牌" PlaceholderText="Authorization 标头内容" Password="{Binding NewAuthToken, Mode=TwoWay}" />
                                     <TextBox Header="User-Agent" PlaceholderText="留空使用全局默认" Text="{Binding NewUserAgent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <PasswordBox Header="Age" PlaceholderText="AGE-SECRET-KEY-..." Password="{Binding NewAgeSecretKey, Mode=TwoWay}" />
+                                    <PasswordBox Header="Age 私钥" PlaceholderText="AGE-SECRET-KEY-..." Password="{Binding NewAgeSecretKey, Mode=TwoWay}" />
                                 </StackPanel>
                             </Flyout>
                         </ui:IconActionButton.Flyout>
@@ -184,7 +184,7 @@
         </ScrollViewer>
 
         <ContentDialog x:Name="EditProfileDialog"
-                       Title="编辑订阅信息"
+                       Title="编辑订阅"
                        PrimaryButtonText="保存"
                        CloseButtonText="取消"
                        DefaultButton="Primary"
@@ -202,13 +202,13 @@
                 <TextBox Header="URL"
                          Text="{Binding EditUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Visibility="{Binding IsEditingRemote, Converter={StaticResource BoolToVis}}" />
-                <PasswordBox Header="Token"
+                <PasswordBox Header="访问令牌"
                              Password="{Binding EditAuthToken, Mode=TwoWay}"
                              Visibility="{Binding IsEditingRemote, Converter={StaticResource BoolToVis}}" />
                 <TextBox Header="User-Agent"
                          Text="{Binding EditUserAgent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Visibility="{Binding IsEditingRemote, Converter={StaticResource BoolToVis}}" />
-                <PasswordBox Header="Age"
+                <PasswordBox Header="Age 私钥"
                              Password="{Binding EditAgeSecretKey, Mode=TwoWay}" />
 
                 <Grid ColumnSpacing="16" Visibility="{Binding IsEditingRemote, Converter={StaticResource BoolToVis}}">
@@ -235,7 +235,7 @@
         <ContentDialog x:Name="ProfileFileDialog"
                        Title="编辑配置文件"
                        PrimaryButtonText="保存"
-                       CloseButtonText="关闭"
+                       CloseButtonText="取消"
                        DefaultButton="Primary"
                        PrimaryButtonClick="ProfileFileDialog_PrimaryButtonClick">
             <ContentDialog.Resources>

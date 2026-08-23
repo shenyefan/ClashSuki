@@ -249,7 +249,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
         if (EnableExternalController && string.IsNullOrWhiteSpace(Secret))
         {
             Runtime.Notifications.Warning(
-                "开启外部控制时请设置 Secret",
+                "开启外部控制时请设置访问密钥",
                 source: LogSources.Core,
                 writeLog: false);
             return;
@@ -286,7 +286,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
                 StoreSelected,
                 StoreFakeIp), EnableExternalController);
             Runtime.Notifications.Success(
-                "核心配置已保存，内核已重启",
+                "内核配置已保存，内核已重启",
                 source: LogSources.Core);
         }
         catch (Exception ex)
@@ -302,7 +302,7 @@ public sealed partial class CoreSettingsViewModel : ObservableObject
             }
 
             Runtime.Notifications.Error(
-                "核心配置保存失败",
+                "内核配置保存失败",
                 source: LogSources.Core,
                 exception: ex);
             await LoadAsync();

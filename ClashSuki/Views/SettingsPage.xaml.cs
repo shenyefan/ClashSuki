@@ -86,7 +86,7 @@ public sealed partial class SettingsPage : Page
 
         if (!await vm.Runtime.Notifications.ConfirmAsync(
                 XamlRoot,
-                "重置软件",
+                "重置应用",
                 "将重置所有应用设置，操作前会自动创建备份。确定继续吗？",
                 "重置",
                 "取消",

@@ -53,7 +53,7 @@
                 </controls:SettingsCard>
                 <controls:SettingsCard Grid.Column="2"
                                        Header="代理模式"
-                                       Description="选择内核的流量处理方式"
+                                       Description="选择流量处理方式"
                                        MinHeight="64"
                                        VerticalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
@@ -113,7 +113,7 @@
                 </Border>
                 <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="运行内存" Style="{StaticResource MetricLabelTextStyle}" />
+                        <TextBlock Text="内存占用" Style="{StaticResource MetricLabelTextStyle}" />
                         <TextBlock Text="{Binding Runtime.MemoryText}" Style="{StaticResource MetricValueTextStyle}" />
                         <TextBlock Style="{StaticResource MutedCaptionTextStyle}">
                             <Run Text="mihomo " />

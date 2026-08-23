@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
@@ -18,6 +19,12 @@ public sealed partial class IconActionButton : UserControl
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         RegisterPropertyChangedCallback(IsEnabledProperty, (_, _) => UpdateInteractionEnabled());
+        RegisterPropertyChangedCallback(
+            AutomationProperties.NameProperty,
+            (_, _) => UpdateAccessibility());
+        RegisterPropertyChangedCallback(
+            ToolTipService.ToolTipProperty,
+            (_, _) => UpdateAccessibility());
     }
 
     public static readonly DependencyProperty GlyphProperty =
@@ -125,6 +132,7 @@ public sealed partial class IconActionButton : UserControl
         TryBindLoadingFromCommand();
         UpdateInteractionEnabled();
         UpdateSelectionState();
+        UpdateAccessibility();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -212,5 +220,19 @@ public sealed partial class IconActionButton : UserControl
         {
             ActionIcon.Foreground = SelectedIconForeground;
         }
+    }
+
+    private void UpdateAccessibility()
+    {
+        var toolTip = ToolTipService.GetToolTip(this);
+        ToolTipService.SetToolTip(ActionButton, toolTip);
+
+        var accessibleName = AutomationProperties.GetName(this);
+        if (string.IsNullOrWhiteSpace(accessibleName) && toolTip is string toolTipText)
+        {
+            accessibleName = toolTipText;
+        }
+
+        AutomationProperties.SetName(ActionButton, accessibleName ?? string.Empty);
     }
 }

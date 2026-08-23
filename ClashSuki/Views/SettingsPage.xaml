@@ -18,8 +18,11 @@
         </Style>
     </Page.Resources>
 
-    <ScrollViewer>
-        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+    <ScrollViewer HorizontalContentAlignment="Stretch">
+        <StackPanel Padding="{StaticResource PagePadding}"
+                    Spacing="{StaticResource PageSpacing}"
+                    MaxWidth="{StaticResource PageMaxWidth}"
+                    HorizontalAlignment="Stretch">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -31,8 +34,8 @@
                 <ui:IconActionButton Grid.Column="2" Command="{Binding SaveCommand}" Glyph="&#xE74E;" ToolTipService.ToolTip="保存设置" />
             </Grid>
 
-            <controls:SettingsExpander Header="常规" Description="启动、外观与基础行为" IsExpanded="True">
-                <controls:SettingsExpander.Items>
+            <TextBlock Text="常规" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
                     <controls:SettingsCard Header="开机自启" Description="登录 Windows 后自动启动 ClashSuki">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.AutoRun, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
@@ -68,107 +71,102 @@
                     <controls:SettingsCard Header="退出应用" Description="停止后台任务并退出 ClashSuki">
                         <ui:IconActionButton Command="{Binding ExitAppCommand}" Glyph="&#xE8BB;" ToolTipService.ToolTip="退出应用" />
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
 
-            <controls:SettingsExpander Header="网络与订阅" Description="下载代理、订阅请求和测速参数">
-                <controls:SettingsExpander.Items>
+            <TextBlock Text="网络与订阅" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
                     <controls:SettingsCard Header="GitHub 下载代理" Description="例如 https://ghproxy.net/">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.GitHubProxy, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="订阅 User Agent" Description="单个订阅未设置时使用">
+                    <controls:SettingsCard Header="订阅 User-Agent" Description="单个订阅未设置时使用">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.UserAgent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="订阅超时时间" Description="下载与更新订阅时的 HTTP 超时（秒）">
+                    <controls:SettingsCard Header="订阅超时（秒）" Description="下载或更新订阅的最长等待时间">
                         <NumberBox Style="{StaticResource SettingsNumberBoxStyle}" Value="{Binding SubscriptionTimeout, Mode=TwoWay}" Minimum="1" Maximum="600" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="下载订阅时使用代理" Description="通过本地 mixed-port 拉取订阅，不勾选则先直连、失败再回退代理">
+                    <controls:SettingsCard Header="订阅下载代理" Description="开启后始终使用本地代理；关闭后先直连，失败时再使用代理">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.ProfileUseProxy, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="延迟测试 URL" Description="节点测速默认地址">
+                    <controls:SettingsCard Header="测速地址" Description="节点测速使用的默认 URL">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.DelayTestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="延迟测试并发数" Description="批量测速最大并发">
+                    <controls:SettingsCard Header="测速并发数" Description="同时测速的最大节点数">
                         <NumberBox Style="{StaticResource SettingsNumberBoxStyle}" Value="{Binding DelayTestConcurrency, Mode=TwoWay}" Minimum="1" Maximum="100" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="延迟测试超时" Description="毫秒">
+                    <controls:SettingsCard Header="测速超时（毫秒）" Description="单个节点的最长等待时间">
                         <NumberBox Style="{StaticResource SettingsNumberBoxStyle}" Value="{Binding DelayTestTimeout, Mode=TwoWay}" Minimum="1000" Maximum="60000" />
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
 
-            <controls:SettingsExpander Header="Gist 同步" Description="同步运行时配置到 GitHub Gist">
-                <controls:SettingsExpander.Items>
-                    <controls:SettingsCard Header="同步运行时配置到 Gist" Description="保存当前运行配置到 Gist">
+            <TextBlock Text="Gist 同步" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                    <controls:SettingsCard Header="同步运行配置" Description="将当前运行配置上传到 GitHub Gist">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                             <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.SyncRuntimeConfigToGist, Mode=TwoWay}" />
                             <ui:IconActionButton Command="{Binding SyncGistCommand}" Glyph="&#xE895;" ToolTipService.ToolTip="立即同步" />
                         </StackPanel>
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="GitHub Token" Description="需要 gist 权限">
+                    <controls:SettingsCard Header="GitHub Token" Description="令牌需包含 gist 权限">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.GitHubToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
                     <controls:SettingsCard Header="Gist ID" Description="留空时新建私有 Gist">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.GistId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="Gist 运行时配置 Age 加密" Description="使用 Age 公钥加密后上传">
+                    <controls:SettingsCard Header="加密 Gist 配置" Description="上传前使用 Age 公钥加密">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.GistAgeEncrypt, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="Gist Age 接收方公钥" Description="age1...">
+                    <controls:SettingsCard Header="Age 接收方公钥" Description="格式：age1…">
                         <TextBox Style="{StaticResource SettingsTextBoxStyle}" Text="{Binding Settings.GistAgeRecipient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="Gist Age 密钥" Description="用于保存/导出本机 Age 私钥">
+                    <controls:SettingsCard Header="Age 私钥" Description="与上方公钥配对，请妥善保管">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                             <TextBox Width="280" Text="{Binding Settings.GistAgeSecretKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <ui:IconActionButton Command="{Binding GenerateAgeKeyCommand}" Glyph="&#xE72C;" ToolTipService.ToolTip="生成 Age 密钥" />
                         </StackPanel>
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
 
-            <controls:SettingsExpander Header="内核与配置" Description="进程、工作目录和配置切换策略">
-                <controls:SettingsExpander.Items>
-                    <controls:SettingsCard Header="核心进程优先级" Description="sidecar 模式下应用">
+            <TextBlock Text="内核与配置" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                    <controls:SettingsCard Header="内核进程优先级" Description="仅在 Sidecar 模式下生效">
                         <ComboBox SelectedIndex="{Binding PriorityIndex, Mode=TwoWay}" MinWidth="160" HorizontalAlignment="Right">
-                            <ComboBoxItem Content="Idle" />
-                            <ComboBoxItem Content="Below normal" />
-                            <ComboBoxItem Content="Normal" />
-                            <ComboBoxItem Content="Above normal" />
-                            <ComboBoxItem Content="High" />
-                            <ComboBoxItem Content="Real time" />
+                            <ComboBoxItem Content="空闲" />
+                            <ComboBoxItem Content="低于正常" />
+                            <ComboBoxItem Content="正常" />
+                            <ComboBoxItem Content="高于正常" />
+                            <ComboBoxItem Content="高" />
+                            <ComboBoxItem Content="实时" />
                         </ComboBox>
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="不同订阅使用独立工作目录" Description="保存设置供内核启动和订阅切换使用">
+                    <controls:SettingsCard Header="独立工作目录" Description="为每个订阅使用单独的内核工作目录">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.DiffWorkDir, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="切换订阅时热重载配置" Description="关闭后切换订阅会重启内核">
+                    <controls:SettingsCard Header="热重载订阅" Description="切换订阅时不重启内核">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.UseHotReloadProfile, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="热重载切换订阅时关闭连接" Description="热重载订阅前关闭现有连接">
+                    <controls:SettingsCard Header="热重载前关闭连接" Description="切换订阅前关闭现有连接">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.HotReloadProfileAutoCloseConnection, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="切换代理/模式时关闭连接" Description="切换节点或模式后关闭现有连接">
+                    <controls:SettingsCard Header="切换代理后关闭连接" Description="切换节点或代理模式后关闭现有连接">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.AutoCloseConnection, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="启动时检查配置文件" Description="启动内核前运行 mihomo 配置校验">
+                    <controls:SettingsCard Header="启动前检查配置" Description="启动内核前检查 mihomo 配置">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.TestProfileOnStart, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
 
-            <controls:SettingsExpander Header="网络环境" Description="指定 WiFi SSID 下自动直连">
-                <controls:SettingsExpander.Items>
-                    <controls:SettingsCard Header="指定 WiFi SSID 直连" Description="每行一个 SSID" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+            <TextBlock Text="网络环境" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
+                    <controls:SettingsCard Header="指定 Wi-Fi 直连" Description="每行一个 SSID" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
                         <TextBox AcceptsReturn="True" MinHeight="96" HorizontalAlignment="Stretch" Text="{Binding PauseSsidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="直连时使用系统默认 DNS" Description="SSID 直连时不强制应用内 DNS">
+                    <controls:SettingsCard Header="直连时使用系统 DNS" Description="匹配上述 SSID 时不使用应用 DNS">
                         <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding Settings.DisableDnsOnPauseSsid, Mode=TwoWay}" HorizontalAlignment="Right" />
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
 
-            <controls:SettingsExpander Header="维护" Description="备份、恢复与重置">
-                <controls:SettingsExpander.Items>
+            <TextBlock Text="维护" Style="{StaticResource SectionTitleStyle}" />
+            <StackPanel Spacing="4">
                     <controls:SettingsCard Header="备份与恢复" Description="备份应用数据或恢复最新备份">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                             <ui:IconActionButton Command="{Binding CreateBackupCommand}" Glyph="&#xE8F1;" ToolTipService.ToolTip="创建备份" />
@@ -176,11 +174,10 @@
                             <ui:IconActionButton Command="{Binding OpenBackupDirectoryCommand}" Glyph="&#xE8B7;" ToolTipService.ToolTip="打开备份目录" />
                         </StackPanel>
                     </controls:SettingsCard>
-                    <controls:SettingsCard Header="重置软件" Description="重置应用设置，重置前会自动创建备份">
-                        <ui:IconActionButton Click="ResetSoftware_Click" Glyph="&#xE74D;" IsLoading="{Binding ResetSoftwareCommand.IsRunning}" ToolTipService.ToolTip="重置软件" />
+                    <controls:SettingsCard Header="重置应用" Description="清除应用设置；操作前会自动创建备份">
+                        <ui:IconActionButton Click="ResetSoftware_Click" Glyph="&#xE74D;" IsLoading="{Binding ResetSoftwareCommand.IsRunning}" ToolTipService.ToolTip="重置应用" />
                     </controls:SettingsCard>
-                </controls:SettingsExpander.Items>
-            </controls:SettingsExpander>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -25,7 +25,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="规则列表" Style="{StaticResource SectionTitleStyle}" />
                     <TextBox Grid.Column="1"
-                             PlaceholderText="筛选过滤"
+                             PlaceholderText="筛选规则"
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              VerticalAlignment="Center" />
                     <ui:IconActionButton Grid.Column="2" Command="{Binding RefreshCommand}" AutoSyncLoadingFromCommand="False" Glyph="&#xE72C;" IsLoading="{Binding IsRefreshing}" VerticalAlignment="Center" ToolTipService.ToolTip="刷新规则" />
@@ -38,7 +38,7 @@
                         <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
                             <FontIcon Glyph="&#xE8A5;" Style="{StaticResource EmptyStateIconStyle}" />
                             <TextBlock Text="{Binding EmptyText}" Style="{StaticResource EmptyStateTitleStyle}" />
-                            <TextBlock Text="规则数据会在核心返回后自动刷新。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                            <TextBlock Text="内核返回规则后将在此显示。" Style="{StaticResource EmptyStateDescriptionStyle}" />
                         </StackPanel>
                     </Grid>
                 </controls:SettingsCard>

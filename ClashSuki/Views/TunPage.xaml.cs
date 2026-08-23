@@ -87,7 +87,7 @@ public sealed partial class TunPage : Page
         if (!await viewModel.Runtime.Notifications.ConfirmAsync(
                 XamlRoot,
                 "修复服务",
-                "程序将停止服务并退出，重新注册应用包和服务后自动启动。是否继续？",
+                "程序将退出并修复服务，完成后自动启动。是否继续？",
                 "修复并重启",
                 "取消",
                 LogSources.Service))

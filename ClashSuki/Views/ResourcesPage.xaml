@@ -21,7 +21,7 @@
 
                 <TextBlock Text="GeoData" Style="{StaticResource SectionTitleStyle}" />
                 <StackPanel Spacing="4">
-                    <controls:SettingsCard Header="GeoIP 数据库" Description="GeoIP 数据源地址">
+                    <controls:SettingsCard Header="GeoIP 数据库" Description="下载地址">
                         <TextBox Tag="geoip"
                                  Text="{Binding GeoIpUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ResourceUrlTextBoxStyle}"
@@ -29,7 +29,7 @@
                                  KeyDown="GeoUrlTextBox_KeyDown" />
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="GeoSite 数据库" Description="GeoSite 数据源地址">
+                    <controls:SettingsCard Header="GeoSite 数据库" Description="下载地址">
                         <TextBox Tag="geosite"
                                  Text="{Binding GeoSiteUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ResourceUrlTextBoxStyle}"
@@ -37,7 +37,7 @@
                                  KeyDown="GeoUrlTextBox_KeyDown" />
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="MMDB 数据库" Description="MMDB 数据源地址">
+                    <controls:SettingsCard Header="MMDB 数据库" Description="下载地址">
                         <TextBox Tag="mmdb"
                                  Text="{Binding MmdbUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ResourceUrlTextBoxStyle}"
@@ -45,7 +45,7 @@
                                  KeyDown="GeoUrlTextBox_KeyDown" />
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="ASN 数据库" Description="ASN 数据源地址">
+                    <controls:SettingsCard Header="ASN 数据库" Description="下载地址">
                         <TextBox Tag="asn"
                                  Text="{Binding AsnUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ResourceUrlTextBoxStyle}"
@@ -53,21 +53,21 @@
                                  KeyDown="GeoUrlTextBox_KeyDown" />
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="GeoData 数据模式" Description="切换 db 或 dat 数据格式">
+                    <controls:SettingsCard Header="GeoData 格式" Description="选择 db 或 dat">
                         <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
                             <primitives:ToggleButton Content="db" IsChecked="{Binding GeoDataMode, Converter={StaticResource InverseBool}, Mode=OneWay}" Click="GeoModeDb_Click" />
                             <primitives:ToggleButton Content="dat" IsChecked="{Binding GeoDataMode, Mode=OneWay}" Click="GeoModeDat_Click" />
                         </StackPanel>
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="自动更新" Description="按间隔更新 GeoData 资源">
+                    <controls:SettingsCard Header="自动更新" Description="定期自动更新 GeoData">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                             <ui:IconActionButton Command="{Binding UpdateGeoDataCommand}" AutoSyncLoadingFromCommand="False" Glyph="&#xE72C;" IsLoading="{Binding IsUpdatingGeoData}" ToolTipService.ToolTip="手动更新 GeoData" />
                             <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding GeoAutoUpdate, Mode=TwoWay}" />
                         </StackPanel>
                     </controls:SettingsCard>
 
-                    <controls:SettingsCard Header="更新间隔（小时）" Description="自动更新的时间间隔" Visibility="{Binding GeoAutoUpdate, Converter={StaticResource BoolToVis}}">
+                    <controls:SettingsCard Header="更新间隔（小时）" Description="两次自动更新之间的间隔" Visibility="{Binding GeoAutoUpdate, Converter={StaticResource BoolToVis}}">
                         <NumberBox Width="150"
                                    HorizontalAlignment="Right"
                                    Value="{Binding GeoUpdateIntervalValue, Mode=TwoWay}"

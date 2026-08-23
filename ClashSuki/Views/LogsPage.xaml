@@ -26,7 +26,7 @@
                         <FontIcon Glyph="&#xE8BD;" />
                     </SelectorBarItem.Icon>
                 </SelectorBarItem>
-                <SelectorBarItem x:Name="MihomoLogsItem" Text="Mihomo 日志">
+                <SelectorBarItem x:Name="MihomoLogsItem" Text="内核日志">
                     <SelectorBarItem.Icon>
                         <FontIcon Glyph="&#xE8A5;" />
                     </SelectorBarItem.Icon>
@@ -50,7 +50,7 @@
                     <ComboBoxItem Content="WARN" />
                     <ComboBoxItem Content="ERROR" />
                 </ComboBox>
-                <ui:IconActionButton Command="{Binding ToggleAutoRefreshCommand}" Glyph="{Binding AutoRefreshGlyph}" VerticalAlignment="Center" ToolTipService.ToolTip="切换日志自动刷新" />
+                <ui:IconActionButton Command="{Binding ToggleAutoRefreshCommand}" Glyph="{Binding AutoRefreshGlyph}" VerticalAlignment="Center" ToolTipService.ToolTip="开启或关闭自动刷新" />
                 <ui:IconActionButton Command="{Binding ClearLogsCommand}" Glyph="&#xE74D;" VerticalAlignment="Center" ToolTipService.ToolTip="清空日志" />
             </StackPanel>
         </Grid>

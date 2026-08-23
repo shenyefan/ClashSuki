@@ -31,7 +31,7 @@
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Width="380" Spacing="12">
                                     <TextBlock Text="下载高级选项" Style="{StaticResource SectionTitleStyle}" Margin="0" />
-                                    <PasswordBox Header="Token" PlaceholderText="Authorization 请求头" Password="{Binding ImportAuthToken, Mode=TwoWay}" />
+                                    <PasswordBox Header="访问令牌" PlaceholderText="Authorization 标头内容" Password="{Binding ImportAuthToken, Mode=TwoWay}" />
                                     <TextBox Header="User-Agent" PlaceholderText="留空使用全局默认" Text="{Binding ImportUserAgent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </Flyout>
@@ -153,7 +153,7 @@
                 <TextBox Header="地址"
                          Text="{Binding InfoUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Visibility="{Binding IsInfoEditingRemote, Converter={StaticResource BoolToVis}}" />
-                <PasswordBox Header="Token"
+                <PasswordBox Header="访问令牌"
                              Password="{Binding InfoAuthToken, Mode=TwoWay}"
                              Visibility="{Binding IsInfoEditingRemote, Converter={StaticResource BoolToVis}}" />
                 <TextBox Header="User-Agent"

@@ -31,6 +31,32 @@ public sealed partial class TunViewModel : ObservableObject
     public async Task SetTunAsync(bool enabled) => await _coordinator.SetTunAsync(enabled);
 
     [RelayCommand]
+    private async Task InstallPortableServiceAsync()
+    {
+        try
+        {
+            await _coordinator.InstallPortableServiceAsync();
+            Runtime.Notifications.Success(
+                "服务安装完成",
+                source: LogSources.Service);
+        }
+        catch (OperationCanceledException)
+        {
+            Runtime.Notifications.Info(
+                "已取消服务安装",
+                source: LogSources.Service,
+                writeLog: false);
+        }
+        catch (Exception ex)
+        {
+            Runtime.Notifications.Error(
+                "服务安装失败",
+                source: LogSources.Service,
+                exception: ex);
+        }
+    }
+
+    [RelayCommand]
     private async Task RepairServiceAsync()
     {
         try

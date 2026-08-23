@@ -30,7 +30,7 @@ public sealed partial class CorePage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                "核心配置加载失败",
+                "内核配置加载失败",
                 source: LogSources.Core,
                 exception: ex);
         }
@@ -45,8 +45,8 @@ public sealed partial class CorePage : Page
 
         if (!await viewModel.Runtime.Notifications.ConfirmAsync(
                 XamlRoot,
-                "重置核心配置",
-                "将恢复核心配置为默认值并保存，随后重启内核。",
+                "重置内核配置",
+                "将恢复内核配置为默认值并保存，随后重启内核。",
                 "重置并保存",
                 "取消",
                 LogSources.Core))

@@ -57,7 +57,7 @@
                 <StackPanel Style="{StaticResource EmptyStatePanelStyle}">
                     <FontIcon Glyph="&#xE893;" Style="{StaticResource EmptyStateIconStyle}" />
                     <TextBlock Text="直连模式" Style="{StaticResource EmptyStateTitleStyle}" />
-                    <TextBlock Text="当前为 direct 模式，代理组不可用。" Style="{StaticResource EmptyStateDescriptionStyle}" />
+                    <TextBlock Text="当前为直连模式，代理组不可用。" Style="{StaticResource EmptyStateDescriptionStyle}" />
                 </StackPanel>
             </Grid>
 

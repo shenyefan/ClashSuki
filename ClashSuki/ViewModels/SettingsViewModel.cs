@@ -74,7 +74,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Settings.DelayTestUrl = string.IsNullOrWhiteSpace(Settings.DelayTestUrl)
                 ? "https://www.gstatic.com/generate_204"
                 : Settings.DelayTestUrl.Trim();
-            ValidateHttpUrl(Settings.DelayTestUrl, "延迟测试 URL");
+            ValidateHttpUrl(Settings.DelayTestUrl, "测速地址");
             if (!string.IsNullOrWhiteSpace(Settings.GitHubProxy))
             {
                 ValidateHttpUrl(Settings.GitHubProxy, "GitHub 下载代理");
@@ -183,9 +183,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             await LoadAsync();
             await ApplyRestoredRuntimeStateAsync();
             Runtime.Notifications.Success(
-                "软件设置已重置，数据已自动备份",
+                "应用设置已重置，数据已自动备份",
                 source: LogSources.Settings);
-        }, "重置软件", LogSources.Settings);
+        }, "重置应用", LogSources.Settings);
 
     private async Task ApplyRestoredRuntimeStateAsync()
     {
@@ -205,7 +205,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Runtime.Notifications.Success(
                 "运行时配置已同步到 Gist",
                 source: LogSources.Gist);
-        }, "同步运行时配置到 Gist", LogSources.Gist);
+        }, "同步运行配置", LogSources.Gist);
 
     [RelayCommand]
     private Task GenerateAgeKeyAsync() =>

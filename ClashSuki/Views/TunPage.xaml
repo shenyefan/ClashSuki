@@ -13,8 +13,11 @@
         </Style>
     </Page.Resources>
 
-    <ScrollViewer>
-        <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource PageSpacing}">
+    <ScrollViewer HorizontalContentAlignment="Stretch">
+        <StackPanel Padding="{StaticResource PagePadding}"
+                    Spacing="{StaticResource PageSpacing}"
+                    MaxWidth="{StaticResource PageMaxWidth}"
+                    HorizontalAlignment="Stretch">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -30,6 +33,10 @@
             <StackPanel Spacing="4">
                 <controls:SettingsCard Header="启用虚拟网卡" Description="{Binding Runtime.TunServiceStatusText}">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="安装服务"
+                                Command="{Binding InstallPortableServiceCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Visibility="{Binding Runtime.ShowTunServiceInstallAction, Converter={StaticResource BoolToVis}}" />
                         <ui:IconActionButton Click="RepairService_Click" Glyph="&#xE72C;" IsLoading="{Binding RepairServiceCommand.IsRunning}" Visibility="{Binding Runtime.ShowTunServiceRepairAction, Converter={StaticResource BoolToVis}}" ToolTipService.ToolTip="修复服务" />
                         <ui:IconActionButton Click="StopService_Click" Glyph="&#xE71A;" IsLoading="{Binding StopServiceCommand.IsRunning}" Visibility="{Binding Runtime.ShowTunServiceStopAction, Converter={StaticResource BoolToVis}}" ToolTipService.ToolTip="停止服务" />
                         <ToggleSwitch MinWidth="0"
@@ -42,10 +49,12 @@
                                       Visibility="{Binding Runtime.IsTunToggleAvailable, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
                 </controls:SettingsCard>
-                <controls:SettingsCard Header="防火墙" Description="重建 mihomo 入站防火墙规则">
+                <controls:SettingsCard Header="防火墙规则"
+                                       Description="{Binding Runtime.TunFirewallDescription}"
+                                       IsEnabled="{Binding Runtime.IsTunToggleAvailable}">
                     <ui:IconActionButton Command="{Binding SetupFirewallCommand}" Glyph="&#xE72C;" ToolTipService.ToolTip="重建防火墙规则" />
                 </controls:SettingsCard>
-                <controls:SettingsCard Header="协议栈" Description="gVisor 兼容性最好，System 性能最好">
+                <controls:SettingsCard Header="协议栈" Description="gVisor 兼容性更好，System 性能更高">
                     <ComboBox SelectedIndex="{Binding StackIndex, Mode=TwoWay}" MinWidth="136" HorizontalAlignment="Right">
                         <ComboBoxItem Content="gVisor" />
                         <ComboBoxItem Content="Mixed" />
@@ -55,7 +64,7 @@
                 <controls:SettingsCard Header="自动路由" Description="自动配置系统路由表">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding AutoRoute, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>
-                <controls:SettingsCard Header="自动检测接口" Description="自动检测出站网络接口">
+                <controls:SettingsCard Header="自动选择接口" Description="自动选择出站网络接口">
                     <ToggleSwitch MinWidth="0" Width="48" OnContent="" OffContent="" IsOn="{Binding AutoDetectInterface, Mode=TwoWay}" HorizontalAlignment="Right" />
                 </controls:SettingsCard>
                 <controls:SettingsCard Header="严格路由" Description="防止路由泄漏">
@@ -82,7 +91,7 @@
                              HorizontalAlignment="Stretch"
                              Text="{Binding DnsHijack, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </controls:SettingsCard>
-                <controls:SettingsCard Header="路由排除地址" Description="每行一个不进入虚拟网卡的地址" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
+                <controls:SettingsCard Header="路由排除地址" Description="不经过虚拟网卡的地址，每行一个" ContentAlignment="Vertical" HorizontalContentAlignment="Stretch">
                     <TextBox AcceptsReturn="True"
                              MinHeight="96"
                              HorizontalAlignment="Stretch"
