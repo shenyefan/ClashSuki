@@ -22,15 +22,20 @@ ClashSuki 使用 WinUI 3 构建，将订阅、代理组、连接、规则、覆�
 | 配置体系 | 基础配置、订阅、YAML/JavaScript 覆写与运行时配置分层合成 |
 | 运行观测 | 实时流量、内存、连接、日志、规则命中、代理与域名排行 |
 | 内核管理 | Mihomo 启停、版本切换、配置校验、GeoData 与外部规则资源 |
-| Windows 集成 | MSIX、打包服务、开机启动、系统托盘和应用修复助手 |
+| Windows 集成 | MSIX、Portable 服务安装、开机启动、系统托盘和应用修复助手 |
 
 ## 系统要求
 
 - Windows 10 版本 2004（Build 19041）或更高版本
 - x64 处理器
-- [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)（MSIX；Portable 已内置）
+- [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)（Portable）
 
-ClashSuki 采用框架依赖发布，不重复打包 .NET 运行时。正式安装包还需要由目标设备信任、且 Publisher 与清单一致的代码签名证书。
+MSIX 采用框架依赖发布，不重复打包 .NET 运行时。Portable ZIP 同时携带自包含的
+.NET、Windows App SDK 和服务组件。普通代理和系统代理无需安装服务；首次使用 TUN
+时，在“虚拟网卡”页面点击“安装服务”并确认 Windows 用户账户控制提示，随后即可使用
+TUN、防火墙管理和 UWP 回环豁免。正式 MSIX 还需要由目标设备信任、且 Publisher 与
+清单一致的代码签名证书。
 
 ## 从源码构建
 
@@ -43,7 +48,8 @@ ClashSuki 采用框架依赖发布，不重复打包 .NET 运行时。正式安�
 
 ## 自动构建与签名
 
-`Build` workflow 会自动生成并校验 x64 MSIX。默认产物未签名；配置以下 GitHub Repository Secrets 后，将使用同一张证书自动签名：
+`Build` workflow 会自动生成并校验 x64 MSIX 和完整的自包含 Portable ZIP。MSIX
+默认未签名；配置以下 GitHub Repository Secrets 后，将使用同一张证书自动签名：
 
 | Secret | 内容 |
 | --- | --- |
