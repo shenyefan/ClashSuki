@@ -120,11 +120,6 @@ public sealed class AppNotificationService : IAppNotificationService
         try
         {
             dialog.XamlRoot = xamlRoot;
-            if (xamlRoot.Content is FrameworkElement themeRoot)
-            {
-                dialog.RequestedTheme = themeRoot.ActualTheme;
-            }
-
             return await dialog.ShowAsync();
         }
         catch (Exception ex)
