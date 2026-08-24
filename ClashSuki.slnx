@@ -4,7 +4,6 @@
   </Configurations>
   <Project Path="ClashSuki/ClashSuki.csproj">
     <Platform Solution="*|x64" Project="x64" />
-    <Deploy />
   </Project>
   <Project Path="ClashSuki.Service/ClashSuki.Service.csproj">
     <Platform Solution="*|x64" Project="x64" />

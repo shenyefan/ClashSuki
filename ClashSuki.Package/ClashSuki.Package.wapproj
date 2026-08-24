@@ -45,8 +45,8 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
-    <Content Include="Assets\*.png">
-      <Link>ClashSuki\Assets\%(Filename)%(Extension)</Link>
+    <Content Include="..\ClashSuki\Assets\Visuals\*.png">
+      <Link>ClashSuki\Assets\Visuals\%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
   <ItemGroup>
@@ -68,5 +68,18 @@
       <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
     </ProjectReference>
   </ItemGroup>
+  <!--
+    WinUI's XAML output group is rooted at the package root, while the entry-point
+    project publish output is placed under ClashSuki\. Keep the root XBF files,
+    but remove the duplicate runtime Assets harvested from the XAML output group.
+  -->
+  <Target Name="RemoveDuplicateRootAppAssets"
+          AfterTargets="_RemoveAllNonWapUWPItems">
+    <ItemGroup>
+      <_DuplicateRootAppAsset Include="@(AppxPackagePayload)"
+                              Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(AppxPackagePayload.TargetPath)', '^Assets\\(Age|Branding|Core|Fonts|GeoData|Tray)\\', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <AppxPackagePayload Remove="@(_DuplicateRootAppAsset)" />
+    </ItemGroup>
+  </Target>
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
 </Project>

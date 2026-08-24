@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Portable 构建独立于 WAP 项目，脚本从仓库 build 目录运行。
 
 function Assert-RequiredFiles
 {
@@ -47,7 +48,6 @@ function Test-IsForbiddenPortableFileName
     )
 
     return (
-        $FileName.StartsWith("ClashSuki.Repair", [System.StringComparison]::OrdinalIgnoreCase) -or
         $FileName.EndsWith(".pdb", [System.StringComparison]::OrdinalIgnoreCase) -or
         $FileName.EndsWith(".appx", [System.StringComparison]::OrdinalIgnoreCase) -or
         $FileName.EndsWith(".appxbundle", [System.StringComparison]::OrdinalIgnoreCase) -or
@@ -93,6 +93,8 @@ function Assert-ServiceInstallerLayout
 
     $expectedServicePath = [System.IO.Path]::GetFullPath(
         (Join-Path $Root "ServiceInstaller\ClashSuki.Service.exe"))
+    $expectedRepairPath = [System.IO.Path]::GetFullPath(
+        (Join-Path $Root "ServiceInstaller\ClashSuki.Repair.exe"))
     $serviceExecutables = @($Files | Where-Object {
         $_.Name.Equals("ClashSuki.Service.exe", [System.StringComparison]::OrdinalIgnoreCase)
     })
@@ -105,41 +107,50 @@ function Assert-ServiceInstallerLayout
         throw "Portable 必须且只能在 ServiceInstaller 目录包含一份 ClashSuki.Service.exe。"
     }
 
-    $unexpectedServiceFiles = @($Files | Where-Object {
-        $_.Name.StartsWith("ClashSuki.Service.", [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not $_.Name.Equals("ClashSuki.Service.exe", [System.StringComparison]::OrdinalIgnoreCase)
-    } | Select-Object -ExpandProperty FullName)
-    if ($unexpectedServiceFiles.Count -gt 0)
+    $repairExecutables = @($Files | Where-Object {
+        $_.Name.Equals("ClashSuki.Repair.exe", [System.StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($repairExecutables.Count -ne 1 -or
+        -not $repairExecutables[0].FullName.Equals(
+            $expectedRepairPath,
+            [System.StringComparison]::OrdinalIgnoreCase))
     {
-        throw "Portable 服务必须为单文件发布，不得包含旁加载文件：$($unexpectedServiceFiles -join '、')"
+        throw "Portable 必须且只能在 ServiceInstaller 目录包含一份 ClashSuki.Repair.exe。"
+    }
+
+    $unexpectedInstallerFiles = @($Files | Where-Object {
+        ($_.Name.StartsWith("ClashSuki.Service.", [System.StringComparison]::OrdinalIgnoreCase) -and
+         -not $_.Name.Equals("ClashSuki.Service.exe", [System.StringComparison]::OrdinalIgnoreCase)) -or
+        ($_.Name.StartsWith("ClashSuki.Repair.", [System.StringComparison]::OrdinalIgnoreCase) -and
+         -not $_.Name.Equals("ClashSuki.Repair.exe", [System.StringComparison]::OrdinalIgnoreCase))
+    } | Select-Object -ExpandProperty FullName)
+    if ($unexpectedInstallerFiles.Count -gt 0)
+    {
+        throw "Portable 服务与安装器必须为单文件发布，不得包含旁加载文件：$($unexpectedInstallerFiles -join '、')"
     }
 }
 
 $projectDirectory = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $projectDirectory
+. (Join-Path $projectDirectory "Build.Common.ps1")
+$payloadManifest = Import-PowerShellDataFile -LiteralPath (Join-Path $projectDirectory "PayloadManifest.psd1")
+$versionPropertiesPath = Join-Path $repositoryRoot "Directory.Build.props"
 $appProjectPath = Join-Path $repositoryRoot "ClashSuki\ClashSuki.csproj"
 $serviceProjectPath = Join-Path $repositoryRoot "ClashSuki.Service\ClashSuki.Service.csproj"
+$repairProjectPath = Join-Path $repositoryRoot "ClashSuki.Repair\ClashSuki.Repair.csproj"
 $runtimeIdentifier = "win-$Platform"
 
-[xml]$appProject = Get-Content -LiteralPath $appProjectPath -Raw
-$versionNode = $appProject.SelectSingleNode("/Project/PropertyGroup/Version")
+[xml]$versionProperties = Get-Content -LiteralPath $versionPropertiesPath -Raw
+$versionNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/Version")
 if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText))
 {
-    throw "无法从 ClashSuki.csproj 读取 Version"
+    throw "无法从 Directory.Build.props 读取 Version"
 }
 
 $version = $versionNode.InnerText.Trim()
 if ($version.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0)
 {
-    throw "ClashSuki.csproj 中的 Version 不能用于产物文件名：$version"
-}
-
-[xml]$serviceProject = Get-Content -LiteralPath $serviceProjectPath -Raw
-$serviceVersionNode = $serviceProject.SelectSingleNode("/Project/PropertyGroup/Version")
-if ($null -eq $serviceVersionNode -or
-    -not $version.Equals($serviceVersionNode.InnerText.Trim(), [System.StringComparison]::Ordinal))
-{
-    throw "ClashSuki 与 ClashSuki.Service 的 Version 必须一致。"
+    throw "Directory.Build.props 中的 Version 不能用于产物文件名：$version"
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory))
@@ -157,6 +168,7 @@ $archivePath = Join-Path $OutputDirectory $archiveName
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ClashSuki-Portable-$([Guid]::NewGuid().ToString('N'))"
 $publishDirectory = Join-Path $temporaryRoot "publish"
 $servicePublishDirectory = Join-Path $temporaryRoot "service-publish"
+$repairPublishDirectory = Join-Path $temporaryRoot "repair-publish"
 $serviceInstallerDirectory = Join-Path $publishDirectory "ServiceInstaller"
 
 $requiredFiles = @(
@@ -171,25 +183,10 @@ $requiredFiles = @(
     "Microsoft.WindowsAppRuntime.dll"
     "Microsoft.ui.xaml.dll"
     "Microsoft.UI.Xaml.Controls.pri"
-    "Assets\Branding\logo.ico"
-    "Assets\Branding\logo.png"
-    "Assets\Tray\default.ico"
-    "Assets\Tray\system-proxy.ico"
-    "Assets\Tray\tun.ico"
-    "Assets\Tray\system-proxy-tun.ico"
-    "Assets\Age\age.exe"
-    "Assets\Age\age-keygen.exe"
-    "Assets\Age\LICENSE"
-    "Assets\Core\mihomo.exe"
-    "Assets\Core\LICENSE"
-    "Assets\Fonts\TwemojiMozilla.ttf"
-    "Assets\Fonts\TwemojiMozilla.LICENSE.md"
-    "Assets\GeoData\Country.mmdb"
-    "Assets\GeoData\geoip.dat"
-    "Assets\GeoData\geosite.dat"
     "ServiceInstaller\ClashSuki.Service.exe"
+    "ServiceInstaller\ClashSuki.Repair.exe"
     "PORTABLE.txt"
-)
+) + @($payloadManifest.RuntimeAssets)
 
 $portableNotice = @"
 ClashSuki Portable $version ($runtimeIdentifier)
@@ -202,14 +199,15 @@ ClashSuki Portable $version ($runtimeIdentifier)
 点击“安装服务”并确认 Windows 用户账户控制提示。安装服务后，TUN、防火墙管理和
 UWP 回环豁免均可使用。
 
-请保持 ServiceInstaller 与 Assets 目录结构完整；服务安装程序会使用
-ServiceInstaller\ClashSuki.Service.exe 和 Assets\Core\mihomo.exe。
+请保持 ServiceInstaller 与 Assets 目录结构完整；修复程序会使用
+ServiceInstaller\ClashSuki.Service.exe 和 Assets\Core\mihomo.exe 安装便携服务。
 "@
 
 try
 {
     New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $servicePublishDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $repairPublishDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $serviceInstallerDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
     if (Test-Path -LiteralPath $archivePath)
@@ -249,6 +247,7 @@ try
 
     Get-ChildItem -LiteralPath $publishDirectory -Filter "*.pdb" -File -Recurse |
         Remove-Item -Force
+    Remove-NonChineseLanguageResources -Root $publishDirectory
 
     $servicePublishArguments = @(
         "publish"
@@ -295,6 +294,51 @@ try
     Copy-Item -LiteralPath $servicePublishFiles[0].FullName `
         -Destination (Join-Path $serviceInstallerDirectory "ClashSuki.Service.exe")
 
+    $repairPublishArguments = @(
+        "publish"
+        $repairProjectPath
+        "--configuration"
+        $Configuration
+        "--runtime"
+        $runtimeIdentifier
+        "--self-contained"
+        "true"
+        "--output"
+        $repairPublishDirectory
+        "/p:Platform=$Platform"
+        "/p:PublishProfile="
+        "/p:SelfContained=true"
+        "/p:UseAppHost=true"
+        "/p:PublishSingleFile=true"
+        "/p:IncludeNativeLibrariesForSelfExtract=true"
+        "/p:EnableCompressionInSingleFile=true"
+        "/p:PublishTrimmed=false"
+        "/p:PublishReadyToRun=false"
+        "/p:DebugSymbols=false"
+        "/p:DebugType=None"
+    )
+
+    & dotnet @repairPublishArguments
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Portable 服务安装器发布失败，dotnet publish 退出码：$LASTEXITCODE"
+    }
+
+    Get-ChildItem -LiteralPath $repairPublishDirectory -Filter "*.pdb" -File -Recurse |
+        Remove-Item -Force
+
+    $repairPublishFiles = @(Get-ChildItem -LiteralPath $repairPublishDirectory -File -Recurse)
+    if ($repairPublishFiles.Count -ne 1 -or
+        -not $repairPublishFiles[0].Name.Equals(
+            "ClashSuki.Repair.exe",
+            [System.StringComparison]::OrdinalIgnoreCase))
+    {
+        throw "Portable 服务安装器没有生成预期的自包含单文件：$($repairPublishFiles.FullName -join '、')"
+    }
+
+    Copy-Item -LiteralPath $repairPublishFiles[0].FullName `
+        -Destination (Join-Path $serviceInstallerDirectory "ClashSuki.Repair.exe")
+
     [System.IO.File]::WriteAllText(
         (Join-Path $publishDirectory "PORTABLE.txt"),
         $portableNotice,
@@ -315,6 +359,7 @@ try
     $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
     try
     {
+        Assert-ChineseOnlyArchiveEntries -Entries $archive.Entries -ArtifactName "Portable ZIP"
         $archiveEntries = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in $archive.Entries)
@@ -370,10 +415,23 @@ try
             throw "Portable ZIP 的服务安装程序目录结构无效。"
         }
 
+        $repairArchiveEntries = @($archiveEntries | Where-Object {
+            (($_ -split "/")[-1]).Equals(
+                "ClashSuki.Repair.exe",
+                [System.StringComparison]::OrdinalIgnoreCase)
+        })
+        if ($repairArchiveEntries.Count -ne 1 -or
+            -not $repairArchiveEntries[0].Equals(
+                "ServiceInstaller/ClashSuki.Repair.exe",
+                [System.StringComparison]::OrdinalIgnoreCase))
+        {
+            throw "Portable ZIP 的服务安装器目录结构无效。"
+        }
+
         $nestedPayloadEntries = @($archiveEntries | Where-Object {
             $_.StartsWith("publish/", [System.StringComparison]::OrdinalIgnoreCase) -or
             $_.StartsWith("ClashSuki/", [System.StringComparison]::OrdinalIgnoreCase) -or
-            (($_ -match "(^|/)Assets/") -and
+            (($_ -match "(^|/)Assets/(Branding|Tray|Age|Core|Fonts|GeoData)/") -and
                 -not $_.StartsWith("Assets/", [System.StringComparison]::OrdinalIgnoreCase))
         })
         if ($nestedPayloadEntries.Count -gt 0)

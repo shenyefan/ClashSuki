@@ -15,9 +15,33 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectDirectory = Split-Path -Parent $PSCommandPath
+$buildDirectory = Split-Path -Parent $PSCommandPath
+$repositoryRoot = Split-Path -Parent $buildDirectory
+. (Join-Path $buildDirectory "Build.Common.ps1")
+$projectDirectory = Join-Path $repositoryRoot "ClashSuki.Package"
 $projectPath = Join-Path $projectDirectory "ClashSuki.Package.wapproj"
+$payloadManifest = Import-PowerShellDataFile -LiteralPath (Join-Path $buildDirectory "PayloadManifest.psd1")
 $vswherePath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+
+[xml]$versionProperties = Get-Content -LiteralPath (Join-Path $repositoryRoot "Directory.Build.props") -Raw
+$assemblyVersionNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/AssemblyVersion")
+if ($null -eq $assemblyVersionNode -or [string]::IsNullOrWhiteSpace($assemblyVersionNode.InnerText))
+{
+    throw "无法从 Directory.Build.props 读取 AssemblyVersion"
+}
+
+$assemblyVersion = $assemblyVersionNode.InnerText.Trim()
+[xml]$packageManifest = Get-Content -LiteralPath (Join-Path $projectDirectory "Package.appxmanifest") -Raw
+$packageIdentity = $packageManifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']")
+[xml]$applicationManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot "ClashSuki\app.manifest") -Raw
+$applicationIdentity = $applicationManifest.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
+if ($null -eq $packageIdentity -or
+    $null -eq $applicationIdentity -or
+    -not $assemblyVersion.Equals($packageIdentity.Version, [System.StringComparison]::Ordinal) -or
+    -not $assemblyVersion.Equals($applicationIdentity.Version, [System.StringComparison]::Ordinal))
+{
+    throw "Directory.Build.props、Package.appxmanifest 与 app.manifest 的四段版本必须一致：$assemblyVersion"
+}
 
 if (-not (Test-Path -LiteralPath $vswherePath))
 {
@@ -118,6 +142,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
 try
 {
+    Assert-ChineseOnlyArchiveEntries -Entries $archive.Entries -ArtifactName "MSIX"
     $packageEntries = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $archive.Entries)
@@ -126,39 +151,23 @@ try
     }
 
     $requiredVisualAssetEntries = @(Get-ChildItem `
-        -LiteralPath (Join-Path $projectDirectory "Assets") `
+        -LiteralPath (Join-Path $projectDirectory "..\ClashSuki\Assets\Visuals") `
         -Filter "*.png" `
         -File | ForEach-Object {
-            "ClashSuki\Assets\$($_.Name)"
+            "ClashSuki\Assets\Visuals\$($_.Name)"
         })
 
     $requiredEntries = @(
         "ClashSuki\ClashSuki.exe"
         "ClashSuki\ClashSuki.deps.json"
         "ClashSuki\ClashSuki.runtimeconfig.json"
-        "ClashSuki\Assets\Branding\logo.ico"
-        "ClashSuki\Assets\Branding\logo.png"
-        "ClashSuki\Assets\Tray\default.ico"
-        "ClashSuki\Assets\Tray\system-proxy.ico"
-        "ClashSuki\Assets\Tray\tun.ico"
-        "ClashSuki\Assets\Tray\system-proxy-tun.ico"
-        "ClashSuki\Assets\Age\age.exe"
-        "ClashSuki\Assets\Age\age-keygen.exe"
-        "ClashSuki\Assets\Age\LICENSE"
-        "ClashSuki\Assets\Core\mihomo.exe"
-        "ClashSuki\Assets\Core\LICENSE"
-        "ClashSuki\Assets\Fonts\TwemojiMozilla.ttf"
-        "ClashSuki\Assets\Fonts\TwemojiMozilla.LICENSE.md"
-        "ClashSuki\Assets\GeoData\Country.mmdb"
-        "ClashSuki\Assets\GeoData\geoip.dat"
-        "ClashSuki\Assets\GeoData\geosite.dat"
         "ClashSuki.Service\ClashSuki.Service.exe"
         "ClashSuki.Service\ClashSuki.Service.deps.json"
         "ClashSuki.Service\ClashSuki.Service.runtimeconfig.json"
         "ClashSuki.Repair\ClashSuki.Repair.exe"
         "ClashSuki.Repair\ClashSuki.Repair.deps.json"
         "ClashSuki.Repair\ClashSuki.Repair.runtimeconfig.json"
-    ) + $requiredVisualAssetEntries
+    ) + @($payloadManifest.RuntimeAssets | ForEach-Object { "ClashSuki\$_" }) + $requiredVisualAssetEntries
     $missingEntries = @($requiredEntries | Where-Object { -not $packageEntries.Contains($_) })
     if ($missingEntries.Count -gt 0)
     {
@@ -173,11 +182,7 @@ try
         throw "MSIX 包根仍包含重复 Assets 目录：$($rootAssetEntries -join '、')"
     }
 
-    $forbiddenEntries = @(
-        "ClashSuki\Assets\Age\age-inspect.exe"
-        "ClashSuki\Assets\Age\age-plugin-batchpass.exe"
-        "ClashSuki\Assets\UWP\enableLoopback.exe"
-    )
+    $forbiddenEntries = @($payloadManifest.ForbiddenRuntimeAssets | ForEach-Object { "ClashSuki\$_" })
     $unexpectedEntries = @($forbiddenEntries | Where-Object { $packageEntries.Contains($_) })
     if ($unexpectedEntries.Count -gt 0)
     {
