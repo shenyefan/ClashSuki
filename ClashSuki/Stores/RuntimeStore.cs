@@ -21,6 +21,7 @@ public sealed partial class RuntimeStore : ObservableObject
     [ObservableProperty] private bool showTunServiceRepair;
     [ObservableProperty] private bool isTunServiceInstalled;
     [ObservableProperty] private bool isTunServiceReady;
+    [ObservableProperty] private string tunServiceInstallActionText = "安装服务";
     [ObservableProperty] private bool showTunServiceInstallAction;
     [ObservableProperty] private bool showTunServiceRepairAction;
     [ObservableProperty] private bool showTunServiceStopAction;
@@ -106,8 +107,11 @@ public sealed partial class RuntimeStore : ObservableObject
             MihomoServiceStatus.Unavailable;
         IsTunServiceInstalled = status != MihomoServiceStatus.InstallRequired;
         IsTunServiceReady = status == MihomoServiceStatus.Ready;
+        TunServiceInstallActionText = status == MihomoServiceStatus.Unavailable
+            ? "重新安装服务"
+            : "安装服务";
         ShowTunServiceInstallAction = !isPackaged && needsServiceRecovery;
-        ShowTunServiceRepairAction = isPackaged && needsServiceRecovery;
+        ShowTunServiceRepairAction = isPackaged;
         ShowTunServiceStopAction = status == MihomoServiceStatus.Ready;
         TunServiceStatusText = status switch
         {
