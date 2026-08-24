@@ -135,7 +135,7 @@ public sealed partial class SysProxyPage : Page
             await viewModel.Runtime.Notifications.ShowDialogAsync(
                 XamlRoot,
                 UwpLoopbackDialog,
-                "配置 UWP 应用代理",
+                "配置商店应用代理",
                 LogSources.Network);
         }
         catch (OperationCanceledException) when (loadCts.IsCancellationRequested)
@@ -145,7 +145,7 @@ public sealed partial class SysProxyPage : Page
         catch (Exception ex)
         {
             viewModel.Runtime.Notifications.Error(
-                "UWP 应用列表读取失败",
+                "商店应用列表读取失败",
                 source: LogSources.Network,
                 exception: ex);
         }

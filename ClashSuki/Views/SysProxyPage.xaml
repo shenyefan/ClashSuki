@@ -49,11 +49,11 @@
                     </ComboBox>
                 </controls:SettingsCard>
                 <controls:SettingsCard x:Name="UwpLoopbackCard"
-                                       Header="UWP 应用代理"
+                                       Header="商店应用代理"
                                        Description="{Binding Runtime.UwpLoopbackDescription}"
                                        IsEnabled="{Binding Runtime.IsTunToggleAvailable}"
                                        IsClickEnabled="True"
-                                       ActionIconToolTip="配置 UWP 应用代理"
+                                       ActionIconToolTip="配置商店应用代理"
                                        Click="OpenUwpLoopback_Click">
                     <ProgressRing x:Name="UwpLoopbackLoadingRing"
                                   Width="20"
@@ -86,13 +86,23 @@
         </ScrollViewer>
 
         <ContentDialog x:Name="UwpLoopbackDialog"
-                       Title="UWP 应用代理"
+                       Title="商店应用代理"
                        PrimaryButtonText="保存"
                        CloseButtonText="取消"
                        DefaultButton="Primary"
                        Closing="UwpLoopbackDialog_Closing"
                        PrimaryButtonClick="UwpLoopbackDialog_PrimaryButtonClick">
-            <Grid RowSpacing="8">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">680</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">680</x:Double>
+                <Style x:Key="UwpLoopbackListItemStyle" TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="4,2" />
+                    <Setter Property="MinHeight" Value="56" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ContentDialog.Resources>
+            <Grid Width="600" RowSpacing="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -102,76 +112,91 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
-                           Text="选择可访问本机代理的 Microsoft Store 应用。保存后将更新所选应用的本机回环权限。"
+                           Text="允许所选商店应用访问本机代理。保存后将更新对应的系统回环权限。"
                            TextWrapping="WrapWholeWords"
-                           Style="{StaticResource BodyTextBlockStyle}" />
+                           Style="{StaticResource MutedCaptionTextStyle}" />
 
                 <InfoBar x:Name="UwpLoopbackInfoBar"
                          Grid.Row="1"
                          IsOpen="False"
                          IsClosable="True" />
 
-                <CommandBar Grid.Row="2"
-                            Background="Transparent"
-                            DefaultLabelPosition="Right"
-                            HorizontalAlignment="Stretch">
-                    <CommandBar.Content>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ProgressRing x:Name="UwpLoopbackSavingRing"
-                                          Width="16"
-                                          Height="16"
-                                          IsActive="False"
-                                          Visibility="Collapsed"
-                                          AutomationProperties.Name="正在保存应用代理设置" />
-                            <TextBlock x:Name="UwpLoopbackSelectionSummary"
-                                       VerticalAlignment="Center"
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       AutomationProperties.LiveSetting="Polite" />
-                        </StackPanel>
-                    </CommandBar.Content>
-                    <AppBarButton x:Name="UwpLoopbackSelectAllButton"
-                                  Icon="SelectAll"
-                                  Label="全选"
-                                  Click="UwpLoopbackSelectAll_Click" />
-                    <AppBarButton x:Name="UwpLoopbackClearSelectionButton"
-                                  Icon="ClearSelection"
-                                  Label="取消全选"
-                                  Click="UwpLoopbackClearSelection_Click" />
-                </CommandBar>
+                <Grid Grid.Row="2" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <ProgressRing x:Name="UwpLoopbackSavingRing"
+                                      Width="16"
+                                      Height="16"
+                                      IsActive="False"
+                                      Visibility="Collapsed"
+                                      AutomationProperties.Name="正在保存应用代理设置" />
+                        <TextBlock x:Name="UwpLoopbackSelectionSummary"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource MutedCaptionTextStyle}"
+                                   AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                        <ui:IconActionButton x:Name="UwpLoopbackSelectAllButton"
+                                             Glyph="&#xE8B3;"
+                                             Click="UwpLoopbackSelectAll_Click"
+                                             ToolTipService.ToolTip="全选" />
+                        <ui:IconActionButton x:Name="UwpLoopbackClearSelectionButton"
+                                             Glyph="&#xE711;"
+                                             Click="UwpLoopbackClearSelection_Click"
+                                             ToolTipService.ToolTip="清除选择" />
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock x:Name="UwpLoopbackListLabel"
                            Grid.Row="3"
                            Text="应用列表"
-                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                           Style="{StaticResource SectionTitleStyle}"
+                           Margin="0" />
 
-                <ListView x:Name="UwpLoopbackList"
-                          Grid.Row="4"
-                          MaxHeight="440"
-                          SelectionMode="Multiple"
-                          SelectionChanged="UwpLoopbackList_SelectionChanged"
-                          HorizontalContentAlignment="Stretch"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                          AutomationProperties.LabeledBy="{Binding ElementName=UwpLoopbackListLabel}">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="MinHeight" Value="56" />
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="services:UwpLoopbackApp">
-                            <StackPanel Padding="4" Spacing="2">
-                                <TextBlock Text="{x:Bind DisplayName}"
-                                           Style="{StaticResource BodyStrongTextBlockStyle}"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{x:Bind PackageFamilyName}"
-                                           Style="{StaticResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                           TextWrapping="WrapWholeWords" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Padding="0">
+                    <ListView x:Name="UwpLoopbackList"
+                              MaxHeight="420"
+                              Padding="0,2"
+                              Background="Transparent"
+                              SelectionMode="Multiple"
+                              IsMultiSelectCheckBoxEnabled="True"
+                              SelectionChanged="UwpLoopbackList_SelectionChanged"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ItemContainerStyle="{StaticResource UwpLoopbackListItemStyle}"
+                              AutomationProperties.LabeledBy="{Binding ElementName=UwpLoopbackListLabel}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="services:UwpLoopbackApp">
+                                <Grid Padding="10,8" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="32"
+                                            Height="32"
+                                            CornerRadius="6"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <FontIcon Glyph="&#xE71D;"
+                                                  FontSize="14"
+                                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind DisplayName}"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind PackageFamilyName}"
+                                                   Style="{StaticResource MutedCaptionTextStyle}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{x:Bind PackageFamilyName}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
             </Grid>
         </ContentDialog>
     </Grid>

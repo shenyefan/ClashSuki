@@ -134,7 +134,7 @@ public sealed partial class RuntimeStore : ObservableObject
         };
         TunFirewallDescription = serviceUnavailableDescription ?? "重新创建 Windows 防火墙规则";
         UwpLoopbackDescription = serviceUnavailableDescription ??
-            "允许所选 Microsoft Store 应用访问本机代理";
+            "允许所选商店应用访问本机代理";
 
         IsTunToggleAvailable = status is MihomoServiceStatus.Ready or MihomoServiceStatus.Stopped;
         ShowTunServiceRepair = isPackaged && !IsTunToggleAvailable;
