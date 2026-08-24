@@ -12,24 +12,47 @@ public static class Program
         var ownsPrimaryInstance = false;
         try
         {
+            WriteStartupCheckpoint(
+                $"进程启动；OS={Environment.OSVersion.VersionString}；" +
+                $"Framework={RuntimeInformation.FrameworkDescription}；" +
+                $"BaseDirectory={AppContext.BaseDirectory}");
             WinRT.ComWrappersSupport.InitializeComWrappers();
+            WriteStartupCheckpoint("WinRT COM 包装器初始化完成");
 
             if (!SingleInstanceManager.TryAcquirePrimary())
             {
+                WriteStartupCheckpoint("检测到已有实例，正在请求激活");
                 SingleInstanceManager.RequestActivatePrimary();
                 return 0;
             }
 
             ownsPrimaryInstance = true;
             SingleInstanceManager.StartListening();
+            WriteStartupCheckpoint("即将启动 WinUI XAML");
 
             Microsoft.UI.Xaml.Application.Start(_ =>
             {
-                var context = new Microsoft.UI.Dispatching.DispatcherQueueSynchronizationContext(
-                    Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread());
-                SynchronizationContext.SetSynchronizationContext(context);
-                new App();
+                try
+                {
+                    WriteStartupCheckpoint("已进入 WinUI XAML 初始化回调");
+                    var context = new Microsoft.UI.Dispatching.DispatcherQueueSynchronizationContext(
+                        Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread());
+                    SynchronizationContext.SetSynchronizationContext(context);
+                    new App();
+                    WriteStartupCheckpoint("App XAML 资源初始化完成");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLog.WriteAppException(
+                        "XAML-STARTUP",
+                        ex,
+                        "WinUI XAML 初始化失败",
+                        "FATAL");
+                    ShowStartupFailure(ex);
+                    Environment.Exit(1);
+                }
             });
+            WriteStartupCheckpoint("WinUI 消息循环已退出");
             return 0;
         }
         catch (Exception ex)
@@ -46,6 +69,9 @@ public static class Program
             }
         }
     }
+
+    private static void WriteStartupCheckpoint(string message) =>
+        DiagnosticLog.WriteApp("STARTUP", message);
 
     private static void ShowStartupFailure(Exception exception)
     {
