@@ -4,7 +4,7 @@ using ClashSuki.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Data;
+using System.ComponentModel;
 
 namespace ClashSuki.Views;
 
@@ -12,7 +12,8 @@ public sealed partial class SysProxyPage : Page
 {
     private bool _uwpLoopbackDialogShowing;
     private bool _uwpLoopbackSaving;
-    private bool _updatingUwpLoopbackSelection;
+    private bool _updatingUwpLoopbackChecks;
+    private IReadOnlyList<UwpLoopbackSelectionItem> _uwpLoopbackItems = [];
     private CancellationTokenSource? _uwpLoopbackLoadCts;
 
     public SysProxyPage()
@@ -115,19 +116,17 @@ public sealed partial class SysProxyPage : Page
             loadCts.Token.ThrowIfCancellationRequested();
 
             UwpLoopbackInfoBar.IsOpen = false;
-            _updatingUwpLoopbackSelection = true;
+            _updatingUwpLoopbackChecks = true;
             try
             {
-                UwpLoopbackList.ItemsSource = apps;
-                UwpLoopbackList.SelectedItems.Clear();
-                foreach (var app in apps.Where(static app => app.IsExempt))
-                {
-                    UwpLoopbackList.SelectedItems.Add(app);
-                }
+                _uwpLoopbackItems = apps
+                    .Select(static app => new UwpLoopbackSelectionItem(app))
+                    .ToArray();
+                UwpLoopbackList.ItemsSource = _uwpLoopbackItems;
             }
             finally
             {
-                _updatingUwpLoopbackSelection = false;
+                _updatingUwpLoopbackChecks = false;
             }
             UpdateUwpLoopbackSelectionState();
             loadCts.Token.ThrowIfCancellationRequested();
@@ -164,24 +163,43 @@ public sealed partial class SysProxyPage : Page
 
     private void UwpLoopbackSelectAll_Click(object sender, RoutedEventArgs e)
     {
-        UwpLoopbackList.SelectAll();
+        SetAllUwpLoopbackChecks(isChecked: true);
     }
 
     private void UwpLoopbackClearSelection_Click(object sender, RoutedEventArgs e)
     {
-        if (UwpLoopbackList.Items.Count > 0)
-        {
-            UwpLoopbackList.DeselectRange(
-                new ItemIndexRange(0, checked((uint)UwpLoopbackList.Items.Count)));
-        }
+        SetAllUwpLoopbackChecks(isChecked: false);
     }
 
-    private void UwpLoopbackList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void UwpLoopbackCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        if (!_updatingUwpLoopbackSelection)
+        if (sender is CheckBox { Tag: UwpLoopbackSelectionItem item } checkBox)
+        {
+            item.IsSelected = checkBox.IsChecked is true;
+        }
+
+        if (!_updatingUwpLoopbackChecks)
         {
             UpdateUwpLoopbackSelectionState();
         }
+    }
+
+    private void SetAllUwpLoopbackChecks(bool isChecked)
+    {
+        _updatingUwpLoopbackChecks = true;
+        try
+        {
+            foreach (var item in _uwpLoopbackItems)
+            {
+                item.IsSelected = isChecked;
+            }
+        }
+        finally
+        {
+            _updatingUwpLoopbackChecks = false;
+        }
+
+        UpdateUwpLoopbackSelectionState();
     }
 
     private async void UwpLoopbackDialog_PrimaryButtonClick(
@@ -194,7 +212,8 @@ public sealed partial class SysProxyPage : Page
             return;
         }
 
-        if (UwpLoopbackList.SelectedItems.Count > LoopbackExemptionPolicy.MaxExemptionCount)
+        if (_uwpLoopbackItems.Count(static item => item.IsSelected) >
+            LoopbackExemptionPolicy.MaxExemptionCount)
         {
             args.Cancel = true;
             ShowUwpLoopbackInfo(
@@ -219,8 +238,8 @@ public sealed partial class SysProxyPage : Page
             "正在更新应用回环权限，请稍候。");
         try
         {
-            var selectedSids = UwpLoopbackList.SelectedItems
-                .OfType<UwpLoopbackApp>()
+            var selectedSids = _uwpLoopbackItems
+                .Where(static item => item.IsSelected)
                 .Select(static app => app.Sid)
                 .ToArray();
             await UwpLoopbackToolService.SetExemptionsAsync(selectedSids);
@@ -277,8 +296,8 @@ public sealed partial class SysProxyPage : Page
 
     private void UpdateUwpLoopbackSelectionState()
     {
-        var selectedCount = UwpLoopbackList.SelectedItems.Count;
-        var totalCount = UwpLoopbackList.Items.Count;
+        var selectedCount = _uwpLoopbackItems.Count(static item => item.IsSelected);
+        var totalCount = _uwpLoopbackItems.Count;
         var exceedsLimit = selectedCount > LoopbackExemptionPolicy.MaxExemptionCount;
 
         var selectionSummary = $"已选择 {selectedCount} 个，共 {totalCount} 个";
@@ -318,4 +337,40 @@ public sealed partial class SysProxyPage : Page
         UwpLoopbackInfoBar.Message = message;
         UwpLoopbackInfoBar.IsOpen = true;
     }
+}
+
+public sealed class UwpLoopbackSelectionItem : INotifyPropertyChanged
+{
+    private bool _isSelected;
+
+    public UwpLoopbackSelectionItem(UwpLoopbackApp app)
+    {
+        Sid = app.Sid;
+        DisplayName = app.DisplayName;
+        PackageFamilyName = app.PackageFamilyName;
+        _isSelected = app.IsExempt;
+    }
+
+    public string Sid { get; }
+
+    public string DisplayName { get; }
+
+    public string PackageFamilyName { get; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }

@@ -6,6 +6,7 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:services="using:ClashSuki.Services"
     xmlns:ui="using:ClashSuki.Controls"
+    xmlns:views="using:ClashSuki.Views"
     NavigationCacheMode="Enabled">
     <Grid>
         <ScrollViewer HorizontalContentAlignment="Stretch">
@@ -98,7 +99,7 @@
                     <Setter Property="Padding" Value="0" />
                     <Setter Property="Margin" Value="4,2" />
                     <Setter Property="MinHeight" Value="56" />
-                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                    <Setter Property="IsTabStop" Value="False" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 </Style>
             </ContentDialog.Resources>
@@ -148,16 +149,21 @@
                               MaxHeight="420"
                               Padding="0,2"
                               Background="Transparent"
-                              SelectionMode="Multiple"
-                              IsMultiSelectCheckBoxEnabled="True"
-                              SelectionChanged="UwpLoopbackList_SelectionChanged"
+                              SelectionMode="None"
                               HorizontalContentAlignment="Stretch"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               ItemContainerStyle="{StaticResource UwpLoopbackListItemStyle}"
                               AutomationProperties.Name="商店应用选择列表">
                         <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="services:UwpLoopbackApp">
-                                <Grid Padding="12,8">
+                            <DataTemplate x:DataType="views:UwpLoopbackSelectionItem">
+                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=OneWay}"
+                                          Tag="{x:Bind}"
+                                          Checked="UwpLoopbackCheckBox_Changed"
+                                          Unchecked="UwpLoopbackCheckBox_Changed"
+                                          Padding="8,6"
+                                          HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Stretch"
+                                          AutomationProperties.Name="{x:Bind DisplayName}">
                                     <StackPanel Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Text="{x:Bind DisplayName}"
                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
@@ -167,7 +173,7 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTipService.ToolTip="{x:Bind PackageFamilyName}" />
                                     </StackPanel>
-                                </Grid>
+                                </CheckBox>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
