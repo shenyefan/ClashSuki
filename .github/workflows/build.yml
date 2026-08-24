@@ -53,14 +53,14 @@ jobs:
                 $certificatePath,
                 [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
 
-              .\ClashSuki.Package\Build-Package.ps1 `
+              .\build\Build-Msix.ps1 `
                 -Configuration Release `
                 -Platform x64 `
                 -CertificatePath $certificatePath `
                 -CertificatePassword $env:WINDOWS_CERTIFICATE_PASSWORD
             }
             else {
-              .\ClashSuki.Package\Build-Package.ps1 `
+              .\build\Build-Msix.ps1 `
                 -Configuration Release `
                 -Platform x64
             }
@@ -73,7 +73,7 @@ jobs:
         id: portable
         shell: pwsh
         run: |
-          .\ClashSuki.Package\Build-Portable.ps1 `
+          .\build\Build-Portable.ps1 `
             -Configuration Release `
             -Platform x64
 

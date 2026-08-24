@@ -46,6 +46,14 @@ TUN、防火墙管理和 UWP 回环豁免。正式 MSIX 还需要由目标设备
 - Windows Application Packaging Project
 - Windows 10 SDK 10.0.19041 或更高版本
 
+Visual Studio 中以 `ClashSuki.Package` 为启动/部署项目即可生成包含主程序、Service
+和 Repair 的 MSIX。命令行构建入口统一放在仓库 `build` 目录：
+
+```powershell
+.\build\Build-Msix.ps1 -Configuration Release -Platform x64
+.\build\Build-Portable.ps1 -Configuration Release -Platform x64
+```
+
 ## 自动构建与签名
 
 `Build` workflow 会自动生成并校验 x64 MSIX 和完整的自包含 Portable ZIP。MSIX
@@ -63,10 +71,10 @@ TUN、防火墙管理和 UWP 回环豁免。正式 MSIX 还需要由目标设备
 ```text
 ClashSuki/
 ├─ ClashSuki/          WinUI 3 主程序
-├─ ClashSuki.Service/  Windows 后台服务
-├─ ClashSuki.Repair/   包注册与修复助手
-├─ ClashSuki.Package/  MSIX 打包项目
-└─ Shared/             进程间共享协议
+├─ ClashSuki.Service/  Windows 服务运行时
+├─ ClashSuki.Repair/   MSIX 修复与便携服务安装助手
+├─ ClashSuki.Package/  纯 WAP/MSIX 清单与多进程打包项目（无业务代码）
+└─ build/              MSIX 与 Portable 构建入口和载荷清单
 ```
 
 ## 致谢
