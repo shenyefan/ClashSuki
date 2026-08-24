@@ -94,16 +94,21 @@
             <ContentDialog.Resources>
                 <x:Double x:Key="ContentDialogMinWidth">680</x:Double>
                 <x:Double x:Key="ContentDialogMaxWidth">680</x:Double>
+                <!-- 提高未选中多选框的辨识度；所有颜色均随应用主题切换。 -->
+                <StaticResource x:Key="ListViewItemCheckBoxBrush" ResourceKey="ControlFillColorDefaultBrush" />
+                <StaticResource x:Key="ListViewItemCheckBoxPointerOverBrush" ResourceKey="ControlFillColorSecondaryBrush" />
+                <StaticResource x:Key="ListViewItemCheckBoxPressedBrush" ResourceKey="ControlFillColorTertiaryBrush" />
+                <StaticResource x:Key="ListViewItemCheckBoxBorderBrush" ResourceKey="ControlStrongStrokeColorDefaultBrush" />
                 <Style x:Key="UwpLoopbackListItemStyle" TargetType="ListViewItem">
                     <Setter Property="Padding" Value="0" />
                     <Setter Property="Margin" Value="4,2" />
                     <Setter Property="MinHeight" Value="56" />
+                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 </Style>
             </ContentDialog.Resources>
             <Grid Width="600" RowSpacing="12">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -120,7 +125,7 @@
                          IsOpen="False"
                          IsClosable="True" />
 
-                <Grid Grid.Row="2" ColumnSpacing="8">
+                <Grid Grid.Row="2" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -137,25 +142,19 @@
                                    Style="{StaticResource MutedCaptionTextStyle}"
                                    AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                        <ui:IconActionButton x:Name="UwpLoopbackSelectAllButton"
-                                             Glyph="&#xE8B3;"
-                                             Click="UwpLoopbackSelectAll_Click"
-                                             ToolTipService.ToolTip="全选" />
-                        <ui:IconActionButton x:Name="UwpLoopbackClearSelectionButton"
-                                             Glyph="&#xE711;"
-                                             Click="UwpLoopbackClearSelection_Click"
-                                             ToolTipService.ToolTip="清除选择" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <Button x:Name="UwpLoopbackSelectAllButton"
+                                Content="全选"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Click="UwpLoopbackSelectAll_Click" />
+                        <Button x:Name="UwpLoopbackClearSelectionButton"
+                                Content="全不选"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Click="UwpLoopbackClearSelection_Click" />
                     </StackPanel>
                 </Grid>
 
-                <TextBlock x:Name="UwpLoopbackListLabel"
-                           Grid.Row="3"
-                           Text="应用列表"
-                           Style="{StaticResource SectionTitleStyle}"
-                           Margin="0" />
-
-                <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="0">
                     <ListView x:Name="UwpLoopbackList"
                               MaxHeight="420"
                               Padding="0,2"
@@ -166,23 +165,11 @@
                               HorizontalContentAlignment="Stretch"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               ItemContainerStyle="{StaticResource UwpLoopbackListItemStyle}"
-                              AutomationProperties.LabeledBy="{Binding ElementName=UwpLoopbackListLabel}">
+                              AutomationProperties.Name="商店应用选择列表">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="services:UwpLoopbackApp">
-                                <Grid Padding="10,8" ColumnSpacing="12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="32" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="32"
-                                            Height="32"
-                                            CornerRadius="6"
-                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                                        <FontIcon Glyph="&#xE71D;"
-                                                  FontSize="14"
-                                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <Grid Padding="12,8">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Text="{x:Bind DisplayName}"
                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
                                                    TextTrimming="CharacterEllipsis" />
