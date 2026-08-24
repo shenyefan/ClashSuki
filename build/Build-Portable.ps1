@@ -140,6 +140,17 @@ $serviceProjectPath = Join-Path $repositoryRoot "ClashSuki.Service\ClashSuki.Ser
 $repairProjectPath = Join-Path $repositoryRoot "ClashSuki.Repair\ClashSuki.Repair.csproj"
 $runtimeIdentifier = "win-$Platform"
 
+[xml]$appProject = Get-Content -LiteralPath $appProjectPath -Raw
+$enableMsixToolingNode = $appProject.SelectSingleNode(
+    "/Project/PropertyGroup/EnableMsixTooling")
+if ($null -eq $enableMsixToolingNode -or
+    -not $enableMsixToolingNode.InnerText.Trim().Equals(
+        "true",
+        [System.StringComparison]::OrdinalIgnoreCase))
+{
+    throw "WinUI 无包发布必须启用 EnableMsixTooling，否则 self-contained 版本会在 XAML 初始化时崩溃。"
+}
+
 [xml]$versionProperties = Get-Content -LiteralPath $versionPropertiesPath -Raw
 $versionNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/Version")
 if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText))
@@ -248,6 +259,7 @@ $requiredFiles = @(
     "ClashSuki.exe"
     "ClashSuki.dll"
     "ClashSuki.deps.json"
+    "ClashSuki.pri"
     "ClashSuki.runtimeconfig.json"
     "coreclr.dll"
     "hostfxr.dll"
