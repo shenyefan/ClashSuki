@@ -21,7 +21,6 @@
     <ScrollViewer HorizontalContentAlignment="Stretch">
         <StackPanel Padding="{StaticResource PagePadding}"
                     Spacing="{StaticResource PageSpacing}"
-                    MaxWidth="{StaticResource PageMaxWidth}"
                     HorizontalAlignment="Stretch">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
