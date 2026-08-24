@@ -31,10 +31,11 @@ ClashSuki 使用 WinUI 3 构建，将订阅、代理组、连接、规则、覆�
 - [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)（MSIX；Portable 已内置）
 - [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)（Portable）
 
-MSIX 采用框架依赖发布，不重复打包 .NET 运行时。Portable ZIP 同时携带自包含的
-.NET、Windows App SDK 和服务组件。普通代理和系统代理无需安装服务；首次使用 TUN
-时，在“虚拟网卡”页面点击“安装服务”并确认 Windows 用户账户控制提示，随后即可使用
-TUN、防火墙管理和 UWP 回环豁免。正式 MSIX 还需要由目标设备信任、且 Publisher 与
+MSIX 自包含 .NET 运行时，并通过包清单声明 Windows App SDK 与 VCLibs 官方框架依赖；
+Portable ZIP 同时携带自包含的 .NET、Windows App SDK、应用本地 VCLibs 和服务组件。
+普通代理和系统代理无需安装服务；首次使用 TUN 时，在“虚拟网卡”页面点击“安装服务”
+并确认 Windows 用户账户控制提示。商店应用代理仅在保存回环权限时请求一次管理员权限，
+不会安装服务。正式 MSIX 还需要由目标设备信任、且 Publisher 与
 清单一致的代码签名证书。
 
 ## 从源码构建
@@ -71,8 +72,8 @@ Visual Studio 中以 `ClashSuki.Package` 为启动/部署项目即可生成包�
 ```text
 ClashSuki/
 ├─ ClashSuki/          WinUI 3 主程序
-├─ ClashSuki.Service/  Windows 服务运行时
-├─ ClashSuki.Repair/   MSIX 修复与便携服务安装助手
+├─ ClashSuki.Service/  TUN、内核与防火墙的 Windows 服务运行时
+├─ ClashSuki.Repair/   MSIX 修复、便携服务安装与一次性提权助手
 ├─ ClashSuki.Package/  纯 WAP/MSIX 清单与多进程打包项目（无业务代码）
 └─ build/              MSIX 与 Portable 构建入口和载荷清单
 ```

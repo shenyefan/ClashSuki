@@ -161,17 +161,53 @@ try
         "ClashSuki\ClashSuki.exe"
         "ClashSuki\ClashSuki.deps.json"
         "ClashSuki\ClashSuki.runtimeconfig.json"
+        "ClashSuki\coreclr.dll"
+        "ClashSuki\hostfxr.dll"
+        "ClashSuki\hostpolicy.dll"
+        "ClashSuki\System.Private.CoreLib.dll"
         "ClashSuki.Service\ClashSuki.Service.exe"
-        "ClashSuki.Service\ClashSuki.Service.deps.json"
-        "ClashSuki.Service\ClashSuki.Service.runtimeconfig.json"
         "ClashSuki.Repair\ClashSuki.Repair.exe"
-        "ClashSuki.Repair\ClashSuki.Repair.deps.json"
-        "ClashSuki.Repair\ClashSuki.Repair.runtimeconfig.json"
     ) + @($payloadManifest.RuntimeAssets | ForEach-Object { "ClashSuki\$_" }) + $requiredVisualAssetEntries
     $missingEntries = @($requiredEntries | Where-Object { -not $packageEntries.Contains($_) })
     if ($missingEntries.Count -gt 0)
     {
         throw "MSIX 缺少清单资源或运行时文件：$($missingEntries -join '、')"
+    }
+
+    $manifestEntry = $archive.GetEntry("AppxManifest.xml")
+    if ($null -eq $manifestEntry)
+    {
+        throw "MSIX 缺少生成后的 AppxManifest.xml。"
+    }
+
+    $manifestStream = $manifestEntry.Open()
+    $manifestReader = [System.IO.StreamReader]::new($manifestStream)
+    try
+    {
+        [xml]$generatedManifest = $manifestReader.ReadToEnd()
+    }
+    finally
+    {
+        $manifestReader.Dispose()
+        $manifestStream.Dispose()
+    }
+
+    $frameworkDependencies = @(
+        $generatedManifest.SelectNodes(
+            "/*[local-name()='Package']/*[local-name()='Dependencies']/*[local-name()='PackageDependency']") |
+        ForEach-Object { $_.Name }
+    )
+    $requiredFrameworkDependencies = @(
+        "Microsoft.VCLibs.140.00"
+        "Microsoft.VCLibs.140.00.UWPDesktop"
+        "Microsoft.WindowsAppRuntime.2"
+    )
+    $missingFrameworkDependencies = @($requiredFrameworkDependencies | Where-Object {
+        $_ -notin $frameworkDependencies
+    })
+    if ($missingFrameworkDependencies.Count -gt 0)
+    {
+        throw "MSIX 未声明官方框架依赖：$($missingFrameworkDependencies -join '、')"
     }
 
     $rootAssetEntries = @($packageEntries | Where-Object {

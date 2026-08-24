@@ -147,6 +147,74 @@ if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerTe
     throw "无法从 Directory.Build.props 读取 Version"
 }
 
+function Add-AppLocalVcRuntime
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Root,
+
+        [Parameter(Mandatory)]
+        [string]$Architecture,
+
+        [Parameter(Mandatory)]
+        [string[]]$FileNames
+    )
+
+    $extensionSdkRoot = Join-Path `
+        ${env:ProgramFiles(x86)} `
+        "Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop"
+    $packageName = "Microsoft.VCLibs.$Architecture.14.00.Desktop.appx"
+    $runtimePackage = Get-ChildItem `
+        -LiteralPath $extensionSdkRoot `
+        -Filter $packageName `
+        -File `
+        -Recurse `
+        -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.FullName.Contains(
+                "\Appx\Retail\",
+                [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+    if ($null -eq $runtimePackage)
+    {
+        throw "未找到官方 Microsoft.VCLibs.Desktop x64 运行库，请安装 Windows SDK 的 UWP C++ 运行时组件。"
+    }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($runtimePackage.FullName)
+    try
+    {
+        foreach ($fileName in $FileNames)
+        {
+            $entry = $archive.Entries | Where-Object {
+                $_.FullName.Equals($fileName, [System.StringComparison]::OrdinalIgnoreCase)
+            } | Select-Object -First 1
+            if ($null -eq $entry -or $entry.Length -eq 0)
+            {
+                throw "$($runtimePackage.FullName) 缺少运行库文件：$fileName"
+            }
+
+            $source = $entry.Open()
+            $destination = [System.IO.File]::Create((Join-Path $Root $fileName))
+            try
+            {
+                $source.CopyTo($destination)
+            }
+            finally
+            {
+                $destination.Dispose()
+                $source.Dispose()
+            }
+        }
+    }
+    finally
+    {
+        $archive.Dispose()
+    }
+}
+
 $version = $versionNode.InnerText.Trim()
 if ($version.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0)
 {
@@ -170,6 +238,11 @@ $publishDirectory = Join-Path $temporaryRoot "publish"
 $servicePublishDirectory = Join-Path $temporaryRoot "service-publish"
 $repairPublishDirectory = Join-Path $temporaryRoot "repair-publish"
 $serviceInstallerDirectory = Join-Path $publishDirectory "ServiceInstaller"
+$vcRuntimeFiles = @(
+    "msvcp140.dll"
+    "vcruntime140.dll"
+    "vcruntime140_1.dll"
+)
 
 $requiredFiles = @(
     "ClashSuki.exe"
@@ -186,18 +259,17 @@ $requiredFiles = @(
     "ServiceInstaller\ClashSuki.Service.exe"
     "ServiceInstaller\ClashSuki.Repair.exe"
     "PORTABLE.txt"
-) + @($payloadManifest.RuntimeAssets)
+) + $vcRuntimeFiles + @($payloadManifest.RuntimeAssets)
 
 $portableNotice = @"
 ClashSuki Portable $version ($runtimeIdentifier)
 
-将 ZIP 完整解压后运行 ClashSuki.exe。本版本同时携带 .NET 与 Windows App SDK
-运行时，不需要另行安装这两套运行时。未安装 Microsoft Visual C++ Redistributable
-的系统仍需先安装它。
+将 ZIP 完整解压后运行 ClashSuki.exe。本版本同时携带 .NET、Windows App SDK 与
+应用本地 Visual C++ 运行库，不需要在目标系统另行安装这些运行环境。
 
 普通代理和系统代理无需安装服务。首次使用 TUN 虚拟网卡时，请在“虚拟网卡”页面
-点击“安装服务”并确认 Windows 用户账户控制提示。安装服务后，TUN、防火墙管理和
-UWP 回环豁免均可使用。
+点击“安装服务”并确认 Windows 用户账户控制提示。商店应用代理只在保存回环权限时
+请求一次管理员权限，不会安装服务。
 
 请保持 ServiceInstaller 与 Assets 目录结构完整；修复程序会使用
 ServiceInstaller\ClashSuki.Service.exe 和 Assets\Core\mihomo.exe 安装便携服务。
@@ -248,6 +320,10 @@ try
     Get-ChildItem -LiteralPath $publishDirectory -Filter "*.pdb" -File -Recurse |
         Remove-Item -Force
     Remove-NonChineseLanguageResources -Root $publishDirectory
+    Add-AppLocalVcRuntime `
+        -Root $publishDirectory `
+        -Architecture $Platform `
+        -FileNames $vcRuntimeFiles
 
     $servicePublishArguments = @(
         "publish"
