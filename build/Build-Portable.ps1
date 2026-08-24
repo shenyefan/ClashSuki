@@ -6,7 +6,10 @@ param(
     [ValidateSet("x64")]
     [string]$Platform = "x64",
 
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+
+    [Parameter(Mandatory)]
+    [string]$PrerequisiteDirectory
 )
 
 $ErrorActionPreference = "Stop"
@@ -148,7 +151,7 @@ if ($null -eq $enableMsixToolingNode -or
         "true",
         [System.StringComparison]::OrdinalIgnoreCase))
 {
-    throw "WinUI 无包发布必须启用 EnableMsixTooling，否则 self-contained 版本会在 XAML 初始化时崩溃。"
+    throw "WinUI 无包发布必须启用 EnableMsixTooling，否则缺少 PRI 资源会在 XAML 初始化时崩溃。"
 }
 
 [xml]$versionProperties = Get-Content -LiteralPath $versionPropertiesPath -Raw
@@ -156,74 +159,6 @@ $versionNode = $versionProperties.SelectSingleNode("/Project/PropertyGroup/Versi
 if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText))
 {
     throw "无法从 Directory.Build.props 读取 Version"
-}
-
-function Add-AppLocalVcRuntime
-{
-    param(
-        [Parameter(Mandatory)]
-        [string]$Root,
-
-        [Parameter(Mandatory)]
-        [string]$Architecture,
-
-        [Parameter(Mandatory)]
-        [string[]]$FileNames
-    )
-
-    $extensionSdkRoot = Join-Path `
-        ${env:ProgramFiles(x86)} `
-        "Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop"
-    $packageName = "Microsoft.VCLibs.$Architecture.14.00.Desktop.appx"
-    $runtimePackage = Get-ChildItem `
-        -LiteralPath $extensionSdkRoot `
-        -Filter $packageName `
-        -File `
-        -Recurse `
-        -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.FullName.Contains(
-                "\Appx\Retail\",
-                [System.StringComparison]::OrdinalIgnoreCase)
-        } |
-        Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 1
-    if ($null -eq $runtimePackage)
-    {
-        throw "未找到官方 Microsoft.VCLibs.Desktop x64 运行库，请安装 Windows SDK 的 UWP C++ 运行时组件。"
-    }
-
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = [System.IO.Compression.ZipFile]::OpenRead($runtimePackage.FullName)
-    try
-    {
-        foreach ($fileName in $FileNames)
-        {
-            $entry = $archive.Entries | Where-Object {
-                $_.FullName.Equals($fileName, [System.StringComparison]::OrdinalIgnoreCase)
-            } | Select-Object -First 1
-            if ($null -eq $entry -or $entry.Length -eq 0)
-            {
-                throw "$($runtimePackage.FullName) 缺少运行库文件：$fileName"
-            }
-
-            $source = $entry.Open()
-            $destination = [System.IO.File]::Create((Join-Path $Root $fileName))
-            try
-            {
-                $source.CopyTo($destination)
-            }
-            finally
-            {
-                $destination.Dispose()
-                $source.Dispose()
-            }
-        }
-    }
-    finally
-    {
-        $archive.Dispose()
-    }
 }
 
 $version = $versionNode.InnerText.Trim()
@@ -242,6 +177,7 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputDirectory))
 }
 
 $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
+$PrerequisiteDirectory = [System.IO.Path]::GetFullPath($PrerequisiteDirectory)
 $archiveName = "ClashSuki-$version-$runtimeIdentifier-portable.zip"
 $archivePath = Join-Path $OutputDirectory $archiveName
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ClashSuki-Portable-$([Guid]::NewGuid().ToString('N'))"
@@ -249,10 +185,11 @@ $publishDirectory = Join-Path $temporaryRoot "publish"
 $servicePublishDirectory = Join-Path $temporaryRoot "service-publish"
 $repairPublishDirectory = Join-Path $temporaryRoot "repair-publish"
 $serviceInstallerDirectory = Join-Path $publishDirectory "ServiceInstaller"
-$vcRuntimeFiles = @(
-    "msvcp140.dll"
-    "vcruntime140.dll"
-    "vcruntime140_1.dll"
+$runtimeInstallerDirectory = Join-Path $publishDirectory "Runtime"
+$runtimeInstallers = @(
+    "dotnet-runtime-10.0.11-win-x64.exe"
+    "windowsappruntimeinstall-2.2.0-x64.exe"
+    "vc_redist.x64.exe"
 )
 
 $requiredFiles = @(
@@ -261,23 +198,16 @@ $requiredFiles = @(
     "ClashSuki.deps.json"
     "ClashSuki.pri"
     "ClashSuki.runtimeconfig.json"
-    "coreclr.dll"
-    "hostfxr.dll"
-    "hostpolicy.dll"
-    "System.Private.CoreLib.dll"
-    "Microsoft.WindowsAppRuntime.dll"
-    "Microsoft.ui.xaml.dll"
-    "Microsoft.UI.Xaml.Controls.pri"
     "ServiceInstaller\ClashSuki.Service.exe"
     "ServiceInstaller\ClashSuki.Repair.exe"
     "PORTABLE.txt"
-) + $vcRuntimeFiles + @($payloadManifest.RuntimeAssets)
+) + @($runtimeInstallers | ForEach-Object { "Runtime\$_" }) + @($payloadManifest.RuntimeAssets)
 
 $portableNotice = @"
 ClashSuki Portable $version ($runtimeIdentifier)
 
-将 ZIP 完整解压后运行 ClashSuki.exe。本版本同时携带 .NET、Windows App SDK 与
-应用本地 Visual C++ 运行库，不需要在目标系统另行安装这些运行环境。
+将 ZIP 完整解压后，先手动安装 Runtime 目录中的 .NET 10 Runtime、
+Windows App Runtime 与 Visual C++ x64 运行库，再运行 ClashSuki.exe。
 
 普通代理和系统代理无需安装服务。首次使用 TUN 虚拟网卡时，请在“虚拟网卡”页面
 点击“安装服务”并确认 Windows 用户账户控制提示。商店应用代理只在保存回环权限时
@@ -293,6 +223,7 @@ try
     New-Item -ItemType Directory -Path $servicePublishDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $repairPublishDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $serviceInstallerDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $runtimeInstallerDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
     if (Test-Path -LiteralPath $archivePath)
     {
@@ -307,14 +238,14 @@ try
         "--runtime"
         $runtimeIdentifier
         "--self-contained"
-        "true"
+        "false"
         "--output"
         $publishDirectory
         "/p:Platform=$Platform"
         "/p:PublishProfile="
         "/p:WindowsPackageType=None"
-        "/p:WindowsAppSDKSelfContained=true"
-        "/p:SelfContained=true"
+        "/p:WindowsAppSDKSelfContained=false"
+        "/p:SelfContained=false"
         "/p:UseAppHost=true"
         "/p:PublishSingleFile=false"
         "/p:PublishTrimmed=false"
@@ -332,10 +263,26 @@ try
     Get-ChildItem -LiteralPath $publishDirectory -Filter "*.pdb" -File -Recurse |
         Remove-Item -Force
     Remove-NonChineseLanguageResources -Root $publishDirectory
-    Add-AppLocalVcRuntime `
-        -Root $publishDirectory `
-        -Architecture $Platform `
-        -FileNames $vcRuntimeFiles
+
+    foreach ($installerName in $runtimeInstallers)
+    {
+        $installerPath = Join-Path $PrerequisiteDirectory $installerName
+        if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf))
+        {
+            throw "缺少便携版运行库安装器：$installerPath"
+        }
+
+        $signature = Get-AuthenticodeSignature -LiteralPath $installerPath
+        if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+            -not $signature.SignerCertificate.Subject.Contains(
+                "Microsoft Corporation",
+                [System.StringComparison]::OrdinalIgnoreCase))
+        {
+            throw "运行库安装器没有有效的 Microsoft 签名：$installerPath"
+        }
+
+        Copy-Item -LiteralPath $installerPath -Destination $runtimeInstallerDirectory
+    }
 
     $servicePublishArguments = @(
         "publish"
@@ -345,16 +292,14 @@ try
         "--runtime"
         $runtimeIdentifier
         "--self-contained"
-        "true"
+        "false"
         "--output"
         $servicePublishDirectory
         "/p:Platform=$Platform"
         "/p:PublishProfile="
-        "/p:SelfContained=true"
+        "/p:SelfContained=false"
         "/p:UseAppHost=true"
         "/p:PublishSingleFile=true"
-        "/p:IncludeNativeLibrariesForSelfExtract=true"
-        "/p:EnableCompressionInSingleFile=true"
         "/p:PublishTrimmed=false"
         "/p:PublishReadyToRun=false"
         "/p:DebugSymbols=false"
@@ -376,7 +321,7 @@ try
             "ClashSuki.Service.exe",
             [System.StringComparison]::OrdinalIgnoreCase))
     {
-        throw "Portable 服务没有生成预期的自包含单文件：$($servicePublishFiles.FullName -join '、')"
+        throw "Portable 服务没有生成预期的框架依赖单文件：$($servicePublishFiles.FullName -join '、')"
     }
 
     Copy-Item -LiteralPath $servicePublishFiles[0].FullName `
@@ -390,16 +335,14 @@ try
         "--runtime"
         $runtimeIdentifier
         "--self-contained"
-        "true"
+        "false"
         "--output"
         $repairPublishDirectory
         "/p:Platform=$Platform"
         "/p:PublishProfile="
-        "/p:SelfContained=true"
+        "/p:SelfContained=false"
         "/p:UseAppHost=true"
         "/p:PublishSingleFile=true"
-        "/p:IncludeNativeLibrariesForSelfExtract=true"
-        "/p:EnableCompressionInSingleFile=true"
         "/p:PublishTrimmed=false"
         "/p:PublishReadyToRun=false"
         "/p:DebugSymbols=false"
@@ -421,7 +364,7 @@ try
             "ClashSuki.Repair.exe",
             [System.StringComparison]::OrdinalIgnoreCase))
     {
-        throw "Portable 服务安装器没有生成预期的自包含单文件：$($repairPublishFiles.FullName -join '、')"
+        throw "Portable 服务安装器没有生成预期的框架依赖单文件：$($repairPublishFiles.FullName -join '、')"
     }
 
     Copy-Item -LiteralPath $repairPublishFiles[0].FullName `
@@ -436,6 +379,25 @@ try
     $portableFiles = @(Get-ChildItem -LiteralPath $publishDirectory -File -Recurse)
     Assert-NoForbiddenPortableFiles -Files $portableFiles
     Assert-ServiceInstallerLayout -Root $publishDirectory -Files $portableFiles
+
+    $embeddedRuntimeNames = @(
+        "coreclr.dll"
+        "hostfxr.dll"
+        "hostpolicy.dll"
+        "System.Private.CoreLib.dll"
+        "Microsoft.WindowsAppRuntime.dll"
+        "Microsoft.ui.xaml.dll"
+        "msvcp140.dll"
+        "vcruntime140.dll"
+        "vcruntime140_1.dll"
+    )
+    $embeddedRuntimeFiles = @($portableFiles | Where-Object {
+        $_.Name -in $embeddedRuntimeNames
+    })
+    if ($embeddedRuntimeFiles.Count -gt 0)
+    {
+        throw "Portable 应附带安装器，不得内置运行库文件：$($embeddedRuntimeFiles.FullName -join '、')"
+    }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::CreateFromDirectory(

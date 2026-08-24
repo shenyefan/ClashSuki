@@ -28,11 +28,13 @@ ClashSuki 使用 WinUI 3 构建，将订阅、代理组、连接、规则、覆�
 
 - Windows 10 版本 2004（Build 19041）或更高版本
 - x64 处理器
-- [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)（MSIX；Portable 已内置）
-- [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)（Portable）
+- [.NET 10 Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)（Portable 包内附安装器）
+- [Windows App Runtime 2.2 x64](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads)（Portable 包内附安装器）
+- [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)（Portable 包内附安装器）
 
 MSIX 自包含 .NET 运行时，并通过包清单声明 Windows App SDK 与 VCLibs 官方框架依赖；
-Portable ZIP 同时携带自包含的 .NET、Windows App SDK、应用本地 VCLibs 和服务组件。
+Portable ZIP 不内置运行库文件，`Runtime` 目录附带上述三个 Microsoft 官方安装器，
+首次使用前需要手动安装。
 普通代理和系统代理无需安装服务；首次使用 TUN 时，在“虚拟网卡”页面点击“安装服务”
 并确认 Windows 用户账户控制提示。商店应用代理仅在保存回环权限时请求一次管理员权限，
 不会安装服务。正式 MSIX 还需要由目标设备信任、且 Publisher 与
@@ -52,12 +54,12 @@ Visual Studio 中以 `ClashSuki.Package` 为启动/部署项目即可生成包�
 
 ```powershell
 .\build\Build-Msix.ps1 -Configuration Release -Platform x64
-.\build\Build-Portable.ps1 -Configuration Release -Platform x64
+.\build\Build-Portable.ps1 -Configuration Release -Platform x64 -PrerequisiteDirectory <安装器目录>
 ```
 
 ## 自动构建与签名
 
-`Build` workflow 会自动生成并校验 x64 MSIX 和完整的自包含 Portable ZIP。MSIX
+`Build` workflow 会自动生成并校验 x64 MSIX 和附带运行库安装器的 Portable ZIP。MSIX
 默认未签名；配置以下 GitHub Repository Secrets 后，将使用同一张证书自动签名：
 
 | Secret | 内容 |
