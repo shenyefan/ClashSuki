@@ -51,7 +51,6 @@
                 <controls:SettingsCard x:Name="UwpLoopbackCard"
                                        Header="商店应用代理"
                                        Description="{Binding Runtime.UwpLoopbackDescription}"
-                                       IsEnabled="{Binding Runtime.IsTunToggleAvailable}"
                                        IsClickEnabled="True"
                                        ActionIconToolTip="配置商店应用代理"
                                        Click="OpenUwpLoopback_Click">

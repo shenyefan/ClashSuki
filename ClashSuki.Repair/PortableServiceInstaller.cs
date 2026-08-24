@@ -107,7 +107,7 @@ internal static class PortableServiceInstaller
             serviceManager.ApplyAccessControl(service, new SecurityIdentifier(options.OwnerSid));
             serviceManager.SetDescription(
                 service,
-                "为 ClashSuki 便携版提供受保护的虚拟网卡、防火墙和 UWP 回环功能。");
+                "为 ClashSuki 便携版提供受保护的虚拟网卡、内核和防火墙功能。");
             serviceManager.StartAndWait(service);
 
             if (oldDirectoryMoved)

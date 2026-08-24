@@ -41,6 +41,8 @@
     <Compile Include="..\ClashSuki.Service\ServiceProtocol.cs" Link="ServiceContract\ServiceProtocol.cs" />
     <Compile Include="..\ClashSuki.Service\ServiceIdentity.cs" Link="ServiceContract\ServiceIdentity.cs" />
     <Compile Include="..\ClashSuki.Service\CoreProcessSettings.cs" Link="ServiceContract\CoreProcessSettings.cs" />
+    <Compile Include="..\ClashSuki.Repair\LoopbackExemptionPolicy.cs"
+             Link="PrivilegedOperations\LoopbackExemptionPolicy.cs" />
   </ItemGroup>
 
   <ItemGroup>

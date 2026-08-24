@@ -12,7 +12,7 @@ public sealed partial class RuntimeStore : ObservableObject
     [ObservableProperty] private string coreStatusText = "内核启动中";
     [ObservableProperty] private string tunServiceStatusText = "正在检查服务";
     [ObservableProperty] private string tunFirewallDescription = "正在检查服务";
-    [ObservableProperty] private string uwpLoopbackDescription = "正在检查服务";
+    [ObservableProperty] private string uwpLoopbackDescription = "保存时请求管理员权限，无需安装服务";
     [ObservableProperty] private string mihomoVersion = "未知";
     [ObservableProperty] private string currentMode = "rule";
     [ObservableProperty] private bool isSystemProxyEnabled;
@@ -133,8 +133,7 @@ public sealed partial class RuntimeStore : ObservableObject
             _ => null
         };
         TunFirewallDescription = serviceUnavailableDescription ?? "重新创建 Windows 防火墙规则";
-        UwpLoopbackDescription = serviceUnavailableDescription ??
-            "允许所选商店应用访问本机代理";
+        UwpLoopbackDescription = "保存时请求管理员权限，无需安装服务";
 
         IsTunToggleAvailable = status is MihomoServiceStatus.Ready or MihomoServiceStatus.Stopped;
         ShowTunServiceRepair = isPackaged && !IsTunToggleAvailable;

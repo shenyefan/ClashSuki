@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using ClashSuki.PrivilegedOperations;
 using ClashSuki.ServiceContract;
 using Windows.Management.Deployment;
 
@@ -22,6 +23,11 @@ internal static class Program
             if (PortableServiceInstaller.IsInstallCommand(args))
             {
                 return PortableServiceInstaller.Run(args);
+            }
+
+            if (LoopbackExemptionRepair.IsCommand(args))
+            {
+                return await LoopbackExemptionRepair.RunAsync(args);
             }
 
             var options = RepairOptions.Parse(args);

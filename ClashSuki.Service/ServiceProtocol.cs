@@ -9,8 +9,6 @@ internal static partial class ServiceProtocol
     public const int Version = 8;
     public const int MaxRequestCharacters = 128 * 1024;
     public const int MaxFirewallRuleCount = 3;
-    public const int MaxLoopbackExemptionCount = 512;
-    public const int MaxLoopbackSidCharacters = 184;
 
     public static JsonSerializerOptions CreateJsonOptions()
     {
@@ -30,7 +28,6 @@ internal static class ServiceCommands
     public const string SetCorePriority = "set_core_priority";
     public const string StopCore = "stop_core";
     public const string ConfigureFirewall = "configure_firewall";
-    public const string SetLoopbackExemptions = "set_loopback_exemptions";
     public const string StopService = "stop_service";
 }
 
@@ -49,7 +46,6 @@ public sealed class ServiceRequest
     public string? CoreIpcPath { get; init; }
     public string? CorePriority { get; init; }
     public FirewallRuleRequest?[]? FirewallRules { get; init; }
-    public string?[]? LoopbackExemptSids { get; init; }
 }
 
 public sealed class FirewallRuleRequest

@@ -30,7 +30,6 @@ try
             services.AddSingleton<CoreProcessSupervisor>();
             services.AddSingleton<CoreLaunchRequestValidator>();
             services.AddSingleton<WindowsFirewallManager>();
-            services.AddSingleton<LoopbackExemptionManager>();
             services.AddSingleton<NamedPipeClientAuthorizer>();
             services.AddSingleton<ServiceCommandDispatcher>();
             services.AddHostedService<Worker>();

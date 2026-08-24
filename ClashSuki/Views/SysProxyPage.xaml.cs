@@ -1,4 +1,4 @@
-using ClashSuki.ServiceContract;
+using ClashSuki.PrivilegedOperations;
 using ClashSuki.Services;
 using ClashSuki.ViewModels;
 using Microsoft.UI.Xaml;
@@ -194,13 +194,13 @@ public sealed partial class SysProxyPage : Page
             return;
         }
 
-        if (UwpLoopbackList.SelectedItems.Count > ServiceProtocol.MaxLoopbackExemptionCount)
+        if (UwpLoopbackList.SelectedItems.Count > LoopbackExemptionPolicy.MaxExemptionCount)
         {
             args.Cancel = true;
             ShowUwpLoopbackInfo(
                 InfoBarSeverity.Warning,
                 "所选应用过多",
-                $"一次最多选择 {ServiceProtocol.MaxLoopbackExemptionCount} 个应用。");
+                $"一次最多选择 {LoopbackExemptionPolicy.MaxExemptionCount} 个应用。");
             return;
         }
 
@@ -279,7 +279,7 @@ public sealed partial class SysProxyPage : Page
     {
         var selectedCount = UwpLoopbackList.SelectedItems.Count;
         var totalCount = UwpLoopbackList.Items.Count;
-        var exceedsLimit = selectedCount > ServiceProtocol.MaxLoopbackExemptionCount;
+        var exceedsLimit = selectedCount > LoopbackExemptionPolicy.MaxExemptionCount;
 
         var selectionSummary = $"已选择 {selectedCount} 个，共 {totalCount} 个";
         if (!string.Equals(UwpLoopbackSelectionSummary.Text, selectionSummary, StringComparison.Ordinal))
@@ -299,7 +299,7 @@ public sealed partial class SysProxyPage : Page
             ShowUwpLoopbackInfo(
                 InfoBarSeverity.Warning,
                 "所选应用过多",
-                $"一次最多选择 {ServiceProtocol.MaxLoopbackExemptionCount} 个应用。");
+                $"一次最多选择 {LoopbackExemptionPolicy.MaxExemptionCount} 个应用。");
         }
         else if (UwpLoopbackInfoBar.IsOpen &&
                  UwpLoopbackInfoBar.Severity == InfoBarSeverity.Warning)

@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
+using ClashSuki.PrivilegedOperations;
 
 namespace ClashSuki.Services;
 
@@ -11,9 +13,8 @@ public sealed record UwpLoopbackApp(
     bool IsExempt);
 
 /// <summary>
-/// Reads AppContainer loopback state through FirewallAPI.dll. Changes are sent
-/// to the packaged LocalSystem service so the UI process never starts an
-/// elevated command or carries a third-party loopback utility.
+/// Reads AppContainer loopback state directly. Changes are delegated to the
+/// one-shot elevated repair helper only when the user saves them.
 /// </summary>
 public static class UwpLoopbackToolService
 {
@@ -29,14 +30,46 @@ public static class UwpLoopbackToolService
     {
         ArgumentNullException.ThrowIfNull(selectedSids);
 
-        var normalizedSids = selectedSids
-            .Where(static sid => !string.IsNullOrWhiteSpace(sid))
-            .Select(static sid => sid.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var normalizedSids = LoopbackExemptionPolicy.Normalize(selectedSids);
+        var payloadDirectory = Path.Combine(AppPaths.DataRoot, "temp");
+        Directory.CreateDirectory(payloadDirectory);
+        var payloadPath = Path.Combine(
+            payloadDirectory,
+            $"loopback-{Guid.NewGuid():N}.txt");
+        try
+        {
+            await File.WriteAllLinesAsync(
+                payloadPath,
+                normalizedSids,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                cancellationToken);
+            if (new FileInfo(payloadPath).Length > LoopbackExemptionPolicy.MaxPayloadBytes)
+            {
+                throw new InvalidOperationException("回环配置载荷过大。");
+            }
 
-        var serviceManager = new MihomoServiceManager();
-        await serviceManager.SetLoopbackExemptionsAsync(normalizedSids, cancellationToken);
+            await RepairHostLauncher.RunElevatedAsync(
+                [
+                    LoopbackExemptionPolicy.Command,
+                    LoopbackExemptionPolicy.PayloadArgument,
+                    payloadPath
+                ],
+                cancellationToken);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(payloadPath);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.WriteAppException(
+                    "REPAIR-CLEANUP",
+                    ex,
+                    "清理回环配置临时文件失败");
+            }
+        }
     }
 
     private static IReadOnlyList<UwpLoopbackApp> GetApps(CancellationToken cancellationToken)

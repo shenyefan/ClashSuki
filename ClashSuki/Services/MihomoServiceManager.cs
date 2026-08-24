@@ -109,7 +109,7 @@ public sealed class MihomoServiceManager
             await StopHostAsync(cancellationToken);
         }
 
-        await PackageRepairLauncher.StartAfterCurrentProcessExitsAsync(cancellationToken);
+        await RepairHostLauncher.StartPackageRepairAfterCurrentProcessExitsAsync(cancellationToken);
     }
 
     public async Task InstallPortableServiceAsync(CancellationToken cancellationToken = default)
@@ -230,32 +230,6 @@ public sealed class MihomoServiceManager
             {
                 Command = ServiceCommands.ConfigureFirewall,
                 FirewallRules = rules.Cast<FirewallRuleRequest?>().ToArray()
-            },
-            cancellationToken);
-    }
-
-    public async Task SetLoopbackExemptionsAsync(
-        IReadOnlyCollection<string> selectedSids,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(selectedSids);
-        var normalizedSids = selectedSids
-            .Where(static sid => !string.IsNullOrWhiteSpace(sid))
-            .Select(static sid => sid.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (normalizedSids.Length > ServiceProtocol.MaxLoopbackExemptionCount)
-        {
-            throw new InvalidOperationException(
-                $"回环豁免不能超过 {ServiceProtocol.MaxLoopbackExemptionCount} 项。");
-        }
-
-        await EnsureAdministrativeServiceReadyAsync(cancellationToken);
-        await _ipcClient.SendAsync(
-            new ServiceRequest
-            {
-                Command = ServiceCommands.SetLoopbackExemptions,
-                LoopbackExemptSids = normalizedSids
             },
             cancellationToken);
     }

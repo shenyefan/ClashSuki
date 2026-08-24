@@ -1,44 +1,92 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using ClashSuki.ServiceContract;
+using System.Security.Principal;
 
-namespace ClashSuki.Service;
+namespace ClashSuki.PrivilegedOperations;
 
-internal sealed class LoopbackExemptionManager
+internal static class LoopbackExemptionRepair
+{
+    public static bool IsCommand(IReadOnlyList<string> args) =>
+        args.Count > 0 &&
+        string.Equals(args[0], LoopbackExemptionPolicy.Command, StringComparison.Ordinal);
+
+    public static async Task<int> RunAsync(IReadOnlyList<string> args)
+    {
+        try
+        {
+            EnsureElevated();
+            var payloadPath = ParsePayloadPath(args);
+            var payload = new FileInfo(payloadPath);
+            if (!payload.Exists || payload.Length > LoopbackExemptionPolicy.MaxPayloadBytes)
+            {
+                throw new InvalidOperationException("回环配置载荷不存在或过大。");
+            }
+
+            if ((payload.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException("回环配置载荷不能是重解析点。");
+            }
+
+            var requestedSids = await File.ReadAllLinesAsync(payload.FullName);
+            var sids = LoopbackExemptionPolicy.Normalize(requestedSids);
+            LoopbackExemptionWriter.SetExemptions(sids);
+            ClashSuki.Repair.Program.WriteLog(
+                "INFO",
+                $"已更新 {sids.Length} 个 AppContainer 回环豁免");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            ClashSuki.Repair.Program.WriteLog("ERROR", "回环豁免写入失败", ex.ToString());
+            return 1;
+        }
+    }
+
+    private static string ParsePayloadPath(IReadOnlyList<string> args)
+    {
+        if (args.Count != 3 ||
+            !string.Equals(
+                args[1],
+                LoopbackExemptionPolicy.PayloadArgument,
+                StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(args[2]) ||
+            !Path.IsPathFullyQualified(args[2]))
+        {
+            throw new ArgumentException(
+                $"用法：{LoopbackExemptionPolicy.Command} " +
+                $"{LoopbackExemptionPolicy.PayloadArgument} <绝对路径>");
+        }
+
+        return Path.GetFullPath(args[2]);
+    }
+
+    private static void EnsureElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+        {
+            throw new UnauthorizedAccessException("保存商店应用回环权限需要管理员权限。");
+        }
+    }
+}
+
+internal static class LoopbackExemptionWriter
 {
     private const uint ErrorSuccess = 0;
     private const byte SecurityAppPackageRidCount = 8;
     private const uint SecurityAppPackageBaseRid = 2;
 
-    public void SetExemptions(
-        IReadOnlyCollection<string?>? requestedSids,
-        CancellationToken cancellationToken)
+    public static void SetExemptions(IEnumerable<string?> requestedSids)
     {
-        if (requestedSids is null)
-        {
-            throw new InvalidOperationException("回环豁免列表不能为空。");
-        }
-
-        var sids = requestedSids
-            .Where(static sid => !string.IsNullOrWhiteSpace(sid))
-            .Select(static sid => sid!.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (sids.Length > ServiceProtocol.MaxLoopbackExemptionCount)
-        {
-            throw new InvalidOperationException(
-                $"回环豁免不能超过 {ServiceProtocol.MaxLoopbackExemptionCount} 项。");
-        }
-
+        var sids = LoopbackExemptionPolicy.Normalize(requestedSids);
         var nativeSids = new List<IntPtr>(sids.Length);
         IntPtr sidItems = IntPtr.Zero;
         try
         {
             foreach (var sid in sids)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 if (!sid.StartsWith("S-1-15-2-", StringComparison.OrdinalIgnoreCase) ||
-                    sid.Length > ServiceProtocol.MaxLoopbackSidCharacters ||
+                    sid.Length > LoopbackExemptionPolicy.MaxSidCharacters ||
                     !ConvertStringSidToSid(sid, out var nativeSid) ||
                     nativeSid == IntPtr.Zero)
                 {
@@ -67,7 +115,6 @@ internal sealed class LoopbackExemptionManager
                 }
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
             var result = NetworkIsolationSetAppContainerConfig(
                 checked((uint)nativeSids.Count),
                 sidItems);
@@ -100,7 +147,8 @@ internal sealed class LoopbackExemptionManager
         }
 
         var countPointer = GetSidSubAuthorityCount(sid);
-        if (countPointer == IntPtr.Zero || Marshal.ReadByte(countPointer) != SecurityAppPackageRidCount)
+        if (countPointer == IntPtr.Zero ||
+            Marshal.ReadByte(countPointer) != SecurityAppPackageRidCount)
         {
             return false;
         }
