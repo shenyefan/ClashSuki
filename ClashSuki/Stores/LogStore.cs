@@ -19,8 +19,11 @@ public sealed partial class LogStore : ObservableObject
             return;
         }
 
-        var normalizedLevel = NormalizeLevel(level);
-        DiagnosticLog.WriteApp(NormalizeSource(source), normalizedLevel, NormalizeMessage(message));
+        var normalizedLevel = DiagnosticLog.NormalizeLevel(level);
+        DiagnosticLog.WriteApp(
+            DiagnosticLog.NormalizeSource(source),
+            normalizedLevel,
+            DiagnosticLog.NormalizeMessage(message));
     }
 
     public void AddPersistedApp(DiagnosticLogEntry entry)
@@ -47,10 +50,11 @@ public sealed partial class LogStore : ObservableObject
             return;
         }
 
-        var parsed = ParseMihomoLog(NormalizeMessage(message));
+        var parsed = ParseMihomoLog(DiagnosticLog.NormalizeMessage(message));
         var normalizedMessage = parsed.Message;
-        var normalizedLevel = NormalizeLevel(parsed.Level ?? level);
-        DiagnosticLog.WriteMihomo(NormalizeSource(source), normalizedLevel, normalizedMessage);
+        var normalizedLevel = DiagnosticLog.NormalizeLevel(parsed.Level ?? level);
+        var normalizedSource = DiagnosticLog.NormalizeSource(source);
+        DiagnosticLog.WriteMihomo(normalizedSource, normalizedLevel, normalizedMessage);
         if (IsPaused)
         {
             return;
@@ -58,7 +62,7 @@ public sealed partial class LogStore : ObservableObject
 
         MihomoItems.AddNewest(new LogItemViewModel
         {
-            Source = NormalizeSource(source),
+            Source = normalizedSource,
             Level = normalizedLevel,
             Timestamp = DateTimeOffset.Now,
             Message = normalizedMessage,
@@ -81,15 +85,16 @@ public sealed partial class LogStore : ObservableObject
                 continue;
             }
 
-            var parsed = ParseMihomoLog(NormalizeMessage(message));
+            var parsed = ParseMihomoLog(DiagnosticLog.NormalizeMessage(message));
             var normalizedMessage = parsed.Message;
-            var normalizedLevel = NormalizeLevel(parsed.Level ?? level);
-            DiagnosticLog.WriteMihomo("MIHOMO", normalizedLevel, normalizedMessage);
+            var normalizedLevel = DiagnosticLog.NormalizeLevel(parsed.Level ?? level);
+            var normalizedSource = DiagnosticLog.NormalizeSource("MIHOMO");
+            DiagnosticLog.WriteMihomo(normalizedSource, normalizedLevel, normalizedMessage);
             if (!IsPaused)
             {
                 items.Add(new LogItemViewModel
                 {
-                    Source = "内核",
+                    Source = normalizedSource,
                     Level = normalizedLevel,
                     Timestamp = DateTimeOffset.Now,
                     Message = normalizedMessage,
@@ -106,28 +111,6 @@ public sealed partial class LogStore : ObservableObject
         AppItems.Clear();
         MihomoItems.Clear();
     }
-
-    private static string NormalizeLevel(string? level)
-    {
-        var value = (level ?? "INFO").Trim().ToUpperInvariant();
-        return value switch
-        {
-            "WARNING" => "WARN",
-            "TRACE" => "DEBUG",
-            "CORE" => "INFO",
-            "" => "INFO",
-            _ => value
-        };
-    }
-
-    private static string NormalizeSource(string? source)
-    {
-        var value = (source ?? "APP").Trim().ToUpperInvariant();
-        return string.IsNullOrWhiteSpace(value) ? "APP" : value;
-    }
-
-    private static string NormalizeMessage(string message) =>
-        message.ReplaceLineEndings(" ").Trim();
 
     private static (string? Level, string Message) ParseMihomoLog(string message)
     {

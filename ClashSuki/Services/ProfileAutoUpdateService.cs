@@ -1,21 +1,11 @@
-using ClashSuki.Models;
-
 namespace ClashSuki.Services;
 
-/// <summary>
-/// 按每条远程订阅的 auto_update / interval 定时拉取更新。
-/// </summary>
 public sealed class ProfileAutoUpdateService : IAsyncDisposable
 {
     private const int DefaultIntervalMinutes = 1440;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(1);
-
     private readonly ProfileService _profileService;
     private readonly Func<string, CancellationToken, Task> _updateProfileAsync;
-    private readonly SemaphoreSlim _updateLock = new(1, 1);
-
-    private CancellationTokenSource? _cts;
-    private Task? _loopTask;
+    private readonly PeriodicUpdateRunner _runner;
 
     public ProfileAutoUpdateService(
         ProfileService profileService,
@@ -23,42 +13,16 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
     {
         _profileService = profileService;
         _updateProfileAsync = updateProfileAsync;
+        _runner = new PeriodicUpdateRunner(
+            CheckDueProfilesAsync,
+            LogSources.Subscription,
+            "订阅自动更新检查失败",
+            "订阅自动更新停止超时");
     }
 
-    public void Start(CancellationToken appToken)
-    {
-        if (_loopTask is not null)
-        {
-            return;
-        }
+    public void Start(CancellationToken appToken) => _runner.Start(appToken);
 
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(appToken);
-        _loopTask = RunLoopAsync(_cts.Token);
-    }
-
-    private async Task RunLoopAsync(CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(PollInterval, token);
-                await CheckDueProfilesAsync(token);
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.WriteAppException(
-                    LogSources.Subscription,
-                    ex,
-                    "订阅自动更新检查失败",
-                    "WARN");
-            }
-        }
-    }
+    public ValueTask DisposeAsync() => _runner.DisposeAsync();
 
     private async Task CheckDueProfilesAsync(CancellationToken token)
     {
@@ -75,51 +39,10 @@ public sealed class ProfileAutoUpdateService : IAsyncDisposable
             }
 
             var intervalMinutes = profile.Interval is > 0 ? profile.Interval.Value : DefaultIntervalMinutes;
-            var lastUpdated = profile.Updated ?? 0;
-            if (now - lastUpdated < intervalMinutes * 60L)
-            {
-                continue;
-            }
-
-            await _updateLock.WaitAsync(token);
-            try
+            if (now - (profile.Updated ?? 0) >= intervalMinutes * 60L)
             {
                 await _updateProfileAsync(profile.Uid, token);
             }
-            finally
-            {
-                _updateLock.Release();
-            }
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_cts is null)
-        {
-            return;
-        }
-
-        await _cts.CancelAsync();
-        if (_loopTask is not null)
-        {
-            try
-            {
-                await _loopTask.WaitAsync(TimeSpan.FromSeconds(3));
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
-            {
-                DiagnosticLog.WriteAppException(
-                    LogSources.Subscription,
-                    ex,
-                    "订阅自动更新停止超时",
-                    "WARN");
-            }
-        }
-
-        _cts.Dispose();
-        _cts = null;
-        _loopTask = null;
-        _updateLock.Dispose();
     }
 }

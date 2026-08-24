@@ -148,7 +148,7 @@ public sealed partial class OverrideViewModel : ObservableObject
 
         try
         {
-            var fetchRequest = BuildFetchRequest(ImportUserAgent, ImportAuthToken, null);
+            var fetchRequest = RemoteFetchRequest.Create(ImportUserAgent, ImportAuthToken);
             var entry = await _service.ImportRemoteAsync(
                 _config,
                 ImportUrl.Trim(),
@@ -467,14 +467,6 @@ public sealed partial class OverrideViewModel : ObservableObject
                 exception: ex);
             return false;
         }
-    }
-
-    private static RemoteFetchRequest BuildFetchRequest(string? userAgent, string? authToken, int? timeoutSeconds)
-    {
-        return new RemoteFetchRequest(
-            string.IsNullOrWhiteSpace(userAgent) ? null : userAgent.Trim(),
-            string.IsNullOrWhiteSpace(authToken) ? null : authToken.Trim(),
-            timeoutSeconds);
     }
 
     private static int? ParsePositiveInt(string? text) =>

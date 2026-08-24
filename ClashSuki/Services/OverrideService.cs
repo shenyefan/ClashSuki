@@ -149,7 +149,7 @@ public sealed class OverrideService : IDisposable
 
         var content = await DownloadRemoteAsync(
             entry.Url,
-            BuildFetchRequest(entry),
+            RemoteFetchRequest.Create(entry.UserAgent, entry.AuthToken, entry.UpdateTimeout),
             mixedPort,
             cancellationToken);
         entry.UpdatedAt = DateTimeOffset.Now;
@@ -179,9 +179,6 @@ public sealed class OverrideService : IDisposable
             fetchRequest ?? new RemoteFetchRequest(),
             mixedPort,
             cancellationToken);
-
-    private static RemoteFetchRequest BuildFetchRequest(OverrideEntry entry) =>
-        new(entry.UserAgent, entry.AuthToken, entry.UpdateTimeout);
 
     private static string NormalizeExt(string? ext) =>
         ext?.TrimStart('.').ToLowerInvariant() == "js" ? "js" : "yaml";

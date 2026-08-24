@@ -1,18 +1,11 @@
 namespace ClashSuki.Services;
 
-/// <summary>
-/// 按每条远程覆写的 auto_update / interval 定时拉取更新。
-/// </summary>
 public sealed class OverrideAutoUpdateService : IAsyncDisposable
 {
     private const int DefaultIntervalMinutes = 1440;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(1);
-
     private readonly OverrideService _overrideService;
     private readonly Func<string, CancellationToken, Task> _refreshOverrideAsync;
-    private readonly SemaphoreSlim _updateLock = new(1, 1);
-    private CancellationTokenSource? _cts;
-    private Task? _loopTask;
+    private readonly PeriodicUpdateRunner _runner;
 
     public OverrideAutoUpdateService(
         OverrideService overrideService,
@@ -20,42 +13,16 @@ public sealed class OverrideAutoUpdateService : IAsyncDisposable
     {
         _overrideService = overrideService;
         _refreshOverrideAsync = refreshOverrideAsync;
+        _runner = new PeriodicUpdateRunner(
+            CheckDueOverridesAsync,
+            LogSources.Override,
+            "覆写自动更新检查失败",
+            "覆写自动更新停止超时");
     }
 
-    public void Start(CancellationToken appToken)
-    {
-        if (_loopTask is not null)
-        {
-            return;
-        }
+    public void Start(CancellationToken appToken) => _runner.Start(appToken);
 
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(appToken);
-        _loopTask = RunLoopAsync(_cts.Token);
-    }
-
-    private async Task RunLoopAsync(CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(PollInterval, token);
-                await CheckDueOverridesAsync(token);
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.WriteAppException(
-                    LogSources.Override,
-                    ex,
-                    "覆写自动更新检查失败",
-                    "WARN");
-            }
-        }
-    }
+    public ValueTask DisposeAsync() => _runner.DisposeAsync();
 
     private async Task CheckDueOverridesAsync(CancellationToken token)
     {
@@ -72,51 +39,10 @@ public sealed class OverrideAutoUpdateService : IAsyncDisposable
             }
 
             var intervalMinutes = entry.Interval is > 0 ? entry.Interval.Value : DefaultIntervalMinutes;
-            var lastUpdated = entry.UpdatedAt.ToUnixTimeSeconds();
-            if (now - lastUpdated < intervalMinutes * 60L)
-            {
-                continue;
-            }
-
-            await _updateLock.WaitAsync(token);
-            try
+            if (now - entry.UpdatedAt.ToUnixTimeSeconds() >= intervalMinutes * 60L)
             {
                 await _refreshOverrideAsync(entry.Id, token);
             }
-            finally
-            {
-                _updateLock.Release();
-            }
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_cts is null)
-        {
-            return;
-        }
-
-        await _cts.CancelAsync();
-        if (_loopTask is not null)
-        {
-            try
-            {
-                await _loopTask.WaitAsync(TimeSpan.FromSeconds(3));
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
-            {
-                DiagnosticLog.WriteAppException(
-                    LogSources.Override,
-                    ex,
-                    "覆写自动更新停止超时",
-                    "WARN");
-            }
-        }
-
-        _cts.Dispose();
-        _cts = null;
-        _loopTask = null;
-        _updateLock.Dispose();
     }
 }

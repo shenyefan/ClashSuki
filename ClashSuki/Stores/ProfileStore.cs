@@ -135,7 +135,7 @@ public sealed class ProfileStore : IDisposable
 
         if (!string.IsNullOrWhiteSpace(fileName))
         {
-            var nextFile = NormalizeProfileFileName(fileName, profile.Uid);
+            var nextFile = ProfileService.NormalizeProfileFileName(fileName, profile.Uid);
             if (!string.Equals(profile.File, nextFile, StringComparison.OrdinalIgnoreCase))
             {
                 RenameProfileFile(profile.File, nextFile);
@@ -324,24 +324,6 @@ public sealed class ProfileStore : IDisposable
 
         Directory.CreateDirectory(Path.GetDirectoryName(nextPath)!);
         File.Move(oldPath, nextPath, overwrite: true);
-    }
-
-    private static string NormalizeProfileFileName(string? fileName, string uid)
-    {
-        fileName = string.IsNullOrWhiteSpace(fileName) ? $"{uid}.yaml" : Path.GetFileName(fileName.Trim());
-        foreach (var invalid in Path.GetInvalidFileNameChars())
-        {
-            fileName = fileName.Replace(invalid, '_');
-        }
-
-        var extension = Path.GetExtension(fileName);
-        if (!extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) &&
-            !extension.Equals(".yml", StringComparison.OrdinalIgnoreCase))
-        {
-            fileName += ".yaml";
-        }
-
-        return string.IsNullOrWhiteSpace(fileName) ? $"{uid}.yaml" : fileName;
     }
 
     private static string? NormalizeAgeSecretKey(string? ageSecretKey)

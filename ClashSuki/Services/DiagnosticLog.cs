@@ -213,7 +213,7 @@ public static class DiagnosticLog
         }
     }
 
-    private static string NormalizeLevel(string? level)
+    internal static string NormalizeLevel(string? level)
     {
         var value = string.IsNullOrWhiteSpace(level) ? "INFO" : level.Trim().ToUpperInvariant();
         return value switch
@@ -227,7 +227,7 @@ public static class DiagnosticLog
         };
     }
 
-    private static string NormalizeSource(string? source)
+    internal static string NormalizeSource(string? source)
     {
         if (string.IsNullOrWhiteSpace(source))
         {
@@ -267,7 +267,7 @@ public static class DiagnosticLog
         return value;
     }
 
-    private static string NormalizeMessage(string? message) =>
+    internal static string NormalizeMessage(string? message) =>
         (message ?? "").ReplaceLineEndings(" ").Trim();
 
     private static string NormalizeDetails(string? details) =>

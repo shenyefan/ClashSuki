@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -14,9 +13,6 @@ namespace ClashSuki.Services;
 /// </summary>
 public sealed class ProfileService : IDisposable
 {
-    // ── 默认 User-Agent，与 mihomo core 保持一致 ──
-    private const string DefaultUserAgent = "clash.meta";
-
     // ── subscription-userinfo 头解析正则 ──
     private static readonly Regex SubInfoRegex = new(
         @"(\w+)=(\d+)",
@@ -28,16 +24,11 @@ public sealed class ProfileService : IDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    // 直连用 HttpClient（禁用系统代理）
-    private readonly HttpClient _directClient = new(
-        new HttpClientHandler { UseProxy = false }, disposeHandler: true)
-    {
-        Timeout = Timeout.InfiniteTimeSpan
-    };
+    private readonly RemoteResourceFetchService _fetch = new();
 
     public void Dispose()
     {
-        _directClient.Dispose();
+        _fetch.Dispose();
     }
 
     // ──────────────────────────────────────────────
@@ -94,7 +85,13 @@ public sealed class ProfileService : IDisposable
         }
 
         // 三级代理回退：直连 → 本地 mixed 代理 → 失败
-        var (content, headers) = await TryDownloadWithFallbackAsync(profile, mixedPort, cancellationToken);
+        var fetchResult = await _fetch.FetchWithHeadersAsync(
+            url,
+            RemoteFetchRequest.Create(profile.UserAgent, profile.AuthToken),
+            mixedPort,
+            cancellationToken);
+        var content = fetchResult.Content;
+        var headers = fetchResult.Headers;
         content = await DecryptAgeContentIfNeededAsync(content, profile.AgeSecretKey, cancellationToken);
 
         // 解析 subscription-userinfo
@@ -203,116 +200,6 @@ public sealed class ProfileService : IDisposable
     // ──────────────────────────────────────────────
     // 私有辅助
     // ──────────────────────────────────────────────
-
-    private async Task<(string Content, Dictionary<string, string> Headers)> TryDownloadWithFallbackAsync(
-        ProfileItem profile,
-        int? mixedPort,
-        CancellationToken cancellationToken)
-    {
-        var url = profile.Url ?? throw new ArgumentException("订阅 URL 不能为空。");
-        var settings = await AppSettingsService.LoadAsync(cancellationToken);
-        var timeout = TimeSpan.FromSeconds(Math.Max(1, settings.SubscriptionTimeout));
-        var userAgent = EffectiveUserAgent(profile, settings);
-        var useProxy = settings.ProfileUseProxy;
-        Exception? lastError = null;
-
-        foreach (var candidate in GitHubProxyUrlService.BuildCandidates(url, settings))
-        {
-            if (!useProxy)
-            {
-                try
-                {
-                    return await FetchWithClientAsync(
-                        _directClient,
-                        candidate,
-                        userAgent,
-                        profile.AuthToken,
-                        timeout,
-                        cancellationToken);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    lastError = ex;
-                }
-            }
-
-            if (!mixedPort.HasValue)
-            {
-                continue;
-            }
-
-            try
-            {
-                using var proxyHandler = new HttpClientHandler
-                {
-                    Proxy = new System.Net.WebProxy($"http://127.0.0.1:{mixedPort}"),
-                    UseProxy = true
-                };
-                using var proxyClient = new HttpClient(proxyHandler)
-                {
-                    Timeout = Timeout.InfiniteTimeSpan
-                };
-                return await FetchWithClientAsync(
-                    proxyClient,
-                    candidate,
-                    userAgent,
-                    profile.AuthToken,
-                    timeout,
-                    cancellationToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                lastError = ex;
-            }
-        }
-
-        if (!mixedPort.HasValue && useProxy)
-        {
-            throw new InvalidOperationException("未获取到 mixed-port，无法通过代理下载订阅");
-        }
-
-        throw new InvalidOperationException("订阅下载失败", lastError);
-    }
-
-    private static string EffectiveUserAgent(ProfileItem profile, AppSettings settings) =>
-        !string.IsNullOrWhiteSpace(profile.UserAgent)
-            ? profile.UserAgent.Trim()
-            : string.IsNullOrWhiteSpace(settings.UserAgent)
-                ? DefaultUserAgent
-                : settings.UserAgent.Trim();
-
-    private static async Task<(string Content, Dictionary<string, string> Headers)> FetchWithClientAsync(
-        HttpClient client,
-        string url,
-        string? userAgent,
-        string? authToken,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.TryAddWithoutValidation("User-Agent", userAgent ?? DefaultUserAgent);
-        request.Headers.TryAddWithoutValidation("Accept", "*/*");
-        request.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
-        if (!string.IsNullOrWhiteSpace(authToken))
-        {
-            request.Headers.TryAddWithoutValidation("Authorization", authToken);
-        }
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-        using var response = await client.SendAsync(request, timeoutCts.Token);
-        response.EnsureSuccessStatusCode();
-
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, values) in response.Headers)
-            headers[key] = string.Join(", ", values);
-        foreach (var (key, values) in response.Content.Headers)
-            headers[key] = string.Join(", ", values);
-
-        return (content, headers);
-    }
 
     private static async Task<string> DecryptAgeContentIfNeededAsync(
         string content,
@@ -555,7 +442,7 @@ public sealed class ProfileService : IDisposable
         }
     }
 
-    private static string NormalizeProfileFileName(string? fileName, string uid)
+    internal static string NormalizeProfileFileName(string? fileName, string uid)
     {
         fileName = string.IsNullOrWhiteSpace(fileName) ? $"{uid}.yaml" : Path.GetFileName(fileName.Trim());
         foreach (var invalid in Path.GetInvalidFileNameChars())
@@ -577,7 +464,7 @@ public sealed class ProfileService : IDisposable
     /// 解析 subscription-userinfo 响应头。
     /// 格式：upload=1234567; download=2345678; total=10000000000; expire=1735689600
     /// </summary>
-    private static ProfileExtra? ParseSubscriptionInfo(Dictionary<string, string> headers)
+    private static ProfileExtra? ParseSubscriptionInfo(IReadOnlyDictionary<string, string> headers)
     {
         if (!headers.TryGetValue("subscription-userinfo", out var info))
         {

@@ -5,7 +5,21 @@ namespace ClashSuki.Services;
 public sealed record RemoteFetchRequest(
     string? UserAgent = null,
     string? AuthToken = null,
-    int? TimeoutSeconds = null);
+    int? TimeoutSeconds = null)
+{
+    public static RemoteFetchRequest Create(
+        string? userAgent,
+        string? authToken,
+        int? timeoutSeconds = null) =>
+        new(
+            string.IsNullOrWhiteSpace(userAgent) ? null : userAgent.Trim(),
+            string.IsNullOrWhiteSpace(authToken) ? null : authToken.Trim(),
+            timeoutSeconds);
+}
+
+public sealed record RemoteFetchResult(
+    string Content,
+    IReadOnlyDictionary<string, string> Headers);
 
 public sealed class RemoteResourceFetchService : IDisposable
 {
@@ -21,6 +35,16 @@ public sealed class RemoteResourceFetchService : IDisposable
     public void Dispose() => _directClient.Dispose();
 
     public async Task<string> FetchAsync(
+        string url,
+        RemoteFetchRequest request,
+        int? mixedPort,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await FetchWithHeadersAsync(url, request, mixedPort, cancellationToken);
+        return result.Content;
+    }
+
+    public async Task<RemoteFetchResult> FetchWithHeadersAsync(
         string url,
         RemoteFetchRequest request,
         int? mixedPort,
@@ -56,7 +80,7 @@ public sealed class RemoteResourceFetchService : IDisposable
         throw lastError ?? new InvalidOperationException("远程下载失败。");
     }
 
-    private async Task<string> TryDownloadWithFallbackAsync(
+    private async Task<RemoteFetchResult> TryDownloadWithFallbackAsync(
         string url,
         RemoteFetchRequest request,
         int? mixedPort,
@@ -74,14 +98,13 @@ public sealed class RemoteResourceFetchService : IDisposable
         {
             try
             {
-                var (content, _) = await FetchWithClientAsync(
+                return await FetchWithClientAsync(
                     _directClient,
                     url,
                     userAgent,
                     request.AuthToken,
                     timeout,
                     cancellationToken);
-                return content;
             }
             catch (Exception ex) when (
                 ex is not OperationCanceledException &&
@@ -104,14 +127,13 @@ public sealed class RemoteResourceFetchService : IDisposable
         {
             Timeout = timeout
         };
-        var (proxyContent, _) = await FetchWithClientAsync(
+        return await FetchWithClientAsync(
             proxyClient,
             url,
             userAgent,
             request.AuthToken,
             timeout,
             cancellationToken);
-        return proxyContent;
     }
 
     private static string EffectiveUserAgent(string? userAgent, AppSettings settings) =>
@@ -121,7 +143,7 @@ public sealed class RemoteResourceFetchService : IDisposable
                 ? DefaultUserAgent
                 : settings.UserAgent.Trim();
 
-    private static async Task<(string Content, Dictionary<string, string> Headers)> FetchWithClientAsync(
+    private static async Task<RemoteFetchResult> FetchWithClientAsync(
         HttpClient client,
         string url,
         string userAgent,
@@ -155,6 +177,6 @@ public sealed class RemoteResourceFetchService : IDisposable
             headers[key] = string.Join(", ", values);
         }
 
-        return (content, headers);
+        return new RemoteFetchResult(content, headers);
     }
 }
