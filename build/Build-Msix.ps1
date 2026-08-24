@@ -98,8 +98,6 @@ $arguments = @(
     "/p:Configuration=$Configuration"
     "/p:Platform=$Platform"
     "/p:GenerateAppxPackageOnBuild=true"
-    # WAP 负责此构建的打包；主项目的 MSIX tooling 仅用于无包发布生成 PRI。
-    "/p:EnableMsixTooling=false"
 )
 
 if ([string]::IsNullOrWhiteSpace($CertificatePath))

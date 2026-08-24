@@ -57,6 +57,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ClashSuki\ClashSuki.csproj">
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+      <AdditionalProperties>EnableMsixTooling=false</AdditionalProperties>
       <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
     </ProjectReference>
     <ProjectReference Include="..\ClashSuki.Service\ClashSuki.Service.csproj">
@@ -82,4 +83,24 @@
     </ItemGroup>
   </Target>
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
+  <!--
+    The entry-point project also supports unpackaged publishing, so its MSIX tooling
+    must stay enabled when it is built directly to produce the WinUI PRI index. WAP
+    publish disables that tooling to avoid a second package, then merges the PRI that
+    this normal project build produces into the package PRI.
+  -->
+  <Target Name="BeforeGenerateProjectPriFile">
+    <MSBuild Projects="..\ClashSuki\ClashSuki.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=win-$(Platform);GenerateAppxPackageOnBuild=false;EnableMsixTooling=true">
+      <Output TaskParameter="TargetOutputs" ItemName="_EntryPointTargetOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <_EntryPointPri Include="@(_EntryPointTargetOutput->'%(RootDir)%(Directory)%(Filename).pri')" />
+      <_EntryPointPri Remove="@(_EntryPointPri)" Condition="!Exists('%(_EntryPointPri.FullPath)')" />
+      <_PriFile Include="@(_EntryPointPri)" />
+    </ItemGroup>
+    <Error Condition="'@(_EntryPointPri)' == ''"
+           Text="The entry-point WinUI PRI index was not generated." />
+  </Target>
 </Project>
