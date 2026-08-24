@@ -163,10 +163,6 @@ try
         "ClashSuki\ClashSuki.exe"
         "ClashSuki\ClashSuki.deps.json"
         "ClashSuki\ClashSuki.runtimeconfig.json"
-        "ClashSuki\coreclr.dll"
-        "ClashSuki\hostfxr.dll"
-        "ClashSuki\hostpolicy.dll"
-        "ClashSuki\System.Private.CoreLib.dll"
         "ClashSuki.Service\ClashSuki.Service.exe"
         "ClashSuki.Repair\ClashSuki.Repair.exe"
     ) + @($payloadManifest.RuntimeAssets | ForEach-Object { "ClashSuki\$_" }) + $requiredVisualAssetEntries
@@ -210,6 +206,23 @@ try
     if ($missingFrameworkDependencies.Count -gt 0)
     {
         throw "MSIX 未声明官方框架依赖：$($missingFrameworkDependencies -join '、')"
+    }
+
+    $embeddedDotNetRuntimeNames = @(
+        "clrjit.dll"
+        "coreclr.dll"
+        "hostfxr.dll"
+        "hostpolicy.dll"
+        "mscordaccore.dll"
+        "mscordbi.dll"
+        "System.Private.CoreLib.dll"
+    )
+    $embeddedDotNetRuntimeEntries = @($packageEntries | Where-Object {
+        [System.IO.Path]::GetFileName($_) -in $embeddedDotNetRuntimeNames
+    })
+    if ($embeddedDotNetRuntimeEntries.Count -gt 0)
+    {
+        throw "MSIX 应使用框架依赖发布，不得内置 .NET 运行时：$($embeddedDotNetRuntimeEntries -join '、')"
     }
 
     $rootAssetEntries = @($packageEntries | Where-Object {
