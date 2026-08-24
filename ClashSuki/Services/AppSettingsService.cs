@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ClashSuki.ServiceContract;
 using ClashSuki.Utilities;
 
 namespace ClashSuki.Services;
@@ -390,15 +391,7 @@ public static class AppSettingsService
         settings.GistAgeSecretKey = settings.GistAgeSecretKey?.Trim() ?? "";
         settings.GitHubToken = settings.GitHubToken?.Trim() ?? "";
         settings.GistId = settings.GistId?.Trim() ?? "";
-        settings.MihomoCpuPriority = settings.MihomoCpuPriority?.Trim().ToLowerInvariant() switch
-        {
-            "idle" => "idle",
-            "below_normal" => "below_normal",
-            "above_normal" => "above_normal",
-            "high" => "high",
-            "real_time" => "real_time",
-            _ => "normal"
-        };
+        settings.MihomoCpuPriority = CoreProcessSettings.NormalizePriority(settings.MihomoCpuPriority);
         settings.CoreReleaseChannel = settings.CoreReleaseChannel?.Trim().ToLowerInvariant() switch
         {
             "preview" => "preview",

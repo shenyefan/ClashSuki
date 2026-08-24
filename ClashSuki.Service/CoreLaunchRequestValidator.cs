@@ -12,7 +12,7 @@ internal sealed class CoreLaunchRequestValidator(ServiceRuntimeContext runtimeCo
         var controlPipePath = string.IsNullOrWhiteSpace(request.CoreIpcPath)
             ? ServiceProtocol.CoreControlPipePath
             : request.CoreIpcPath.Trim();
-        var priority = NormalizePriority(request.CorePriority);
+        var priority = CoreProcessSettings.NormalizePriority(request.CorePriority);
 
         if (!File.Exists(corePath))
         {
@@ -74,17 +74,6 @@ internal sealed class CoreLaunchRequestValidator(ServiceRuntimeContext runtimeCo
 
         return new CoreLaunchOptions(corePath, configPath, configDirectory, controlPipePath, priority);
     }
-
-    public static string NormalizePriority(string? priority) =>
-        priority?.Trim().ToLowerInvariant() switch
-        {
-            "idle" => "idle",
-            "below_normal" => "below_normal",
-            "above_normal" => "above_normal",
-            "high" => "high",
-            "real_time" => "real_time",
-            _ => "normal"
-        };
 
     private static string NormalizeRequiredPath(string? path, string displayName)
     {

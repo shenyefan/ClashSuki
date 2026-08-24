@@ -3,7 +3,11 @@ using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Services;
 
-public static class PackagedServiceController
+/// <summary>
+/// Controls the Windows service selected for the current distribution mode.
+/// Installation and repair belong to ClashSuki.Repair, not to this controller.
+/// </summary>
+public static class ClashSukiServiceController
 {
     public static string ServiceName => PackageIdentityService.IsPackaged
         ? ServiceProtocol.ServiceName

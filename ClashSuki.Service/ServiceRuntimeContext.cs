@@ -7,15 +7,12 @@ namespace ClashSuki.Service;
 
 internal sealed class ServiceRuntimeContext
 {
-    internal const string PortableRegistrationFileName = "portable-service.json";
-    private const int PortableRegistrationSchemaVersion = 1;
-
     private ServiceRuntimeContext(
         bool isPortable,
         string serviceName,
         string pipeName,
         string corePath,
-        PortableServiceRegistration? portableRegistration)
+        PortableServiceConfiguration.Registration? portableRegistration)
     {
         IsPortable = isPortable;
         ServiceName = serviceName;
@@ -32,7 +29,7 @@ internal sealed class ServiceRuntimeContext
 
     public string CorePath { get; }
 
-    public PortableServiceRegistration? PortableRegistration { get; }
+    public PortableServiceConfiguration.Registration? PortableRegistration { get; }
 
     public static ServiceRuntimeContext Create(IReadOnlyList<string> args)
     {
@@ -74,17 +71,6 @@ internal sealed class ServiceRuntimeContext
         return result;
     }
 
-    public static string GetPortableServiceDirectory()
-    {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        if (string.IsNullOrWhiteSpace(programFiles))
-        {
-            throw new InvalidOperationException("无法确定 Program Files 目录。");
-        }
-
-        return Path.GetFullPath(Path.Combine(programFiles, "ClashSuki", "PortableService"));
-    }
-
     private static ServiceRuntimeContext CreateMsix()
     {
         var corePath = Path.GetFullPath(Path.Combine(
@@ -105,9 +91,9 @@ internal sealed class ServiceRuntimeContext
 
     private static ServiceRuntimeContext CreatePortable()
     {
-        var expectedDirectory = GetPortableServiceDirectory();
+        var expectedDirectory = PortableServiceConfiguration.GetInstallDirectory();
         var actualDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        if (!PathsEqual(actualDirectory, expectedDirectory))
+        if (!PortableServiceConfiguration.PathsEqual(actualDirectory, expectedDirectory))
         {
             throw new InvalidOperationException(
                 $"便携服务只能从受保护目录启动：{expectedDirectory}");
@@ -115,8 +101,8 @@ internal sealed class ServiceRuntimeContext
 
         EnsurePortableDirectoryIsProtected(actualDirectory);
 
-        var registrationPath = Path.Combine(actualDirectory, PortableRegistrationFileName);
-        var registration = JsonSerializer.Deserialize<PortableServiceRegistration>(
+        var registrationPath = Path.Combine(actualDirectory, PortableServiceConfiguration.RegistrationFileName);
+        var registration = JsonSerializer.Deserialize<PortableServiceConfiguration.Registration>(
                                File.ReadAllText(registrationPath))
                            ?? throw new InvalidDataException("便携服务注册信息无效。");
         registration.Validate();
@@ -182,61 +168,4 @@ internal sealed class ServiceRuntimeContext
         }
     }
 
-    internal static bool PathsEqual(string left, string right) =>
-        string.Equals(
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(left)),
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(right)),
-            StringComparison.OrdinalIgnoreCase);
-
-    internal sealed class PortableServiceRegistration
-    {
-        public int SchemaVersion { get; init; } = PortableRegistrationSchemaVersion;
-
-        public string OwnerSid { get; init; } = "";
-
-        public string DataRoot { get; init; } = "";
-
-        public string ClientPath { get; init; } = "";
-
-        public string ClientExeSha256 { get; init; } = "";
-
-        public string ClientDllSha256 { get; init; } = "";
-
-        public void Validate()
-        {
-            if (SchemaVersion != PortableRegistrationSchemaVersion)
-            {
-                throw new InvalidDataException("便携服务注册信息版本不受支持。");
-            }
-
-            _ = new SecurityIdentifier(OwnerSid);
-            ValidateAbsoluteLocalPath(DataRoot, "数据目录");
-            ValidateAbsoluteLocalPath(ClientPath, "客户端路径");
-            if (!string.Equals(Path.GetFileName(ClientPath), "ClashSuki.exe", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidDataException("便携服务客户端必须是 ClashSuki.exe。");
-            }
-
-            ValidateSha256(ClientExeSha256, "客户端 EXE");
-            ValidateSha256(ClientDllSha256, "客户端 DLL");
-        }
-
-        private static void ValidateAbsoluteLocalPath(string path, string displayName)
-        {
-            if (string.IsNullOrWhiteSpace(path) ||
-                !Path.IsPathFullyQualified(path) ||
-                Path.GetFullPath(path).StartsWith(@"\\", StringComparison.Ordinal))
-            {
-                throw new InvalidDataException($"便携服务{displayName}必须是本机绝对路径。");
-            }
-        }
-
-        private static void ValidateSha256(string value, string displayName)
-        {
-            if (value.Length != 64 || value.Any(static character => !Uri.IsHexDigit(character)))
-            {
-                throw new InvalidDataException($"便携服务{displayName}哈希无效。");
-            }
-        }
-    }
 }

@@ -9,14 +9,12 @@
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <ApplicationIcon>..\ClashSuki\Assets\Branding\logo.ico</ApplicationIcon>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
-    <InformationalVersion>2.0.0</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <Compile Include="..\ClashSuki.Service\ServiceIdentity.cs" Link="ServiceContract\ServiceIdentity.cs" />
+    <Compile Include="..\ClashSuki.Service\PortableServiceConfiguration.cs" Link="ServiceContract\PortableServiceConfiguration.cs" />
+    <Compile Include="..\ClashSuki.Service\FileIntegrity.cs" Link="ServiceContract\FileIntegrity.cs" />
   </ItemGroup>
 
 </Project>

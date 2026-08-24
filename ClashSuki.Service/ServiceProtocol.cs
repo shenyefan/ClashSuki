@@ -3,14 +3,8 @@ using System.Text.Json.Serialization;
 
 namespace ClashSuki.ServiceContract;
 
-public static class ServiceProtocol
+internal static partial class ServiceProtocol
 {
-    public const string ServiceName = "ClashSukiService";
-    public const string PipeName = "ClashSukiService";
-    public const string PortableServiceName = "ClashSukiPortableService";
-    public const string PortablePipeName = "ClashSukiPortableService";
-    public const string PortableServiceHostArgument = "--portable-service-host";
-    public const string InstallPortableServiceArgument = "--install-portable-service";
     public const string CoreControlPipePath = @"\\.\pipe\clashsuki-mihomo";
     public const int Version = 8;
     public const int MaxRequestCharacters = 128 * 1024;
@@ -28,7 +22,7 @@ public static class ServiceProtocol
     }
 }
 
-public static class ServiceCommands
+internal static class ServiceCommands
 {
     public const string Ping = "ping";
     public const string GetStatus = "get_status";
@@ -40,7 +34,7 @@ public static class ServiceCommands
     public const string StopService = "stop_service";
 }
 
-public static class FirewallRuleNames
+internal static class FirewallRuleNames
 {
     public const string Mihomo = "mihomo";
     public const string MihomoAlpha = "mihomo-alpha";

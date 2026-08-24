@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Principal;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Services;
 
@@ -64,7 +65,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         var serviceStatus = await _serviceManager.GetStatusAsync(cancellationToken);
         if (requireTun &&
             serviceStatus != MihomoServiceStatus.Ready &&
-            PackagedServiceController.IsInstalled())
+            ClashSukiServiceController.IsInstalled())
         {
             serviceStatus = await _serviceManager.EnsureReadyAsync(cancellationToken);
         }
@@ -90,7 +91,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
 
         if (requireTun &&
             serviceStatus == MihomoServiceStatus.Unavailable &&
-            PackagedServiceController.IsInstalled())
+            ClashSukiServiceController.IsInstalled())
         {
             throw new InvalidOperationException(
                 "ClashSuki 服务不可用。为避免重复启动内核，请修复服务后重试。");
@@ -314,7 +315,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         startInfo.ArgumentList.Add(AppPaths.RuntimeConfigPath);
         startInfo.ArgumentList.Add("-ext-ctl-pipe");
         startInfo.ArgumentList.Add(ControllerPipePath);
-        ClearProxyEnvironment(startInfo);
+        CoreProcessSettings.ClearProxyEnvironment(startInfo);
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         process.OutputDataReceived += (_, args) => EmitCoreLog(args.Data);
@@ -340,15 +341,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         try
         {
             var settings = await AppSettingsService.LoadAsync(CancellationToken.None);
-            process.PriorityClass = settings.MihomoCpuPriority.ToLowerInvariant() switch
-            {
-                "idle" => ProcessPriorityClass.Idle,
-                "below_normal" => ProcessPriorityClass.BelowNormal,
-                "above_normal" => ProcessPriorityClass.AboveNormal,
-                "high" => ProcessPriorityClass.High,
-                "real_time" => ProcessPriorityClass.RealTime,
-                _ => ProcessPriorityClass.Normal
-            };
+            process.PriorityClass = CoreProcessSettings.ParsePriority(settings.MihomoCpuPriority);
         }
         catch (Exception ex)
         {
@@ -425,7 +418,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add(configPath);
         startInfo.ArgumentList.Add("-t");
-        ClearProxyEnvironment(startInfo);
+        CoreProcessSettings.ClearProxyEnvironment(startInfo);
 
         using var process = Process.Start(startInfo)
                             ?? throw new InvalidOperationException("无法运行 mihomo 配置测试");
@@ -451,7 +444,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         await _lifecycleLock.WaitAsync(cancellationToken);
         try
         {
-            if (PackagedServiceController.IsInstalled())
+            if (ClashSukiServiceController.IsInstalled())
             {
                 try
                 {
@@ -642,18 +635,6 @@ public sealed class MihomoCoreManager : IAsyncDisposable
     {
         try { return process.ExitCode.ToString(); }
         catch { return "未知"; }
-    }
-
-    private static void ClearProxyEnvironment(ProcessStartInfo startInfo)
-    {
-        foreach (var name in new[]
-                 {
-                     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
-                     "http_proxy", "https_proxy", "all_proxy", "no_proxy"
-                 })
-        {
-            startInfo.Environment.Remove(name);
-        }
     }
 
     private void EmitCoreLog(string? message)

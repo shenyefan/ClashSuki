@@ -22,11 +22,6 @@
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <StartupObject>ClashSuki.Program</StartupObject>
     <ApplicationIcon>Assets\Branding\logo.ico</ApplicationIcon>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
-    <InformationalVersion>2.0.0</InformationalVersion>
-    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,7 +38,9 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
-    <Compile Include="..\Shared\ServiceProtocol.cs" Link="ServiceContract\ServiceProtocol.cs" />
+    <Compile Include="..\ClashSuki.Service\ServiceProtocol.cs" Link="ServiceContract\ServiceProtocol.cs" />
+    <Compile Include="..\ClashSuki.Service\ServiceIdentity.cs" Link="ServiceContract\ServiceIdentity.cs" />
+    <Compile Include="..\ClashSuki.Service\CoreProcessSettings.cs" Link="ServiceContract\CoreProcessSettings.cs" />
   </ItemGroup>
 
   <ItemGroup>

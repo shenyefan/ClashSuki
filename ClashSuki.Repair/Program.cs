@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using ClashSuki.ServiceContract;
 using Windows.Management.Deployment;
 
 namespace ClashSuki.Repair;
@@ -18,6 +19,11 @@ internal static class Program
     {
         try
         {
+            if (PortableServiceInstaller.IsInstallCommand(args))
+            {
+                return PortableServiceInstaller.Run(args);
+            }
+
             var options = RepairOptions.Parse(args);
             await WaitForProcessExitAsync(options.WaitProcessId, TimeSpan.FromMinutes(2));
             await RegisterPackageAsync(options.PackageFullName);
@@ -135,14 +141,14 @@ internal static class Program
     {
     }
 
-    private static void WriteLog(string level, string message, string? details = null)
+    internal static void WriteLog(string level, string message, string? details = null)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
             File.AppendAllText(
                 LogPath,
-                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [服务修复] {message.ReplaceLineEndings(" ").Trim()}{Environment.NewLine}");
+                $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] [Repair] {message.ReplaceLineEndings(" ").Trim()}{Environment.NewLine}");
             if (!string.IsNullOrWhiteSpace(details))
             {
                 File.AppendAllText(LogPath, details.TrimEnd() + Environment.NewLine);

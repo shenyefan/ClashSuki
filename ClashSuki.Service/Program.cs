@@ -1,5 +1,4 @@
 using ClashSuki.Service;
-using ClashSuki.ServiceContract;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 {
@@ -12,11 +11,6 @@ AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 
 try
 {
-    if (PortableServiceInstaller.IsInstallCommand(args))
-    {
-        return PortableServiceInstaller.Run(args);
-    }
-
     var runtimeContext = ServiceRuntimeContext.Create(args);
     var builder = Host.CreateDefaultBuilder(Array.Empty<string>())
         .UseWindowsService(options =>

@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Security.Principal;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Service;
 
@@ -75,7 +75,7 @@ internal sealed class NamedPipeClientAuthorizer(
     private bool ValidatePortableClient(string clientPath, out string reason)
     {
         var registration = runtimeContext.PortableRegistration!;
-        if (!ServiceRuntimeContext.PathsEqual(clientPath, registration.ClientPath))
+        if (!PortableServiceConfiguration.PathsEqual(clientPath, registration.ClientPath))
         {
             reason = $"便携服务客户端路径未登记：{clientPath}";
             return false;
@@ -89,11 +89,11 @@ internal sealed class NamedPipeClientAuthorizer(
         }
 
         if (!string.Equals(
-                ComputeSha256(clientPath),
+                FileIntegrity.ComputeSha256(clientPath),
                 registration.ClientExeSha256,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(
-                ComputeSha256(clientDllPath),
+                FileIntegrity.ComputeSha256(clientDllPath),
                 registration.ClientDllSha256,
                 StringComparison.OrdinalIgnoreCase))
         {
@@ -141,18 +141,6 @@ internal sealed class NamedPipeClientAuthorizer(
     private static bool IsRegularFile(string path) =>
         File.Exists(path) &&
         (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read | FileShare.Delete,
-            bufferSize: 128 * 1024,
-            FileOptions.SequentialScan);
-        return Convert.ToHexString(SHA256.HashData(stream));
-    }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

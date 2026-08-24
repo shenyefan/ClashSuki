@@ -74,7 +74,7 @@ internal sealed class ServiceCommandDispatcher(
         CancellationToken cancellationToken)
     {
         await coreSupervisor.SetPriorityAsync(
-            CoreLaunchRequestValidator.NormalizePriority(request.CorePriority),
+            CoreProcessSettings.NormalizePriority(request.CorePriority),
             cancellationToken);
         return ServiceCommandResult.Success(ServiceResponse.Success());
     }

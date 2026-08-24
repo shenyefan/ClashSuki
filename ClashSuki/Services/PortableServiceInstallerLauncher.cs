@@ -7,7 +7,7 @@ namespace ClashSuki.Services;
 
 internal static class PortableServiceInstallerLauncher
 {
-    private const string InstallerRelativePath = @"ServiceInstaller\ClashSuki.Service.exe";
+    private const string InstallerRelativePath = @"ServiceInstaller\ClashSuki.Repair.exe";
     private const int ErrorCancelled = 1223;
 
     public static async Task InstallAsync(CancellationToken cancellationToken)

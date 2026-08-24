@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ClashSuki.ServiceContract;
 
 namespace ClashSuki.Service;
 
@@ -54,7 +55,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
             startInfo.ArgumentList.Add(options.ConfigPath);
             startInfo.ArgumentList.Add("-ext-ctl-pipe");
             startInfo.ArgumentList.Add(options.ControlPipePath);
-            ClearProxyEnvironment(startInfo);
+            CoreProcessSettings.ClearProxyEnvironment(startInfo);
 
             var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             process.OutputDataReceived += OnCoreOutput;
@@ -173,15 +174,7 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
 
     private static void ApplyPriority(Process process, string priority)
     {
-        process.PriorityClass = priority switch
-        {
-            "idle" => ProcessPriorityClass.Idle,
-            "below_normal" => ProcessPriorityClass.BelowNormal,
-            "above_normal" => ProcessPriorityClass.AboveNormal,
-            "high" => ProcessPriorityClass.High,
-            "real_time" => ProcessPriorityClass.RealTime,
-            _ => ProcessPriorityClass.Normal
-        };
+        process.PriorityClass = CoreProcessSettings.ParsePriority(priority);
     }
 
     private async Task HandleCoreExitedAsync(Process process)
@@ -320,17 +313,6 @@ internal sealed class CoreProcessSupervisor(ILogger<CoreProcessSupervisor> logge
         }
     }
 
-    private static void ClearProxyEnvironment(ProcessStartInfo startInfo)
-    {
-        foreach (var name in new[]
-                 {
-                     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
-                     "http_proxy", "https_proxy", "all_proxy", "no_proxy"
-                 })
-        {
-            startInfo.Environment.Remove(name);
-        }
-    }
 }
 
 internal readonly record struct CoreProcessStatus(bool Running, int? ProcessId);

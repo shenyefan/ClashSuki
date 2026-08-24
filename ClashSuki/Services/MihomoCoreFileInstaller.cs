@@ -44,7 +44,7 @@ public static class MihomoCoreFileInstaller
         }
         catch (Exception ex) when (IsAccessDenied(ex))
         {
-            await MihomoServiceManager.ReplaceCoreFileElevatedAsync(backupPath, destinationPath, cancellationToken);
+            await ReplaceWithRequiredPrivilegesAsync(backupPath, destinationPath, cancellationToken);
         }
     }
 
@@ -121,8 +121,22 @@ public static class MihomoCoreFileInstaller
         }
         catch (Exception ex) when (IsAccessDenied(ex))
         {
-            await MihomoServiceManager.ReplaceCoreFileElevatedAsync(pendingPath, destinationPath, cancellationToken);
+            await ReplaceWithRequiredPrivilegesAsync(pendingPath, destinationPath, cancellationToken);
         }
+    }
+
+    private static async Task ReplaceWithRequiredPrivilegesAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        if (!MihomoCoreManager.IsElevated)
+        {
+            throw new UnauthorizedAccessException(
+                "无法替换内核文件。请关闭占用该文件的程序后重试。");
+        }
+
+        await ReplaceInProcessAsync(sourcePath, destinationPath, cancellationToken);
     }
 
     internal static async Task WaitForWritableAsync(string path, CancellationToken cancellationToken, int timeoutMs = 8000)

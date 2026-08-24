@@ -26,12 +26,12 @@ public sealed class MihomoServiceManager
     {
         await AppPaths.BootstrapAsync(cancellationToken);
 
-        if (!PackagedServiceController.IsInstalled())
+        if (!ClashSukiServiceController.IsInstalled())
         {
             return MihomoServiceStatus.InstallRequired;
         }
 
-        if (!PackagedServiceController.IsRunning())
+        if (!ClashSukiServiceController.IsRunning())
         {
             return MihomoServiceStatus.Stopped;
         }
@@ -45,7 +45,7 @@ public sealed class MihomoServiceManager
     {
         await AppPaths.BootstrapAsync(cancellationToken);
 
-        if (!PackagedServiceController.IsInstalled())
+        if (!ClashSukiServiceController.IsInstalled())
         {
             return MihomoServiceStatus.InstallRequired;
         }
@@ -61,11 +61,11 @@ public sealed class MihomoServiceManager
         {
             if (probe.IsReachable)
             {
-                PackagedServiceController.Restart();
+                ClashSukiServiceController.Restart();
             }
             else
             {
-                PackagedServiceController.Start();
+                ClashSukiServiceController.Start();
             }
 
             await WaitUntilReadyAsync(TimeSpan.FromSeconds(15), cancellationToken);
@@ -78,7 +78,7 @@ public sealed class MihomoServiceManager
 
         try
         {
-            PackagedServiceController.Restart();
+            ClashSukiServiceController.Restart();
             await WaitUntilReadyAsync(TimeSpan.FromSeconds(15), cancellationToken);
             return MihomoServiceStatus.Ready;
         }
@@ -104,7 +104,7 @@ public sealed class MihomoServiceManager
                 "便携版不使用应用包修复，请在虚拟网卡页面安装服务。");
         }
 
-        if (PackagedServiceController.IsRunning())
+        if (ClashSukiServiceController.IsRunning())
         {
             await StopHostAsync(cancellationToken);
         }
@@ -126,7 +126,7 @@ public sealed class MihomoServiceManager
 
     public async Task StopHostAsync(CancellationToken cancellationToken = default)
     {
-        if (!PackagedServiceController.IsRunning())
+        if (!ClashSukiServiceController.IsRunning())
         {
             return;
         }
@@ -147,7 +147,7 @@ public sealed class MihomoServiceManager
                 "WARN");
             try
             {
-                await Task.Run(PackagedServiceController.Stop, cancellationToken);
+                await Task.Run(ClashSukiServiceController.Stop, cancellationToken);
             }
             catch (Exception fallbackEx)
             {
@@ -156,21 +156,6 @@ public sealed class MihomoServiceManager
                     new AggregateException(ex, fallbackEx));
             }
         }
-    }
-
-    public static async Task ReplaceCoreFileElevatedAsync(
-        string sourcePath,
-        string destinationPath,
-        CancellationToken cancellationToken = default)
-    {
-        if (MihomoCoreManager.IsElevated)
-        {
-            await MihomoCoreFileInstaller.ReplaceInProcessAsync(sourcePath, destinationPath, cancellationToken);
-            return;
-        }
-
-        throw new UnauthorizedAccessException(
-            "无法替换内核文件。请关闭占用该文件的程序后重试。");
     }
 
     public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
@@ -188,7 +173,7 @@ public sealed class MihomoServiceManager
         }
 
         throw new TimeoutException(
-            $"服务已安装但 IPC 管道未就绪，请检查 Windows 服务 {PackagedServiceController.ServiceName}。");
+            $"服务已安装但 IPC 管道未就绪，请检查 Windows 服务 {ClashSukiServiceController.ServiceName}。");
     }
 
     public async Task StartCoreAsync(
@@ -335,7 +320,7 @@ public sealed class MihomoServiceManager
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (PackagedServiceController.IsRunning() == expectedRunning)
+            if (ClashSukiServiceController.IsRunning() == expectedRunning)
             {
                 return;
             }

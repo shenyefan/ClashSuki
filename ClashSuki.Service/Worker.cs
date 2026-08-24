@@ -57,13 +57,6 @@ internal sealed class Worker(
 
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
     {
-        if (!clientAuthorizer.IsAuthorized(pipe, out var denialReason))
-        {
-            logger.LogWarning("拒绝命名管道客户端，原因: {Reason}", denialReason);
-            await WriteResponseAsync(pipe, ServiceResponse.Failure("无权访问 ClashSuki 服务。"), stoppingToken);
-            return;
-        }
-
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
 
@@ -75,6 +68,11 @@ internal sealed class Worker(
             if (string.IsNullOrWhiteSpace(line))
             {
                 result = ServiceCommandResult.Failure("请求内容为空。");
+            }
+            else if (!clientAuthorizer.IsAuthorized(pipe, out var denialReason))
+            {
+                logger.LogWarning("拒绝命名管道客户端，原因: {Reason}", denialReason);
+                result = ServiceCommandResult.Failure("无权访问 ClashSuki 服务。");
             }
             else
             {
