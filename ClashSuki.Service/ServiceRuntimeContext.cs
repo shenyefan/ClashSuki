@@ -9,13 +9,11 @@ internal sealed class ServiceRuntimeContext
 {
     private ServiceRuntimeContext(
         bool isPortable,
-        string serviceName,
         string pipeName,
         string corePath,
         PortableServiceConfiguration.Registration? portableRegistration)
     {
         IsPortable = isPortable;
-        ServiceName = serviceName;
         PipeName = pipeName;
         CorePath = Path.GetFullPath(corePath);
         PortableRegistration = portableRegistration;
@@ -23,19 +21,17 @@ internal sealed class ServiceRuntimeContext
 
     public bool IsPortable { get; }
 
-    public string ServiceName { get; }
-
     public string PipeName { get; }
 
     public string CorePath { get; }
 
     public PortableServiceConfiguration.Registration? PortableRegistration { get; }
 
-    public static ServiceRuntimeContext Create(IReadOnlyList<string> args)
+    public static string GetServiceName(IReadOnlyList<string> args)
     {
         if (args.Count == 0)
         {
-            return CreateMsix();
+            return ServiceProtocol.ServiceName;
         }
 
         if (args.Count == 1 &&
@@ -44,11 +40,19 @@ internal sealed class ServiceRuntimeContext
                 ServiceProtocol.PortableServiceHostArgument,
                 StringComparison.Ordinal))
         {
-            return CreatePortable();
+            return ServiceProtocol.PortableServiceName;
         }
 
         throw new InvalidOperationException("服务宿主参数无效。");
     }
+
+    public static ServiceRuntimeContext Create(IReadOnlyList<string> args) =>
+        string.Equals(
+            GetServiceName(args),
+            ServiceProtocol.PortableServiceName,
+            StringComparison.Ordinal)
+            ? CreatePortable()
+            : CreateMsix();
 
     public IReadOnlySet<string> GetTrustedMsixClientPaths()
     {
@@ -83,7 +87,6 @@ internal sealed class ServiceRuntimeContext
         EnsureCoreExists(corePath);
         return new ServiceRuntimeContext(
             isPortable: false,
-            ServiceProtocol.ServiceName,
             ServiceProtocol.PipeName,
             corePath,
             portableRegistration: null);
@@ -111,7 +114,6 @@ internal sealed class ServiceRuntimeContext
         EnsureCoreExists(corePath);
         return new ServiceRuntimeContext(
             isPortable: true,
-            ServiceProtocol.PortableServiceName,
             ServiceProtocol.PortablePipeName,
             corePath,
             registration);
@@ -144,9 +146,10 @@ internal sealed class ServiceRuntimeContext
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null).Value
         };
         const FileSystemRights writeRights =
-            FileSystemRights.Write |
-            FileSystemRights.Modify |
-            FileSystemRights.FullControl |
+            FileSystemRights.WriteData |
+            FileSystemRights.AppendData |
+            FileSystemRights.WriteExtendedAttributes |
+            FileSystemRights.WriteAttributes |
             FileSystemRights.Delete |
             FileSystemRights.DeleteSubdirectoriesAndFiles |
             FileSystemRights.ChangePermissions |

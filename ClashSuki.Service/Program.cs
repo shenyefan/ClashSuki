@@ -11,29 +11,27 @@ AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 
 try
 {
-    var runtimeContext = ServiceRuntimeContext.Create(args);
-    var builder = Host.CreateDefaultBuilder(Array.Empty<string>())
-        .UseWindowsService(options =>
-        {
-            options.ServiceName = runtimeContext.ServiceName;
-        })
-        .ConfigureLogging(logging =>
-        {
-            logging.AddEventLog(settings =>
-            {
-                settings.SourceName = runtimeContext.ServiceName;
-            });
-        })
-        .ConfigureServices(services =>
-        {
-            services.AddSingleton(runtimeContext);
-            services.AddSingleton<CoreProcessSupervisor>();
-            services.AddSingleton<CoreLaunchRequestValidator>();
-            services.AddSingleton<WindowsFirewallManager>();
-            services.AddSingleton<NamedPipeClientAuthorizer>();
-            services.AddSingleton<ServiceCommandDispatcher>();
-            services.AddHostedService<Worker>();
-        });
+    var serviceName = ServiceRuntimeContext.GetServiceName(args);
+    var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+    {
+        Args = Array.Empty<string>(),
+        ContentRootPath = AppContext.BaseDirectory
+    });
+    builder.Services.AddWindowsService(options =>
+    {
+        options.ServiceName = serviceName;
+    });
+    builder.Logging.AddEventLog(settings =>
+    {
+        settings.SourceName = serviceName;
+    });
+    builder.Services.AddSingleton(_ => ServiceRuntimeContext.Create(args));
+    builder.Services.AddSingleton<CoreProcessSupervisor>();
+    builder.Services.AddSingleton<CoreLaunchRequestValidator>();
+    builder.Services.AddSingleton<WindowsFirewallManager>();
+    builder.Services.AddSingleton<NamedPipeClientAuthorizer>();
+    builder.Services.AddSingleton<ServiceCommandDispatcher>();
+    builder.Services.AddHostedService<Worker>();
 
     await builder.Build().RunAsync();
     return 0;
