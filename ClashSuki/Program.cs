@@ -8,7 +8,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        var ownsPrimaryInstance = false;
+        var ownsPortableInstanceLock = false;
         try
         {
             WriteStartupCheckpoint(
@@ -18,13 +18,17 @@ public static class Program
             WinRT.ComWrappersSupport.InitializeComWrappers();
             WriteStartupCheckpoint("WinRT COM 包装器初始化完成");
 
-            if (!AppLifetimeGuard.TryAcquire())
+            if (!PackageIdentityService.IsPackaged)
             {
-                WriteStartupCheckpoint("检测到已有实例，本次启动直接退出");
-                return 0;
+                if (!PortableInstanceGuard.TryAcquire())
+                {
+                    WriteStartupCheckpoint("检测到已有便携版实例，本次启动直接退出");
+                    return 0;
+                }
+
+                ownsPortableInstanceLock = true;
             }
 
-            ownsPrimaryInstance = true;
             WriteStartupCheckpoint("即将启动 WinUI XAML");
 
             Microsoft.UI.Xaml.Application.Start(_ =>
@@ -60,9 +64,9 @@ public static class Program
         }
         finally
         {
-            if (ownsPrimaryInstance)
+            if (ownsPortableInstanceLock)
             {
-                AppLifetimeGuard.Release();
+                PortableInstanceGuard.Release();
             }
         }
     }

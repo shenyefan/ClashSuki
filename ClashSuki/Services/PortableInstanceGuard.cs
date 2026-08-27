@@ -2,11 +2,8 @@ using System.Security.Principal;
 
 namespace ClashSuki.Services;
 
-internal static class AppLifetimeGuard
+internal static class PortableInstanceGuard
 {
-    // MSIX and Portable builds share config, ports and service state. A user-scoped
-    // global lock prevents every distribution and Windows session from running a
-    // second owner; it intentionally performs no activation or window IPC.
     private static readonly string MutexName =
         $@"Global\ClashSuki.SingleInstance.{GetCurrentUserSid()}";
 
@@ -42,7 +39,7 @@ internal static class AppLifetimeGuard
             DiagnosticLog.WriteAppException(
                 "STARTUP-GUARD",
                 ex,
-                "释放应用生命周期锁失败",
+                "释放便携版单实例锁失败",
                 "WARN");
         }
         finally
