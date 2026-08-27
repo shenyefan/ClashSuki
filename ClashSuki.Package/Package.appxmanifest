@@ -4,15 +4,14 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
-  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="mp uap uap5 uap10 desktop6 rescap">
+  IgnorableNamespaces="mp uap uap5 desktop6 rescap">
 
   <Identity
     Name="ClashSuki"
     Publisher="CN=shenyefan"
-    Version="2.1.12.0" />
+    Version="2.2.2.0" />
 
   <mp:PhoneIdentity PhoneProductId="7b1b3221-30d4-46df-aa3d-96c4f42d2bca" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
@@ -33,11 +32,7 @@
   </Resources>
 
   <Applications>
-    <Application
-      Id="App"
-      Executable="ClashSuki\ClashSuki.exe"
-      EntryPoint="Windows.FullTrustApplication"
-      uap10:SupportsMultipleInstances="true">
+    <Application Id="App" Executable="ClashSuki\ClashSuki.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         AppListEntry="default"
         DisplayName="ClashSuki"

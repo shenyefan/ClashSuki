@@ -95,8 +95,6 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        SingleInstanceManager.RegisterActivateHandler(ActivateMainWindow);
-
         var dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         var dispatcher = new UiDispatcher(dispatcherQueue);
         ProxyIconLoader.Initialize(dispatcherQueue);
@@ -161,20 +159,6 @@ public partial class App : Application
         }
 
         _ = StartCoreAsync(viewModel);
-    }
-
-    internal static void ActivateMainWindow()
-    {
-        if (TrayService is not null)
-        {
-            TrayService.ShowWindow();
-            return;
-        }
-
-        if (CurrentWindow is MainWindow window)
-        {
-            window.DispatcherQueue.TryEnqueue(async () => await window.PresentAsync());
-        }
     }
 
     private async Task PrepareStartupStateAsync(MainViewModel viewModel)

@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using ClashSuki.Services;
-using ClashSuki.Utilities;
 
 namespace ClashSuki;
 
@@ -19,15 +18,13 @@ public static class Program
             WinRT.ComWrappersSupport.InitializeComWrappers();
             WriteStartupCheckpoint("WinRT COM 包装器初始化完成");
 
-            if (!SingleInstanceManager.TryAcquirePrimary())
+            if (!AppLifetimeGuard.TryAcquire())
             {
-                WriteStartupCheckpoint("检测到已有实例，正在请求激活");
-                SingleInstanceManager.RequestActivatePrimary();
+                WriteStartupCheckpoint("检测到已有实例，本次启动直接退出");
                 return 0;
             }
 
             ownsPrimaryInstance = true;
-            SingleInstanceManager.StartListening();
             WriteStartupCheckpoint("即将启动 WinUI XAML");
 
             Microsoft.UI.Xaml.Application.Start(_ =>
@@ -65,7 +62,7 @@ public static class Program
         {
             if (ownsPrimaryInstance)
             {
-                SingleInstanceManager.ReleasePrimary();
+                AppLifetimeGuard.Release();
             }
         }
     }
