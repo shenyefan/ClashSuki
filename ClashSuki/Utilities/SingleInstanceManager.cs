@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Text;
@@ -9,10 +10,13 @@ public static class SingleInstanceManager
 {
     private static readonly string InstanceScope = GetCurrentUserScope();
     private static readonly string MutexName = $@"Global\ClashSuki.SingleInstance.{InstanceScope}";
-    private static readonly string PipeName = $"ClashSuki.SingleInstance.{InstanceScope}";
+    private static readonly string SessionMarkerName = $@"Local\ClashSuki.SingleInstance.{InstanceScope}";
+    private static readonly string PipeName =
+        $"ClashSuki.SingleInstance.{InstanceScope}.{Process.GetCurrentProcess().SessionId}";
     private const string ActivateCommand = "show";
 
     private static Mutex? _mutex;
+    private static Mutex? _sessionMarker;
     private static CancellationTokenSource? _listenerCts;
     private static Action? _activateHandler;
 
@@ -29,6 +33,13 @@ public static class SingleInstanceManager
     public static bool TryAcquirePrimary()
     {
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
+        if (createdNew)
+        {
+            // This marker lets a secondary launch distinguish another window in
+            // this session from the same user's primary instance in another one.
+            _sessionMarker = new Mutex(initiallyOwned: false, SessionMarkerName);
+        }
+
         return createdNew;
     }
 
@@ -50,6 +61,8 @@ public static class SingleInstanceManager
     public static void ReleasePrimary()
     {
         StopListening();
+        _sessionMarker?.Dispose();
+        _sessionMarker = null;
 
         if (_mutex is null)
         {
@@ -78,6 +91,14 @@ public static class SingleInstanceManager
 
     public static void RequestActivatePrimary()
     {
+        if (!HasPrimaryInCurrentSession())
+        {
+            DiagnosticLog.WriteApp(
+                "STARTUP",
+                "已有实例位于其他 Windows 会话，本次启动直接退出");
+            return;
+        }
+
         for (var attempt = 0; attempt < 25; attempt++)
         {
             try
@@ -107,6 +128,23 @@ public static class SingleInstanceManager
                 Thread.Sleep(200);
             }
         }
+    }
+
+    private static bool HasPrimaryInCurrentSession()
+    {
+        // Allow a brief race while the primary creates its per-session marker.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            if (Mutex.TryOpenExisting(SessionMarkerName, out var marker))
+            {
+                marker.Dispose();
+                return true;
+            }
+
+            Thread.Sleep(20);
+        }
+
+        return false;
     }
 
     private static async Task ListenLoopAsync(CancellationToken cancellationToken)
