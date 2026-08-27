@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Security.Principal;
 using System.Text;
 using ClashSuki.Services;
 
@@ -6,13 +7,24 @@ namespace ClashSuki.Utilities;
 
 public static class SingleInstanceManager
 {
-    private const string MutexName = @"Local\ClashSuki.SingleInstance";
-    private const string PipeName = "ClashSuki.SingleInstance";
+    private static readonly string InstanceScope = GetCurrentUserScope();
+    private static readonly string MutexName = $@"Global\ClashSuki.SingleInstance.{InstanceScope}";
+    private static readonly string PipeName = $"ClashSuki.SingleInstance.{InstanceScope}";
     private const string ActivateCommand = "show";
 
     private static Mutex? _mutex;
     private static CancellationTokenSource? _listenerCts;
     private static Action? _activateHandler;
+
+    private static string GetCurrentUserScope()
+    {
+        // A Local\ mutex is isolated to one interactive logon session. Windows can
+        // start the same user's startup task again in another desktop/session, so
+        // use the user's SID to enforce one instance across those sessions without
+        // preventing a different Windows user from running their own instance.
+        return WindowsIdentity.GetCurrent().User?.Value
+               ?? throw new InvalidOperationException("无法获取当前 Windows 用户标识。");
+    }
 
     public static bool TryAcquirePrimary()
     {
