@@ -40,13 +40,15 @@
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
     <GenerateTestArtifacts>False</GenerateTestArtifacts>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <PackageCertificateThumbprint>B39032E3289393F18D34B10D2775ED127FA0068B</PackageCertificateThumbprint>
   </PropertyGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
     <Content Include="..\ClashSuki\Assets\Visuals\*.png">
-      <Link>ClashSuki\Assets\Visuals\%(Filename)%(Extension)</Link>
+      <Link>Assets\Visuals\%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
   <ItemGroup>
@@ -70,16 +72,14 @@
     </ProjectReference>
   </ItemGroup>
   <!--
-    WinUI's XAML output group is rooted at the package root, while the entry-point
-    project publish output is placed under ClashSuki\. Keep the root XBF files,
-    but remove the duplicate runtime Assets harvested from the XAML output group.
+    WinUI's XAML output group places Assets at the package root, matching the
+    portable layout and ms-appx resource URIs. Remove the duplicate copy harvested
+    from the entry-point publish directory under ClashSuki\.
   -->
-  <Target Name="RemoveDuplicateRootAppAssets"
-          AfterTargets="_RemoveAllNonWapUWPItems">
+  <Target Name="RemoveDuplicateNestedAppAssets" AfterTargets="_RemoveAllNonWapUWPItems">
     <ItemGroup>
-      <_DuplicateRootAppAsset Include="@(AppxPackagePayload)"
-                              Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(AppxPackagePayload.TargetPath)', '^Assets\\(Age|Branding|Core|Fonts|GeoData|Tray)\\', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
-      <AppxPackagePayload Remove="@(_DuplicateRootAppAsset)" />
+      <_DuplicateNestedAppAsset Include="@(AppxPackagePayload)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(AppxPackagePayload.TargetPath)', '^ClashSuki\\Assets\\', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <AppxPackagePayload Remove="@(_DuplicateNestedAppAsset)" />
     </ItemGroup>
   </Target>
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
@@ -90,9 +90,7 @@
     this normal project build produces into the package PRI.
   -->
   <Target Name="BeforeGenerateProjectPriFile">
-    <MSBuild Projects="..\ClashSuki\ClashSuki.csproj"
-             Targets="Build"
-             Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=win-$(Platform);GenerateAppxPackageOnBuild=false;EnableMsixTooling=true">
+    <MSBuild Projects="..\ClashSuki\ClashSuki.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=win-$(Platform);GenerateAppxPackageOnBuild=false;EnableMsixTooling=true">
       <Output TaskParameter="TargetOutputs" ItemName="_EntryPointTargetOutput" />
     </MSBuild>
     <ItemGroup>
@@ -100,7 +98,6 @@
       <_EntryPointPri Remove="@(_EntryPointPri)" Condition="!Exists('%(_EntryPointPri.FullPath)')" />
       <_PriFile Include="@(_EntryPointPri)" />
     </ItemGroup>
-    <Error Condition="'@(_EntryPointPri)' == ''"
-           Text="The entry-point WinUI PRI index was not generated." />
+    <Error Condition="'@(_EntryPointPri)' == ''" Text="The entry-point WinUI PRI index was not generated." />
   </Target>
 </Project>

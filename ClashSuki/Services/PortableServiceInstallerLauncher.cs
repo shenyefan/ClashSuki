@@ -18,7 +18,7 @@ internal static class PortableServiceInstallerLauncher
         }
 
         var installerPath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
+            AppPaths.DistributionRootDirectory,
             InstallerRelativePath));
         if (!File.Exists(installerPath))
         {

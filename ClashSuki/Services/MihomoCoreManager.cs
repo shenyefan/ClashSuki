@@ -108,7 +108,7 @@ public sealed class MihomoCoreManager : IAsyncDisposable
         if (!File.Exists(AppPaths.ManagedCorePath))
         {
             throw new FileNotFoundException(
-                $"找不到 mihomo 内核，请将 mihomo.exe 放到 {Path.Combine("ClashSuki", "Assets", "Core", "mihomo.exe")} 或 {AppPaths.ManagedCorePath}",
+                $"找不到 mihomo 内核，请将 mihomo.exe 放到 {Path.Combine("Assets", "Core", "mihomo.exe")} 或 {AppPaths.ManagedCorePath}",
                 AppPaths.ManagedCorePath);
         }
 

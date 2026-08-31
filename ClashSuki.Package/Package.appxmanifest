@@ -11,14 +11,14 @@
   <Identity
     Name="ClashSuki"
     Publisher="CN=shenyefan"
-    Version="2.2.3.0" />
+    Version="2.2.6.0" />
 
   <mp:PhoneIdentity PhoneProductId="7b1b3221-30d4-46df-aa3d-96c4f42d2bca" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
     <DisplayName>ClashSuki</DisplayName>
     <PublisherDisplayName>ClashSuki</PublisherDisplayName>
-    <Logo>ClashSuki\Assets\Visuals\StoreLogo.png</Logo>
+    <Logo>Assets\Visuals\StoreLogo.png</Logo>
     <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
@@ -38,10 +38,10 @@
         DisplayName="ClashSuki"
         Description="ClashSuki"
         BackgroundColor="transparent"
-        Square150x150Logo="ClashSuki\Assets\Visuals\Square150x150Logo.png"
-        Square44x44Logo="ClashSuki\Assets\Visuals\Square44x44Logo.png">
-        <uap:DefaultTile Square71x71Logo="ClashSuki\Assets\Visuals\SmallTile.png" Wide310x150Logo="ClashSuki\Assets\Visuals\WideTile.png" Square310x310Logo="ClashSuki\Assets\Visuals\LargeTile.png"/>
-        <uap:SplashScreen Image="ClashSuki\Assets\Visuals\SplashScreen.png"/>
+        Square150x150Logo="Assets\Visuals\Square150x150Logo.png"
+        Square44x44Logo="Assets\Visuals\Square44x44Logo.png">
+        <uap:DefaultTile Square71x71Logo="Assets\Visuals\SmallTile.png" Wide310x150Logo="Assets\Visuals\WideTile.png" Square310x310Logo="Assets\Visuals\LargeTile.png"/>
+        <uap:SplashScreen Image="Assets\Visuals\SplashScreen.png"/>
       </uap:VisualElements>
       <Extensions>
         <desktop6:Extension

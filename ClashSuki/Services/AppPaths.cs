@@ -21,6 +21,10 @@ public static class AppPaths
     public static string CoreDirectory { get; } = Path.Combine(DataRoot, "core");
     public static string ConfigDirectory { get; } = Path.Combine(DataRoot, "config");
     public static string LogDirectory { get; } = Path.Combine(DataRoot, "logs");
+    public static string DistributionRootDirectory { get; } = PackageIdentityService.IsPackaged
+        ? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."))
+        : Path.GetFullPath(AppContext.BaseDirectory);
+    public static string AssetsDirectory { get; } = Path.Combine(DistributionRootDirectory, "Assets");
 
     public static string ManagedCorePath { get; } = Path.Combine(CoreDirectory, "mihomo.exe");
     public static string RuntimeConfigPath { get; } = Path.Combine(ConfigDirectory, "mihomo-runtime.yaml");
@@ -95,14 +99,8 @@ public static class AppPaths
             return;
         }
 
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, "Assets", "Core", "mihomo.exe"),
-            Path.Combine(AppContext.BaseDirectory, "mihomo.exe")
-        };
-
-        var bundledCore = candidates.FirstOrDefault(File.Exists);
-        if (bundledCore is not null)
+        var bundledCore = Path.Combine(AssetsDirectory, "Core", "mihomo.exe");
+        if (File.Exists(bundledCore))
         {
             File.Copy(bundledCore, ManagedCorePath, overwrite: true);
         }
@@ -118,8 +116,7 @@ public static class AppPaths
             var candidates = new[]
             {
                 Path.Combine(DataRoot, fileName),
-                Path.Combine(AppContext.BaseDirectory, "Assets", "GeoData", fileName),
-                Path.Combine(AppContext.BaseDirectory, fileName)
+                Path.Combine(AssetsDirectory, "GeoData", fileName)
             };
 
             var destination = Path.Combine(targetDirectory, fileName);

@@ -154,7 +154,7 @@ try
         -LiteralPath (Join-Path $projectDirectory "..\ClashSuki\Assets\Visuals") `
         -Filter "*.png" `
         -File | ForEach-Object {
-            "ClashSuki\Assets\Visuals\$($_.Name)"
+            "Assets\Visuals\$($_.Name)"
         })
 
     $requiredEntries = @(
@@ -163,7 +163,7 @@ try
         "ClashSuki\ClashSuki.runtimeconfig.json"
         "ClashSuki.Service\ClashSuki.Service.exe"
         "ClashSuki.Repair\ClashSuki.Repair.exe"
-    ) + @($payloadManifest.RuntimeAssets | ForEach-Object { "ClashSuki\$_" }) + $requiredVisualAssetEntries
+    ) + @($payloadManifest.RuntimeAssets) + $requiredVisualAssetEntries
     $missingEntries = @($requiredEntries | Where-Object { -not $packageEntries.Contains($_) })
     if ($missingEntries.Count -gt 0)
     {
@@ -223,15 +223,15 @@ try
         throw "MSIX 应使用框架依赖发布，不得内置 .NET 运行时：$($embeddedDotNetRuntimeEntries -join '、')"
     }
 
-    $rootAssetEntries = @($packageEntries | Where-Object {
-        $_.StartsWith("Assets\", [System.StringComparison]::OrdinalIgnoreCase)
+    $nestedAssetEntries = @($packageEntries | Where-Object {
+        $_.StartsWith("ClashSuki\Assets\", [System.StringComparison]::OrdinalIgnoreCase)
     })
-    if ($rootAssetEntries.Count -gt 0)
+    if ($nestedAssetEntries.Count -gt 0)
     {
-        throw "MSIX 包根仍包含重复 Assets 目录：$($rootAssetEntries -join '、')"
+        throw "MSIX 的 ClashSuki 目录仍包含重复 Assets：$($nestedAssetEntries -join '、')"
     }
 
-    $forbiddenEntries = @($payloadManifest.ForbiddenRuntimeAssets | ForEach-Object { "ClashSuki\$_" })
+    $forbiddenEntries = @($payloadManifest.ForbiddenRuntimeAssets)
     $unexpectedEntries = @($forbiddenEntries | Where-Object { $packageEntries.Contains($_) })
     if ($unexpectedEntries.Count -gt 0)
     {

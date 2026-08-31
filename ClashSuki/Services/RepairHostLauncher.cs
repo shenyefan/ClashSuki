@@ -124,23 +124,19 @@ internal static class RepairHostLauncher
 
     private static string ResolvePackagedRepairHostDirectory()
     {
-        var candidates = new[]
-        {
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "ClashSuki.Repair")),
-            Path.Combine(AppContext.BaseDirectory, "ClashSuki.Repair")
-        };
-
-        return candidates.FirstOrDefault(
-                   path => File.Exists(Path.Combine(path, RepairExecutableName)))
-               ?? throw new FileNotFoundException(
-                   "找不到 ClashSuki.Repair.exe，请重新生成 MSIX。",
-                   Path.Combine(candidates[0], RepairExecutableName));
+        var directory = Path.Combine(AppPaths.DistributionRootDirectory, "ClashSuki.Repair");
+        var executablePath = Path.Combine(directory, RepairExecutableName);
+        return File.Exists(executablePath)
+            ? directory
+            : throw new FileNotFoundException(
+                "找不到 ClashSuki.Repair.exe，请重新生成 MSIX。",
+                executablePath);
     }
 
     private static string ResolvePortableRepairExecutable()
     {
         var path = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
+            AppPaths.DistributionRootDirectory,
             "ServiceInstaller",
             RepairExecutableName));
         return File.Exists(path)

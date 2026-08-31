@@ -294,8 +294,10 @@ public sealed class ProfileService : IDisposable
 
     private static string ResolveAgeExecutablePath()
     {
-        var bundled = Path.Combine(AppContext.BaseDirectory, "Assets", "Age", "age.exe");
-        return File.Exists(bundled) ? bundled : "age";
+        var bundled = Path.Combine(AppPaths.AssetsDirectory, "Age", "age.exe");
+        return File.Exists(bundled)
+            ? bundled
+            : throw new FileNotFoundException("未找到内置 age.exe。", bundled);
     }
 
     private static List<string> ParseAgeSecretKeys(string? ageSecretKey)

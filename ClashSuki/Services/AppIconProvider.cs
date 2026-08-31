@@ -15,12 +15,12 @@ public enum TrayIconState
 
 public static class AppIconProvider
 {
-    private const string LogoIconPath = "Assets/Branding/logo.ico";
-    private const string LogoImagePath = "Assets/Branding/logo.png";
-    private const string TrayDefaultIconPath = "Assets/Tray/default.ico";
-    private const string TraySystemProxyIconPath = "Assets/Tray/system-proxy.ico";
-    private const string TrayTunIconPath = "Assets/Tray/tun.ico";
-    private const string TraySystemProxyTunIconPath = "Assets/Tray/system-proxy-tun.ico";
+    private const string LogoIconPath = "Branding/logo.ico";
+    private const string LogoImagePath = "Branding/logo.png";
+    private const string TrayDefaultIconPath = "Tray/default.ico";
+    private const string TraySystemProxyIconPath = "Tray/system-proxy.ico";
+    private const string TrayTunIconPath = "Tray/tun.ico";
+    private const string TraySystemProxyTunIconPath = "Tray/system-proxy-tun.ico";
 
     public static void ApplyWindowIcon(AppWindow appWindow)
     {
@@ -66,7 +66,7 @@ public static class AppIconProvider
     private static string GetAssetPath(string relativePath)
     {
         var path = Path.Combine(
-            AppContext.BaseDirectory,
+            AppPaths.AssetsDirectory,
             relativePath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(path))
         {

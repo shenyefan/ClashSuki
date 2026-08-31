@@ -56,34 +56,19 @@ internal sealed class ServiceRuntimeContext
 
     public IReadOnlySet<string> GetTrustedMsixClientPaths()
     {
-        var serviceDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        var parent = Directory.GetParent(serviceDirectory)?.FullName;
-        var grandParent = parent is null ? null : Directory.GetParent(parent)?.FullName;
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var root in new[] { serviceDirectory, parent, grandParent })
+        return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            if (string.IsNullOrWhiteSpace(root))
-            {
-                continue;
-            }
-
-            result.Add(Path.GetFullPath(Path.Combine(root, "ClashSuki.exe")));
-            result.Add(Path.GetFullPath(Path.Combine(root, "ClashSuki", "ClashSuki.exe")));
-        }
-
-        return result;
+            Path.Combine(GetMsixPackageRoot(), "ClashSuki", "ClashSuki.exe")
+        };
     }
 
     private static ServiceRuntimeContext CreateMsix()
     {
-        var corePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "ClashSuki",
+        var corePath = Path.Combine(
+            GetMsixPackageRoot(),
             "Assets",
             "Core",
-            "mihomo.exe"));
+            "mihomo.exe");
         EnsureCoreExists(corePath);
         return new ServiceRuntimeContext(
             isPortable: false,
@@ -91,6 +76,9 @@ internal sealed class ServiceRuntimeContext
             corePath,
             portableRegistration: null);
     }
+
+    private static string GetMsixPackageRoot() =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
 
     private static ServiceRuntimeContext CreatePortable()
     {

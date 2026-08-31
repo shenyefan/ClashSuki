@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
-    <Version>2.2.3</Version>
-    <AssemblyVersion>2.2.3.0</AssemblyVersion>
-    <FileVersion>2.2.3.0</FileVersion>
-    <InformationalVersion>2.2.3</InformationalVersion>
+    <Version>2.2.6</Version>
+    <AssemblyVersion>2.2.6.0</AssemblyVersion>
+    <FileVersion>2.2.6.0</FileVersion>
+    <InformationalVersion>2.2.6</InformationalVersion>
     <SatelliteResourceLanguages>zh-CN</SatelliteResourceLanguages>
   </PropertyGroup>
 </Project>

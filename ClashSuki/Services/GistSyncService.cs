@@ -167,12 +167,8 @@ public sealed class GistSyncService
 
     private static string? ResolveAgeTool(string fileName)
     {
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, "Assets", "Age", fileName),
-            Path.Combine(AppContext.BaseDirectory, fileName)
-        };
-        return candidates.FirstOrDefault(File.Exists);
+        var path = Path.Combine(AppPaths.AssetsDirectory, "Age", fileName);
+        return File.Exists(path) ? path : null;
     }
 
     private sealed record GistRequest(
