@@ -11,11 +11,13 @@ internal sealed class ServiceRuntimeContext
         bool isPortable,
         string pipeName,
         string corePath,
+        string? packageFamilyName,
         PortableServiceConfiguration.Registration? portableRegistration)
     {
         IsPortable = isPortable;
         PipeName = pipeName;
         CorePath = Path.GetFullPath(corePath);
+        PackageFamilyName = packageFamilyName;
         PortableRegistration = portableRegistration;
     }
 
@@ -24,6 +26,8 @@ internal sealed class ServiceRuntimeContext
     public string PipeName { get; }
 
     public string CorePath { get; }
+
+    public string? PackageFamilyName { get; }
 
     public PortableServiceConfiguration.Registration? PortableRegistration { get; }
 
@@ -54,14 +58,6 @@ internal sealed class ServiceRuntimeContext
             ? CreatePortable()
             : CreateMsix();
 
-    public IReadOnlySet<string> GetTrustedMsixClientPaths()
-    {
-        return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            Path.Combine(GetMsixPackageRoot(), "ClashSuki", "ClashSuki.exe")
-        };
-    }
-
     private static ServiceRuntimeContext CreateMsix()
     {
         var corePath = Path.Combine(
@@ -74,6 +70,7 @@ internal sealed class ServiceRuntimeContext
             isPortable: false,
             ServiceProtocol.PipeName,
             corePath,
+            PackageProcessIdentity.GetCurrentFamilyName(),
             portableRegistration: null);
     }
 
@@ -104,6 +101,7 @@ internal sealed class ServiceRuntimeContext
             isPortable: true,
             ServiceProtocol.PortablePipeName,
             corePath,
+            packageFamilyName: null,
             registration);
     }
 

@@ -35,7 +35,6 @@ internal static class FirewallRuleNames
 {
     public const string Mihomo = "mihomo";
     public const string MihomoAlpha = "mihomo-alpha";
-    public const string ClashSuki = "ClashSuki";
 }
 
 public sealed class ServiceRequest

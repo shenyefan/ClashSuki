@@ -206,6 +206,24 @@ try
         throw "MSIX 未声明官方框架依赖：$($missingFrameworkDependencies -join '、')"
     }
 
+    $startupExtension = $generatedManifest.SelectSingleNode(
+        "/*[local-name()='Package']/*[local-name()='Applications']/*[local-name()='Application']/*[local-name()='Extensions']/*[local-name()='Extension'][@Category='windows.startupTask']")
+    $startupTask = if ($null -eq $startupExtension)
+    {
+        $null
+    }
+    else
+    {
+        $startupExtension.SelectSingleNode("*[local-name()='StartupTask']")
+    }
+    if ($null -eq $startupExtension -or
+        $null -eq $startupTask -or
+        -not [string]::Equals($startupExtension.Executable, "ClashSuki\ClashSuki.exe", [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not [string]::Equals($startupTask.TaskId, "ClashSukiStartup", [System.StringComparison]::Ordinal))
+    {
+        throw "MSIX 开机自启必须使用包内相对路径和稳定的 StartupTask 标识。"
+    }
+
     $embeddedDotNetRuntimeNames = @(
         "clrjit.dll"
         "coreclr.dll"

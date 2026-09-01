@@ -9,10 +9,33 @@ public static class WindowsAutoRunService
     private const string ValueName = "ClashSuki";
     private const string StartupTaskId = "ClashSukiStartup";
 
+    public static void ReconcilePackageRegistration()
+    {
+        if (!PackageIdentityService.IsPackaged)
+        {
+            return;
+        }
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            key?.DeleteValue(ValueName, throwOnMissingValue: false);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.WriteAppException(
+                LogSources.Settings,
+                ex,
+                "清理旧版开机自启注册表项失败",
+                "WARN");
+        }
+    }
+
     public static async Task<bool> IsEnabledAsync()
     {
         if (PackageIdentityService.IsPackaged)
         {
+            ReconcilePackageRegistration();
             var task = await StartupTask.GetAsync(StartupTaskId);
             return task.State is StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy;
         }
@@ -26,6 +49,7 @@ public static class WindowsAutoRunService
     {
         if (PackageIdentityService.IsPackaged)
         {
+            ReconcilePackageRegistration();
             var task = await StartupTask.GetAsync(StartupTaskId);
             if (!enabled)
             {

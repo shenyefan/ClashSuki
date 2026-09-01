@@ -55,13 +55,32 @@ internal sealed class NamedPipeClientAuthorizer(
                 return true;
             }
 
-            if (runtimeContext.GetTrustedMsixClientPaths().Contains(normalizedClientPath))
+            if (!string.Equals(
+                    Path.GetFileName(normalizedClientPath),
+                    "ClashSuki.exe",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                reason = $"拒绝包内非主程序客户端，进程标识: {processId}，路径: {normalizedClientPath}";
+                return false;
+            }
+
+            if (!PackageProcessIdentity.TryGetFamilyName(process, out var clientPackageFamilyName))
+            {
+                reason = $"拒绝没有 MSIX 包身份的客户端，进程标识: {processId}";
+                return false;
+            }
+
+            if (string.Equals(
+                    clientPackageFamilyName,
+                    runtimeContext.PackageFamilyName,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 reason = string.Empty;
                 return true;
             }
 
-            reason = $"拒绝非 ClashSuki 客户端，进程标识: {processId}，路径: {normalizedClientPath}";
+            reason = $"拒绝其他 MSIX 包的客户端，进程标识: {processId}，" +
+                     $"包系列: {clientPackageFamilyName}";
             return false;
         }
         catch (Exception ex)

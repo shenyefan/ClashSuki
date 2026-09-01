@@ -22,12 +22,10 @@ public static class WindowsFirewallService
 
     private static List<FirewallRuleRequest> ResolveRules()
     {
-        var appPath = Environment.ProcessPath;
         var candidates = new[]
         {
             (FirewallRuleNames.Mihomo, AppPaths.ManagedCorePath),
-            (FirewallRuleNames.MihomoAlpha, Path.Combine(AppPaths.CoreDirectory, "mihomo-alpha.exe")),
-            (FirewallRuleNames.ClashSuki, appPath ?? "")
+            (FirewallRuleNames.MihomoAlpha, Path.Combine(AppPaths.CoreDirectory, "mihomo-alpha.exe"))
         };
 
         return candidates

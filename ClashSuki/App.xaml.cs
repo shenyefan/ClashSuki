@@ -128,6 +128,7 @@ public partial class App : Application
             return;
         }
 
+        WindowsAutoRunService.ReconcilePackageRegistration();
         await PrepareStartupStateAsync(viewModel);
         await ApplySavedAppearanceAsync();
 

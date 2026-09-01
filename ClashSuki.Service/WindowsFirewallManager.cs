@@ -14,13 +14,13 @@ internal sealed class WindowsFirewallManager(
     private const int FirewallProtocolAny = 256;
     private const int FirewallDirectionInbound = 1;
     private const int FirewallActionAllow = 1;
+    private const string ObsoleteAppRuleName = "ClashSuki";
 
     private static readonly IReadOnlyDictionary<string, string> AllowedRuleFileNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [FirewallRuleNames.Mihomo] = "mihomo.exe",
-            [FirewallRuleNames.MihomoAlpha] = "mihomo-alpha.exe",
-            [FirewallRuleNames.ClashSuki] = "ClashSuki.exe"
+            [FirewallRuleNames.MihomoAlpha] = "mihomo-alpha.exe"
         };
 
     public void Configure(
@@ -51,6 +51,10 @@ internal sealed class WindowsFirewallManager(
                           ?? throw new InvalidOperationException("无法读取 Windows 防火墙规则集合。");
             dynamic nativeRules = rulesObject;
             var existingRuleNames = GetExistingRuleNames(rulesObject, cancellationToken);
+            if (existingRuleNames.Remove(ObsoleteAppRuleName))
+            {
+                nativeRules.Remove(ObsoleteAppRuleName);
+            }
 
             foreach (var rule in rules)
             {
@@ -114,17 +118,22 @@ internal sealed class WindowsFirewallManager(
             }
 
             var name = requestedRule.Name;
-            if (!AllowedRuleFileNames.TryGetValue(name, out var expectedFileName))
-            {
-                throw new InvalidOperationException($"不允许配置防火墙规则：{name}");
-            }
-
             if (!names.Add(name))
             {
                 throw new InvalidOperationException($"防火墙规则名称重复：{name}");
             }
 
-            var programPath = ResolveProgramPath(name, requestedRule.ProgramPath);
+            if (string.Equals(name, ObsoleteAppRuleName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!AllowedRuleFileNames.TryGetValue(name, out var expectedFileName))
+            {
+                throw new InvalidOperationException($"不允许配置防火墙规则：{name}");
+            }
+
+            var programPath = ResolveProgramPath(name);
 
             if (!string.Equals(Path.GetFileName(programPath), expectedFileName, StringComparison.OrdinalIgnoreCase))
             {
@@ -153,7 +162,7 @@ internal sealed class WindowsFirewallManager(
         return validated;
     }
 
-    private string ResolveProgramPath(string ruleName, string? requestedProgramPath)
+    private string ResolveProgramPath(string ruleName)
     {
         if (string.Equals(ruleName, FirewallRuleNames.Mihomo, StringComparison.Ordinal))
         {
@@ -165,25 +174,7 @@ internal sealed class WindowsFirewallManager(
             return Path.Combine(Path.GetDirectoryName(runtimeContext.CorePath)!, "mihomo-alpha.exe");
         }
 
-        if (runtimeContext.IsPortable)
-        {
-            return runtimeContext.PortableRegistration!.ClientPath;
-        }
-
-        if (string.IsNullOrWhiteSpace(requestedProgramPath) ||
-            !Path.IsPathFullyQualified(requestedProgramPath))
-        {
-            throw new InvalidOperationException($"防火墙程序路径必须是绝对路径：{ruleName}");
-        }
-
-        var normalizedPath = Path.GetFullPath(requestedProgramPath);
-        if (normalizedPath.StartsWith(@"\\", StringComparison.Ordinal) ||
-            !runtimeContext.GetTrustedMsixClientPaths().Contains(normalizedPath))
-        {
-            throw new InvalidOperationException($"防火墙程序路径不属于受信任的 ClashSuki 安装目录：{ruleName}");
-        }
-
-        return normalizedPath;
+        throw new InvalidOperationException($"不允许配置防火墙规则：{ruleName}");
     }
 
     private static object CreateNativeRule(Type ruleType, ValidatedFirewallRule rule)
