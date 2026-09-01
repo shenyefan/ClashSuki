@@ -42,7 +42,9 @@ internal static class PortableServiceInstaller
         PortableServicePayload.EnsureElevated();
 
         var sourceDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        var sourceExecutable = Path.Combine(sourceDirectory, "ClashSuki.Service.exe");
+        var sourceExecutable = Path.Combine(
+            sourceDirectory,
+            PortableServiceConfiguration.ServiceExecutableFileName);
         PortableServicePayload.EnsureRegularFile(sourceExecutable, "便携服务载荷");
         var sourceCorePath = Path.GetFullPath(Path.Combine(
             sourceDirectory,
@@ -55,8 +57,10 @@ internal static class PortableServiceInstaller
         var serviceDirectory = PortableServiceConfiguration.GetInstallDirectory();
         var serviceParentDirectory = Path.GetDirectoryName(serviceDirectory)
                                      ?? throw new InvalidOperationException("无法确定便携服务父目录。");
-        var installedExecutable = Path.Combine(serviceDirectory, "ClashSuki.Service.exe");
-        var imagePath = $"\"{installedExecutable}\" {ServiceProtocol.PortableServiceHostArgument}";
+        var installedExecutable = Path.Combine(
+            serviceDirectory,
+            PortableServiceConfiguration.ServiceExecutableFileName);
+        var imagePath = PortableServiceConfiguration.GetImagePath();
         Directory.CreateDirectory(serviceParentDirectory);
 
         var operationId = Guid.NewGuid().ToString("N");
@@ -119,7 +123,17 @@ internal static class PortableServiceInstaller
         {
             if (serviceCreated && service is not null)
             {
-                serviceManager.Delete(service);
+                try
+                {
+                    serviceManager.Delete(service);
+                }
+                catch (Exception deleteException)
+                {
+                    Program.WriteLog(
+                        "WARN",
+                        "安装回滚时无法删除便携服务",
+                        deleteException.ToString());
+                }
             }
 
             service?.Dispose();

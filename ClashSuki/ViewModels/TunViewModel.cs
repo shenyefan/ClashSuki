@@ -98,6 +98,32 @@ public sealed partial class TunViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private async Task UninstallPortableServiceAsync()
+    {
+        try
+        {
+            await _coordinator.UninstallPortableServiceAsync();
+            Runtime.Notifications.Success(
+                "服务已卸载",
+                source: LogSources.Service);
+        }
+        catch (OperationCanceledException)
+        {
+            Runtime.Notifications.Info(
+                "已取消服务卸载",
+                source: LogSources.Service,
+                writeLog: false);
+        }
+        catch (Exception ex)
+        {
+            Runtime.Notifications.Error(
+                "服务卸载失败",
+                source: LogSources.Service,
+                exception: ex);
+        }
+    }
+
     public async Task LoadAsync()
     {
         var settings = await _coordinator.LoadTunSettingsAsync();

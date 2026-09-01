@@ -38,6 +38,7 @@
                                 Visibility="{Binding Runtime.ShowTunServiceInstallAction, Converter={StaticResource BoolToVis}}" />
                         <ui:IconActionButton Click="RepairService_Click" Glyph="&#xE72C;" IsLoading="{Binding RepairServiceCommand.IsRunning}" Visibility="{Binding Runtime.ShowTunServiceRepairAction, Converter={StaticResource BoolToVis}}" ToolTipService.ToolTip="修复服务" />
                         <ui:IconActionButton Click="StopService_Click" Glyph="&#xE71A;" IsLoading="{Binding StopServiceCommand.IsRunning}" Visibility="{Binding Runtime.ShowTunServiceStopAction, Converter={StaticResource BoolToVis}}" ToolTipService.ToolTip="停止服务" />
+                        <ui:IconActionButton Click="UninstallService_Click" Glyph="&#xE74D;" IsLoading="{Binding UninstallPortableServiceCommand.IsRunning}" Visibility="{Binding Runtime.ShowTunServiceUninstallAction, Converter={StaticResource BoolToVis}}" ToolTipService.ToolTip="卸载服务" />
                         <ToggleSwitch MinWidth="0"
                                       Width="48"
                                       OnContent=""

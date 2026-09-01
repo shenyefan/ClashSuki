@@ -25,6 +25,11 @@ internal static class Program
                 return PortableServiceInstaller.Run(args);
             }
 
+            if (PortableServiceUninstaller.IsUninstallCommand(args))
+            {
+                return PortableServiceUninstaller.Run(args);
+            }
+
             if (LoopbackExemptionRepair.IsCommand(args))
             {
                 return await LoopbackExemptionRepair.RunAsync(args);

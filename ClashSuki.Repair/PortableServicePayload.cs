@@ -59,7 +59,7 @@ internal static class PortableServicePayload
         var principal = new WindowsPrincipal(identity);
         if (!principal.IsInRole(WindowsBuiltInRole.Administrator))
         {
-            throw new UnauthorizedAccessException("安装便携服务需要管理员权限。");
+            throw new UnauthorizedAccessException("管理便携服务需要管理员权限。");
         }
     }
 

@@ -8,4 +8,5 @@ internal static partial class ServiceProtocol
     public const string PortablePipeName = "ClashSukiPortableService";
     public const string PortableServiceHostArgument = "--portable-service-host";
     public const string InstallPortableServiceArgument = "--install-portable-service";
+    public const string UninstallPortableServiceArgument = "--uninstall-portable-service";
 }

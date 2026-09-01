@@ -4,6 +4,7 @@ namespace ClashSuki.ServiceContract;
 
 internal static class PortableServiceConfiguration
 {
+    public const string ServiceExecutableFileName = "ClashSuki.Service.exe";
     public const string RegistrationFileName = "portable-service.json";
     private const int RegistrationSchemaVersion = 1;
 
@@ -17,6 +18,10 @@ internal static class PortableServiceConfiguration
 
         return Path.GetFullPath(Path.Combine(programFiles, "ClashSuki", "PortableService"));
     }
+
+    public static string GetImagePath() =>
+        $"\"{Path.Combine(GetInstallDirectory(), ServiceExecutableFileName)}\" " +
+        ServiceProtocol.PortableServiceHostArgument;
 
     public static bool PathsEqual(string left, string right) =>
         string.Equals(

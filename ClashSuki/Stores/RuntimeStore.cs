@@ -25,6 +25,7 @@ public sealed partial class RuntimeStore : ObservableObject
     [ObservableProperty] private bool showTunServiceInstallAction;
     [ObservableProperty] private bool showTunServiceRepairAction;
     [ObservableProperty] private bool showTunServiceStopAction;
+    [ObservableProperty] private bool showTunServiceUninstallAction;
     [ObservableProperty] private bool isAllowLan;
     [ObservableProperty] private string mixedPortText = "mixed --";
     [ObservableProperty] private string apiPortText = "api 9090";
@@ -113,6 +114,7 @@ public sealed partial class RuntimeStore : ObservableObject
         ShowTunServiceInstallAction = !isPackaged && needsServiceRecovery;
         ShowTunServiceRepairAction = isPackaged;
         ShowTunServiceStopAction = status == MihomoServiceStatus.Ready;
+        ShowTunServiceUninstallAction = !isPackaged && IsTunServiceInstalled;
         TunServiceStatusText = status switch
         {
             MihomoServiceStatus.Ready => "服务已就绪",

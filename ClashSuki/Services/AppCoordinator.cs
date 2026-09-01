@@ -907,17 +907,7 @@ public sealed partial class AppCoordinator : IAsyncDisposable
         const int verifySeconds = 3;
         var verifyTimeout = TimeSpan.FromSeconds(verifySeconds);
 
-        var patch = new Dictionary<string, object?>
-        {
-            ["tun"] = new Dictionary<string, object?> { ["enable"] = enabled }
-        };
-        if (enabled)
-        {
-            patch["dns"] = new Dictionary<string, object?> { ["enable"] = true };
-        }
-
-        await YamlConfigService.PersistBasePatchAsync(patch, cancellationToken);
-        await _runtimeConfig.RebuildAsync(cancellationToken);
+        await PersistTunSettingAsync(enabled, cancellationToken);
 
         if (!enabled)
         {
@@ -967,6 +957,21 @@ public sealed partial class AppCoordinator : IAsyncDisposable
         }
 
         throw new TimeoutException("TUN 未能启动：tun.enable 仍为 false");
+    }
+
+    private async Task PersistTunSettingAsync(bool enabled, CancellationToken cancellationToken)
+    {
+        var patch = new Dictionary<string, object?>
+        {
+            ["tun"] = new Dictionary<string, object?> { ["enable"] = enabled }
+        };
+        if (enabled)
+        {
+            patch["dns"] = new Dictionary<string, object?> { ["enable"] = true };
+        }
+
+        await YamlConfigService.PersistBasePatchAsync(patch, cancellationToken);
+        await _runtimeConfig.RebuildAsync(cancellationToken);
     }
 
     private async Task<bool> WaitForTunStateAsync(bool expected, TimeSpan timeout, CancellationToken cancellationToken)

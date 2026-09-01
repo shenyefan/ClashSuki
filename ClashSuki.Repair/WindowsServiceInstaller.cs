@@ -183,7 +183,14 @@ internal sealed class WindowsServiceInstaller : IDisposable
 
     public void Delete(ServiceHandle service)
     {
-        _ = DeleteService(service);
+        if (!DeleteService(service))
+        {
+            var error = Marshal.GetLastWin32Error();
+            if (error != ErrorServiceMarkedForDelete)
+            {
+                throw new Win32Exception(error, "无法删除 ClashSuki 便携服务。");
+            }
+        }
     }
 
     private static QueriedServiceConfiguration QueryConfiguration(ServiceHandle service)
@@ -359,6 +366,7 @@ internal sealed class WindowsServiceInstaller : IDisposable
     private const int ErrorServiceAlreadyRunning = 1056;
     private const int ErrorServiceDoesNotExist = 1060;
     private const int ErrorServiceNotActive = 1062;
+    private const int ErrorServiceMarkedForDelete = 1072;
     private const int ErrorInsufficientBuffer = 122;
     private const uint DaclSecurityInformation = 0x00000004;
 

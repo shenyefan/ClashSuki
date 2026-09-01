@@ -98,6 +98,27 @@ public sealed partial class TunPage : Page
         await viewModel.RepairServiceCommand.ExecuteAsync(null);
     }
 
+    private async void UninstallService_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not TunViewModel viewModel)
+        {
+            return;
+        }
+
+        if (!await viewModel.Runtime.Notifications.ConfirmAsync(
+                XamlRoot,
+                "卸载服务",
+                "将关闭虚拟网卡，并从 Windows 删除便携服务及其受保护文件。普通代理仍可使用。",
+                "卸载",
+                "取消",
+                LogSources.Service))
+        {
+            return;
+        }
+
+        await viewModel.UninstallPortableServiceCommand.ExecuteAsync(null);
+    }
+
     private async void Tun_Toggled(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (DataContext is not TunViewModel viewModel ||

@@ -120,8 +120,18 @@ public sealed class MihomoServiceManager
         }
 
         await AppPaths.BootstrapAsync(cancellationToken);
-        await PortableServiceInstallerLauncher.InstallAsync(cancellationToken);
+        await PortableServiceMaintenanceLauncher.InstallAsync(cancellationToken);
         await WaitUntilReadyAsync(TimeSpan.FromSeconds(20), cancellationToken);
+    }
+
+    public Task UninstallPortableServiceAsync(CancellationToken cancellationToken = default)
+    {
+        if (PackageIdentityService.IsPackaged)
+        {
+            throw new InvalidOperationException("MSIX 版本由 Windows 管理服务，不能手动卸载。");
+        }
+
+        return PortableServiceMaintenanceLauncher.UninstallAsync(cancellationToken);
     }
 
     public async Task StopHostAsync(CancellationToken cancellationToken = default)
